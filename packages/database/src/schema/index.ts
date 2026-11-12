@@ -39,6 +39,8 @@ export * from "./content/homepage-versions";
 export * from "./entrepreneur/ventures";
 export * from "./entrepreneur/products";
 export * from "./entrepreneur/venture-products";
+export * from "./entrepreneur/venture-categories";
+export * from "./entrepreneur/venture-category-assignments";
 
 export * from "./artist/releases";
 export * from "./artist/release-platforms";
