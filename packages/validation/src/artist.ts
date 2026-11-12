@@ -19,7 +19,7 @@ export const releaseSchema = z.object({
   canonicalUrl: z.string().optional(),
   keywords: z.string().optional(),
   lyrics: z.string().optional(),
-  credits: z.record(z.unknown()).optional(),
+  credits: z.record(z.string(), z.unknown()).optional(),
   createdBy: uuidSchema.optional(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
@@ -40,7 +40,7 @@ export const createReleaseSchema = z.object({
   canonicalUrl: z.string().optional(),
   keywords: z.string().optional(),
   lyrics: z.string().optional(),
-  credits: z.record(z.unknown()).optional(),
+  credits: z.record(z.string(), z.unknown()).optional(),
   createdBy: uuidSchema.optional(),
 });
 
@@ -70,14 +70,14 @@ export const releaseLyricSchema = z.object({
   releaseId: uuidSchema,
   lyricsText: z.string().optional(),
   lyricsLanguage: z.string().max(10).optional(),
-  translations: z.record(z.unknown()).optional(),
+  translations: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const createReleaseLyricSchema = z.object({
   releaseId: uuidSchema,
   lyricsText: z.string().optional(),
   lyricsLanguage: z.string().max(10).optional(),
-  translations: z.record(z.unknown()).optional(),
+  translations: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const updateReleaseLyricSchema = releaseLyricSchema.partial();

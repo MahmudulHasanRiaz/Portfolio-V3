@@ -32,7 +32,7 @@ export const portalMessageSchema = z.object({
   senderType: z.enum(["admin", "client"]),
   senderId: uuidSchema,
   message: z.string(),
-  attachments: z.record(z.unknown()).optional(),
+  attachments: z.record(z.string(), z.unknown()).optional(),
   isRead: z.boolean(),
   createdAt: timestampSchema,
 });
@@ -42,7 +42,7 @@ export const createPortalMessageSchema = z.object({
   senderType: z.enum(["admin", "client"]),
   senderId: uuidSchema,
   message: z.string(),
-  attachments: z.record(z.unknown()).optional(),
+  attachments: z.record(z.string(), z.unknown()).optional(),
   isRead: z.boolean(),
 });
 

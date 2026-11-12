@@ -14,7 +14,7 @@ export const mediaAssetSchema = z.object({
   height: z.coerce.number().int().optional(),
   altText: z.string().optional(),
   folderId: uuidSchema.optional(),
-  variants: z.record(z.unknown()).optional(),
+  variants: z.record(z.string(), z.unknown()).optional(),
   uploadedBy: uuidSchema,
   createdAt: timestampSchema,
   deletedAt: timestampSchema.optional(),
@@ -30,7 +30,7 @@ export const createMediaAssetSchema = z.object({
   height: z.coerce.number().int().optional(),
   altText: z.string().optional(),
   folderId: uuidSchema.optional(),
-  variants: z.record(z.unknown()).optional(),
+  variants: z.record(z.string(), z.unknown()).optional(),
   uploadedBy: uuidSchema,
 });
 

@@ -5,6 +5,61 @@ Read this before you touch any TypeScript in this repo, especially in
 twice. This note records the failure class, the incidents, and the rule
 that prevents the next one.
 
+## V3 (2026-11-13) — this guard carries forward, deploy target changed
+
+V3 is the same monorepo rebuilt from V2 main `5d738ee` + Public main
+`c61cc057` (see `SOURCE_MANIFEST.md`). Everything below about the failure
+class, the trap, and the rule still applies — the only thing that changed
+is the deploy target: **Cloudflare (Workers + Pages), not Portainer /
+Docker.** The Docker/Portainer specifics in the sections below are V2
+history; the rule ("full local `turbo run build` passes before any PR")
+and the CI check are unchanged.
+
+- **V3 scaffold verification:** full local build
+  `npx turbo run build --concurrency=2` — **24 successful, 24 total,
+  0 cached, 1m34.986s, EXIT 0** (2026-11-13, clean state, `--force`;
+  the first clean run was 23/23 in 2m27s before `packages/artist`
+  gained its `build` script — see below). Log:
+  `~/workspace/v3-import/turbo-build-v3-final.log`. The build command
+  is exactly the Docker/CI command; the env is the placeholder set from
+  the V2 reproduce command (see "How to reproduce" below).
+- **The 83-unused-imports fix is already in this tree.** The V2 PR #106
+  fix (removing the 83 unused `drizzle-orm/pg-core` specifiers from the
+  21 schema files) is present in the imported V2 main — verified in the
+  scaffold by a mechanical audit (0 unused specifiers) and by
+  `@repo/entrepreneur` building exit 0. No tsconfig weakening was needed.
+- **TypeScript 7 peer lag.** V3 pins TypeScript 7.0.2 (the only stable
+  7.x). Three latest packages still declare peer ranges excluding TS 7
+  (`@astrojs/check` ^5||^6, `typescript-eslint` <6.1.0, `@sveltejs/kit`
+  ^6 via better-auth — TS 6 was never released). A strict `npm install`
+  therefore fails with ERESOLVE; the repo sets `legacy-peer-deps=true`
+  in `.npmrc` (see `docs/VERSIONS.md`). None of those peers is in the
+  build path. Remove the flag once they declare TS 7 support.
+- **`astro check` does not support TS 7.0.** `@astrojs/check` 0.9.12
+  refuses TS 7.0.2 outright. `astro build` does not type-check, so this
+  does not block the build — but there is currently no type-check for
+  `apps/public` until TS 7.1+ with `@astrojs/ts-content-mapper` or a
+  future `@astrojs/check`.
+- **Root tsconfig references fixed in the scaffold.** `tsconfig.json`
+  pointed at `apps/web` (dropped in V3) and `apps/dashboard` (renamed to
+  `apps/admin`), which broke Vite 7's tsconfig resolution during
+  `astro sync`. Fixed, and the four missing packages (`artist`,
+  `entrepreneur`, `media`, `workflows`) were added. `apps/public` is
+  deliberately not a project reference (Astro); `apps/public` pins Vite
+  to its own tsconfig (`vite.tsconfig` in `astro.config.mjs`).
+- **OpenNext verified in the scaffold:** `npx opennextjs-cloudflare
+  build` in `apps/admin` exits 0 (Next.js 16.4.6 +
+  @opennextjs/cloudflare 1.20.17). The admin's `build` script stays
+  `next build` — the turbo/CI gate. `apps/admin/wrangler.jsonc` +
+  `open-next.config.ts` are in the tree; before the first admin deploy,
+  create the R2 bucket `portfolio-v3-admin-opennext-cache` and set the
+  Worker secrets (`DATABASE_URL`, `BETTER_AUTH_SECRET`,
+  `BETTER_AUTH_URL`, `PUBLIC_SITE_URL`, `CACHE_INVALIDATE_SECRET`,
+  `R2_*`).
+- **CI:** `.github/workflows/ci.yml` is the same build-only PR check
+  (build command only). It cannot be pushed via the API — upload it
+  through the GitHub web UI (browser).
+
 ## The failure class
 
 **A TypeScript error in a shared package breaks the Portainer Docker build.**

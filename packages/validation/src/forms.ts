@@ -38,8 +38,8 @@ export const formFieldSchema = z.object({
   isRequired: z.boolean(),
   placeholder: z.string().optional(),
   description: z.string().optional(),
-  options: z.record(z.unknown()).optional(),
-  validationRules: z.record(z.unknown()).optional(),
+  options: z.record(z.string(), z.unknown()).optional(),
+  validationRules: z.record(z.string(), z.unknown()).optional(),
   sortOrder: z.coerce.number().int().optional(),
 });
 
@@ -50,8 +50,8 @@ export const createFormFieldSchema = z.object({
   isRequired: z.boolean(),
   placeholder: z.string().optional(),
   description: z.string().optional(),
-  options: z.record(z.unknown()).optional(),
-  validationRules: z.record(z.unknown()).optional(),
+  options: z.record(z.string(), z.unknown()).optional(),
+  validationRules: z.record(z.string(), z.unknown()).optional(),
   sortOrder: z.coerce.number().int().optional(),
 });
 
@@ -62,7 +62,7 @@ export const updateFormFieldSchema = formFieldSchema.partial();
 export const formSubmissionSchema = z.object({
   id: uuidSchema,
   formId: uuidSchema,
-  data: z.record(z.unknown()),
+  data: z.record(z.string(), z.unknown()),
   leadId: uuidSchema.optional(),
   spamScore: z.coerce.number().optional(),
   createdAt: timestampSchema,
@@ -70,7 +70,7 @@ export const formSubmissionSchema = z.object({
 
 export const createFormSubmissionSchema = z.object({
   formId: uuidSchema,
-  data: z.record(z.unknown()),
+  data: z.record(z.string(), z.unknown()),
   leadId: uuidSchema.optional(),
   spamScore: z.coerce.number().optional(),
 });

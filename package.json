@@ -1,8 +1,8 @@
 {
-  "name": "personal-brand-os",
+  "name": "portfolio-v3",
   "private": true,
   "version": "0.0.1",
-  "description": "Personal Brand OS Platform — Monorepo",
+  "description": "Portfolio V3 — Monorepo (Astro public + Hono API + Next.js admin + Portal)",
   "workspaces": [
     "apps/*",
     "packages/*",
@@ -18,14 +18,14 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\""
   },
   "devDependencies": {
-    "prettier": "^3.5.0",
-    "turbo": "^2.5.0"
+    "prettier": "^3.10.1",
+    "turbo": "^2.11.11"
   },
   "packageManager": "npm@11.13.0",
   "engines": {
     "node": ">=22.0.0"
   },
   "dependencies": {
-    "better-auth": "^1.6.16"
+    "better-auth": "^1.7.22"
   }
 }

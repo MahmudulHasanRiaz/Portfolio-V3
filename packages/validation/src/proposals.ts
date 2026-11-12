@@ -10,7 +10,7 @@ export const proposalTemplateSchema = z.object({
   clientType: z.string().optional(),
   type: z.enum(["proposal", "contract"]),
   content: z.string(),
-  variables: z.record(z.unknown()).optional(),
+  variables: z.record(z.string(), z.unknown()).optional(),
   isActive: z.boolean(),
   createdBy: uuidSchema,
   createdAt: timestampSchema,
@@ -22,7 +22,7 @@ export const createProposalTemplateSchema = z.object({
   clientType: z.string().optional(),
   type: z.enum(["proposal", "contract"]),
   content: z.string(),
-  variables: z.record(z.unknown()).optional(),
+  variables: z.record(z.string(), z.unknown()).optional(),
   isActive: z.boolean(),
   createdBy: uuidSchema,
 });

@@ -13,16 +13,16 @@
     "@repo/database": "*",
     "@repo/validation": "*",
     "@repo/shared": "*",
-    "@aws-sdk/client-s3": "^3.775.0",
-    "@aws-sdk/s3-request-presigner": "^3.775.0",
-    "sharp": "^0.34.1",
-    "mime-types": "^2.1.35",
-    "zod": "^3.24.0"
+    "@aws-sdk/client-s3": "^3.1167.0",
+    "@aws-sdk/s3-request-presigner": "^3.1167.0",
+    "sharp": "^0.35.5",
+    "mime-types": "^3.0.2",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@repo/typescript-config": "*",
     "@repo/eslint-config": "*",
-    "@types/mime-types": "^2.1.4",
-    "typescript": "^5.8.0"
+    "@types/mime-types": "^3.0.1",
+    "typescript": "^7.0.2"
   }
 }

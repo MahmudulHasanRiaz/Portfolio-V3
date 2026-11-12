@@ -15,15 +15,15 @@
   },
   "dependencies": {
     "@repo/database": "*",
-    "better-auth": "^1.6.16",
-    "drizzle-orm": "^0.45.2",
-    "postgres": "^3.4.0"
+    "better-auth": "^1.7.22",
+    "drizzle-orm": "^0.45.4",
+    "postgres": "^4.1.1"
   },
   "devDependencies": {
     "@repo/typescript-config": "*",
     "@repo/eslint-config": "*",
-    "@types/node": "^22.0.0",
-    "@types/react": "^19.0.0",
-    "typescript": "^5.8.0"
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.3.0",
+    "typescript": "^7.0.2"
   }
 }

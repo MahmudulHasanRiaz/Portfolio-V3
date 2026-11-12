@@ -95,8 +95,8 @@ export const personProfileSchema = z.object({
   website: z.string().optional(),
   resumeUrl: z.string().optional(),
   pressKitUrl: z.string().optional(),
-  socialLinks: z.record(z.unknown()).optional(),
-  streamingLinks: z.record(z.unknown()).optional(),
+  socialLinks: z.record(z.string(), z.unknown()).optional(),
+  streamingLinks: z.record(z.string(), z.unknown()).optional(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
 });
@@ -115,8 +115,8 @@ export const createPersonProfileSchema = z.object({
   website: z.string().optional(),
   resumeUrl: z.string().optional(),
   pressKitUrl: z.string().optional(),
-  socialLinks: z.record(z.unknown()).optional(),
-  streamingLinks: z.record(z.unknown()).optional(),
+  socialLinks: z.record(z.string(), z.unknown()).optional(),
+  streamingLinks: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const updatePersonProfileSchema = personProfileSchema.partial();
@@ -126,16 +126,16 @@ export const updatePersonProfileSchema = personProfileSchema.partial();
 export const developerProfileSchema = z.object({
   id: uuidSchema,
   yearsExperience: z.coerce.number().int().optional(),
-  skills: z.record(z.unknown()).optional(),
-  certifications: z.record(z.unknown()).optional(),
+  skills: z.record(z.string(), z.unknown()).optional(),
+  certifications: z.record(z.string(), z.unknown()).optional(),
   resumeText: z.string().optional(),
 });
 
 export const createDeveloperProfileSchema = z.object({
   id: uuidSchema,
   yearsExperience: z.coerce.number().int().optional(),
-  skills: z.record(z.unknown()).optional(),
-  certifications: z.record(z.unknown()).optional(),
+  skills: z.record(z.string(), z.unknown()).optional(),
+  certifications: z.record(z.string(), z.unknown()).optional(),
   resumeText: z.string().optional(),
 });
 

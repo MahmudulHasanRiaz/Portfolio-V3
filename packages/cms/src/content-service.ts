@@ -151,7 +151,9 @@ export class ContentService {
     const db = getDb();
     const { table, createSchema, authorField } = this.def;
 
-    const validated = createSchema.parse(data);
+    // Zod 4 types bare `z.ZodSchema` as unknown-output, so narrow here:
+    // every content schema in @repo/validation is an object schema.
+    const validated = createSchema.parse(data) as Record<string, unknown>;
 
     const insertData: Record<string, unknown> = {
       ...validated,
@@ -182,7 +184,7 @@ export class ContentService {
     const db = getDb();
     const { table, updateSchema } = this.def;
 
-    const validated = updateSchema.parse(data);
+    const validated = updateSchema.parse(data) as Record<string, unknown>;
 
     const existing = await this.getById(id);
     if (existing) {

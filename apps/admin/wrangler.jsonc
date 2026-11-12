@@ -1,0 +1,41 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"main": ".open-next/worker.js",
+	"name": "portfolio-v3-admin",
+	"compatibility_date": "2026-11-13",
+	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	"services": [
+		{
+			// Self-reference service binding, the service name must match the worker name
+			// see https://opennext.js.org/cloudflare/caching
+			"binding": "WORKER_SELF_REFERENCE",
+			"service": "portfolio-v3-admin"
+		}
+	],
+	"vars": {
+		// Set at deploy time (Cloudflare dashboard / `wrangler secret put`):
+		// DATABASE_URL (Neon pooled), DIRECT_DATABASE_URL (Neon direct),
+		// BETTER_AUTH_SECRET, BETTER_AUTH_URL, PUBLIC_SITE_URL,
+		// CACHE_INVALIDATE_SECRET, R2_* vars.
+		"NODE_ENV": "production"
+	},
+	"r2_buckets": [
+		// Use R2 incremental cache
+		// See https://opennext.js.org/cloudflare/caching
+		// NOTE: create this bucket before the first deploy
+		// (`wrangler r2 bucket create portfolio-v3-admin-opennext-cache`).
+		{
+			"binding": "NEXT_INC_CACHE_R2_BUCKET",
+			"bucket_name": "portfolio-v3-admin-opennext-cache"
+		}
+	],
+	"images": {
+		// Enable image optimization
+		// see https://opennext.js.org/cloudflare/howtos/image
+		"binding": "IMAGES"
+	}
+}

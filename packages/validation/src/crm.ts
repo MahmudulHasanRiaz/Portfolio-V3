@@ -72,7 +72,7 @@ export const leadActivitySchema = z.object({
   leadId: uuidSchema,
   activityType: z.string(),
   description: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   createdBy: uuidSchema,
   createdAt: timestampSchema,
 });
@@ -81,7 +81,7 @@ export const createLeadActivitySchema = z.object({
   leadId: uuidSchema,
   activityType: z.string(),
   description: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   createdBy: uuidSchema,
 });
 
@@ -114,7 +114,7 @@ export const abandonedLeadSchema = z.object({
   email: z.string().max(255),
   phone: z.string().max(50).optional(),
   sourcePage: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   capturedAt: timestampSchema,
 });
 
@@ -122,7 +122,7 @@ export const createAbandonedLeadSchema = z.object({
   email: z.string().max(255),
   phone: z.string().max(50).optional(),
   sourcePage: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const updateAbandonedLeadSchema = abandonedLeadSchema.partial();

@@ -32,6 +32,19 @@ import preact from "@astrojs/preact";
 //     build-time API calls without re-checking the whole live design.
 export default defineConfig({
 	output: "server",
+	// Pin Vite to this app's own tsconfig (Vite 7 native tsconfigPaths
+	// resolution, enabled by Astro, otherwise walks up past
+	// apps/public/tsconfig.json — .astro files are not covered by its
+	// include/extensions — to the monorepo root tsconfig.json, whose
+	// `references` still point at apps/web (dropped in V3) and
+	// apps/dashboard (renamed to apps/admin). Rolldown then tries to
+	// load apps/web/tsconfig.json and the build dies with
+	// "Tsconfig not found .../apps/web" during `astro sync`.
+	// The root tsconfig's stale references are a scaffold-level bug
+	// (fix them there too); this pin keeps apps/public hermetic.
+	vite: {
+		tsconfig: "./tsconfig.json",
+	},
 	// Critical CSS (PageSpeed): with no prerendered HTML the old
 	// build-time critters step (scripts/inline-critical.mjs, deleted
 	// with this change) has nothing to process. Instead Astro inlines

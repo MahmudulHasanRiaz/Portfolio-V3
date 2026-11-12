@@ -1,10 +1,21 @@
 ---
 import { Picture } from "astro:assets";
-// Fallback portrait — imported from public/ DELIBERATELY (not a
-// src/assets/ duplicate): the file stays the single source for the
+import type { ImageMetadata } from "astro";
+// Fallback portrait — resolved via import.meta.glob (same pattern as
+// ThumbImage.astro), NOT a static import: public/speaker.jpg is a
+// binary asset that is NOT in the tree yet (separate step), and the
+// build must not depend on it. When the file is present the glob
+// yields it and the hero renders the build-time Sharp <Picture> as
+// before; when absent the build still passes and the hero renders a
+// plain <img src="/speaker.jpg">, which resolves at runtime as soon
+// as the binary lands. The file stays the single source for the
 // fallback, the post-detail author avatar and the og:image fallback
 // (site.ts / Layout.astro), so no 147KB binary is committed twice.
-import speakerFallback from "../../public/speaker.jpg";
+const speakerModules = import.meta.glob<{ default: ImageMetadata }>(
+	"../../public/speaker.jpg",
+	{ eager: true },
+);
+const speakerFallback = Object.values(speakerModules)[0]?.default;
 import { PROFILE, STATS } from "../data/site";
 import { getStats } from "../lib/content";
 import { getSiteSettings, type SettingsBn } from "../lib/settings";
@@ -76,34 +87,50 @@ const designations =
 			    loading=eager + decoding=sync + fetchpriority high;
 			    `sizes` is honest to the frame (22rem / 352px mobile,
 			    5fr column / ~412px desktop). */}
-			<Picture
-				src={speakerFallback}
-				formats={["avif", "webp"]}
-				widths={[352, 576, 704, 1068]}
-				// sizes is honest to the RENDERED frame (PageSpeed
-				// 2026-11-10: displayed 574 device px at DPR 1.75 ≈
-				// 328 CSS px — the frame is viewport−80px (.page
-				// 16px + .glass 24px padding each side), capped at
-				// 22rem/352px. The old 352px overstated small phones,
-				// so the browser picked the 704w variant (46KB AVIF)
-				// when the 576w (35KB) covers the rendered size —
-				// ~12KB wasted per load. Desktop (412px) and tablet
-				// (352px) unchanged.
-				sizes="(max-width: 412px) 328px, (max-width: 1023px) 352px, 412px"
-				quality={75}
-				priority
-				// LCP render delay (PageSpeed 2026-11-10: the hero
-				// loads in 210ms but paints 1,930ms later): `priority`
-				// sets decoding="sync" by default, which forces the
-				// AVIF decode onto the main thread and blocks the
-				// paint on it. An explicit decoding="async" wins
-				// over that default (Astro resolves with ??=), so
-				// the image still loads eager + fetchpriority high
-				// but decodes off the paint path. No visual change.
-				decoding="async"
-				alt={t.photoAlt}
-				data-hero-photo
-			/>
+			{speakerFallback ? (
+				<Picture
+						src={speakerFallback}
+					formats={["avif", "webp"]}
+					widths={[352, 576, 704, 1068]}
+					// sizes is honest to the RENDERED frame (PageSpeed
+					// 2026-11-10: displayed 574 device px at DPR 1.75 ≈
+					// 328 CSS px — the frame is viewport−80px (.page
+					// 16px + .glass 24px padding each side), capped at
+					// 22rem/352px. The old 352px overstated small phones,
+					// so the browser picked the 704w variant (46KB AVIF)
+					// when the 576w (35KB) covers the rendered size —
+					// ~12KB wasted per load. Desktop (412px) and tablet
+					// (352px) unchanged.
+					sizes="(max-width: 412px) 328px, (max-width: 1023px) 352px, 412px"
+					quality={75}
+					priority
+					// LCP render delay (PageSpeed 2026-11-10: the hero
+					// loads in 210ms but paints 1,930ms later): `priority`
+					// sets decoding="sync" by default, which forces the
+					// AVIF decode onto the main thread and blocks the
+					// paint on it. An explicit decoding="async" wins
+					// over that default (Astro resolves with ??=), so
+					// the image still loads eager + fetchpriority high
+					// but decodes off the paint path. No visual change.
+					decoding="async"
+					alt={t.photoAlt}
+					data-hero-photo
+				/>
+			) : (
+				// No local portrait binary in the tree yet: plain runtime
+				// <img> at the same URL the Picture would serve. Same
+				// eager/high-priority load; the frame's aspect-ratio +
+				// object-fit: cover keep the layout identical, and the
+				// photo appears as soon as public/speaker.jpg lands.
+				<img
+					src="/speaker.jpg"
+					alt={t.photoAlt}
+					loading="eager"
+					decoding="async"
+					fetchpriority="high"
+					data-hero-photo
+				/>
+			)}
 			<div class="hero-photo-gradient" aria-hidden="true" />
 			<svg
 				class="hero-runlight"

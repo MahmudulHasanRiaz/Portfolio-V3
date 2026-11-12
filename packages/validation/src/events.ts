@@ -114,7 +114,7 @@ export const eventActivityLogSchema = z.object({
   eventId: uuidSchema,
   actorId: uuidSchema,
   action: z.string(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   createdAt: timestampSchema,
 });
 
@@ -122,7 +122,7 @@ export const createEventActivityLogSchema = z.object({
   eventId: uuidSchema,
   actorId: uuidSchema,
   action: z.string(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const updateEventActivityLogSchema = eventActivityLogSchema.partial();

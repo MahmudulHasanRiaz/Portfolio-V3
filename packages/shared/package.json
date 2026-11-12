@@ -10,11 +10,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "zod": "^3.24.0"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@repo/typescript-config": "*",
     "@repo/eslint-config": "*",
-    "typescript": "^5.8.0"
+    "typescript": "^7.0.2"
   }
 }

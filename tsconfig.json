@@ -4,8 +4,7 @@
     "noEmit": true
   },
   "references": [
-    { "path": "apps/web" },
-    { "path": "apps/dashboard" },
+    { "path": "apps/admin" },
     { "path": "apps/portal" },
     { "path": "packages/ui" },
     { "path": "packages/auth" },
@@ -23,6 +22,10 @@
     { "path": "packages/portal" },
     { "path": "packages/proposals" },
     { "path": "packages/notifications" },
-    { "path": "packages/shared" }
+    { "path": "packages/shared" },
+    { "path": "packages/artist" },
+    { "path": "packages/entrepreneur" },
+    { "path": "packages/media" },
+    { "path": "packages/workflows" }
   ]
 }

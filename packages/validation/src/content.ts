@@ -55,7 +55,7 @@ export const homepageSectionSchema = z.object({
   sectionKey: z.string().max(100),
   isVisible: z.boolean().default(true),
   sortOrder: z.coerce.number().int().optional(),
-  content: z.record(z.unknown()).optional(),
+  content: z.record(z.string(), z.unknown()).optional(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
 });
@@ -63,7 +63,7 @@ export const homepageSectionSchema = z.object({
 export const createHomepageSectionSchema = z.object({
   sectionKey: z.string().max(100),
   sortOrder: z.coerce.number().int().optional(),
-  content: z.record(z.unknown()).optional(),
+  content: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const updateHomepageSectionSchema = homepageSectionSchema.partial();
@@ -287,7 +287,7 @@ export const caseStudySchema = z.object({
   strategyBn: z.string().optional(),
   results: z.string().optional(),
   resultsBn: z.string().optional(),
-  metrics: z.record(z.unknown()).optional(),
+  metrics: z.record(z.string(), z.unknown()).optional(),
   thumbnailType: z.enum(["image", "video"]).optional(),
   thumbnailUrl: z.string().optional(),
   thumbnailVideoUrl: z.string().optional(),
@@ -320,7 +320,7 @@ export const createCaseStudySchema = z.object({
   strategyBn: z.string().optional(),
   results: z.string().optional(),
   resultsBn: z.string().optional(),
-  metrics: z.record(z.unknown()).optional(),
+  metrics: z.record(z.string(), z.unknown()).optional(),
   thumbnailType: z.enum(["image", "video"]).optional(),
   thumbnailUrl: z.string().optional(),
   thumbnailVideoUrl: z.string().optional(),

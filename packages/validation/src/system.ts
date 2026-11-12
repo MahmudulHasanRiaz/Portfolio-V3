@@ -6,7 +6,7 @@ import { uuidSchema, timestampSchema } from "./common";
 export const settingSchema = z.object({
   id: uuidSchema,
   key: z.string().max(255),
-  value: z.record(z.unknown()),
+  value: z.record(z.string(), z.unknown()),
   group: z.string().max(100),
   description: z.string().optional(),
   updatedBy: uuidSchema.optional(),
@@ -15,7 +15,7 @@ export const settingSchema = z.object({
 
 export const createSettingSchema = z.object({
   key: z.string().max(255),
-  value: z.record(z.unknown()),
+  value: z.record(z.string(), z.unknown()),
   group: z.string().max(100),
   description: z.string().optional(),
   updatedBy: uuidSchema.optional(),
@@ -31,7 +31,7 @@ export const auditLogSchema = z.object({
   action: z.string(),
   entityType: z.string().max(50),
   entityId: uuidSchema,
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   ipAddress: z.string().max(45).optional(),
   createdAt: timestampSchema,
 });
@@ -41,7 +41,7 @@ export const createAuditLogSchema = z.object({
   action: z.string(),
   entityType: z.string().max(50),
   entityId: uuidSchema,
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   ipAddress: z.string().max(45).optional(),
 });
 
@@ -54,7 +54,7 @@ export const contentRevisionSchema = z.object({
   entityType: z.string().max(50),
   entityId: uuidSchema,
   revisionNumber: z.coerce.number().int(),
-  contentSnapshot: z.record(z.unknown()),
+  contentSnapshot: z.record(z.string(), z.unknown()),
   createdBy: uuidSchema,
   createdAt: timestampSchema,
 });
@@ -63,7 +63,7 @@ export const createContentRevisionSchema = z.object({
   entityType: z.string().max(50),
   entityId: uuidSchema,
   revisionNumber: z.coerce.number().int(),
-  contentSnapshot: z.record(z.unknown()),
+  contentSnapshot: z.record(z.string(), z.unknown()),
   createdBy: uuidSchema,
 });
 

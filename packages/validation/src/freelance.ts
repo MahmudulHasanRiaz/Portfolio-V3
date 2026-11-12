@@ -40,7 +40,7 @@ export const projectsFreelanceSchema = z.object({
   currency: z.string().max(10).optional(),
   isPaidProject: z.boolean().optional(),
   assignedTo: z.array(uuidSchema).optional(),
-  subcontractors: z.record(z.unknown()).optional(),
+  subcontractors: z.record(z.string(), z.unknown()).optional(),
   tags: z.array(z.string()).optional(),
   portalAccessEnabled: z.boolean().optional(),
   portalToken: z.string().max(255).optional(),
@@ -63,7 +63,7 @@ export const createProjectsFreelanceSchema = z.object({
   currency: z.string().max(10).optional(),
   isPaidProject: z.boolean().optional(),
   assignedTo: z.array(uuidSchema).optional(),
-  subcontractors: z.record(z.unknown()).optional(),
+  subcontractors: z.record(z.string(), z.unknown()).optional(),
   tags: z.array(z.string()).optional(),
   portalAccessEnabled: z.boolean().optional(),
   portalToken: z.string().max(255).optional(),
@@ -130,7 +130,7 @@ export const projectActivityLogSchema = z.object({
   projectId: uuidSchema,
   actorId: uuidSchema,
   action: z.string(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   createdAt: timestampSchema,
 });
 
@@ -138,7 +138,7 @@ export const createProjectActivityLogSchema = z.object({
   projectId: uuidSchema,
   actorId: uuidSchema,
   action: z.string(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const updateProjectActivityLogSchema = projectActivityLogSchema.partial();

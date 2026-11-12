@@ -2,15 +2,18 @@
 
 import { useState } from "react";
 import {
-  type ColumnDef,
   flexRender,
-  getCoreRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useReactTable,
+  type RowData,
   type SortingState,
   type RowSelectionState,
 } from "@tanstack/react-table";
+import {
+  type LegacyColumnDef,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useLegacyTable,
+} from "@tanstack/react-table/legacy";
 import {
   Table,
   TableBody,
@@ -31,8 +34,8 @@ import {
 } from "./select";
 import { ChevronDown, ChevronUp, ChevronsUpDown } from "lucide-react";
 
-interface DataTableProps<TData> {
-  columns: ColumnDef<TData>[];
+interface DataTableProps<TData extends RowData> {
+  columns: LegacyColumnDef<TData, unknown>[];
   data: TData[];
   isLoading?: boolean;
   loadingRows?: number;
@@ -42,7 +45,7 @@ interface DataTableProps<TData> {
   showPageSizeSelector?: boolean;
 }
 
-function DataTable<TData>({
+function DataTable<TData extends RowData>({
   columns,
   data,
   isLoading = false,
@@ -56,7 +59,7 @@ function DataTable<TData>({
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [pageSize, setPageSize] = useState(initialPageSize);
 
-  const table = useReactTable({
+  const table = useLegacyTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
