@@ -1,0 +1,47 @@
+# CI — build-only PR check (the V3 build guard).
+#
+# Runs the EXACT command the deploy uses (`npx turbo run build
+# --concurrency=2`) on every pull request to main. If this is red, do not
+# merge — reproduce locally, fix what the build reports, and re-run the
+# FULL build until it is green. See docs/BUILD_GUARD.md.
+#
+# Deliberately BUILD-ONLY: lint / typecheck / test stay out until the
+# dashboard's pre-existing typecheck errors are baselined separately.
+# (The admin's next.config sets typescript.ignoreBuildErrors: true, so
+# `next build` does not type-check — the packages' `tsc` builds are the
+# type gate, and they run here as part of the turbo build.)
+#
+# NOTE: workflow files cannot be pushed via the GitHub API (the App lacks
+# the workflows permission) — this file is uploaded through the GitHub web
+# UI (browser). Do not expect it to arrive via a snapshot push.
+name: CI — build check
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Full build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Full build (same command as the deploy)
+        run: npx turbo run build --concurrency=2
+        env:
+          # Placeholder, same as the Dockerfile/local reproduce command:
+          # the build only validates the format; no real database is
+          # needed (queries fail soft during page-data collection).
+          DATABASE_URL: postgresql://user:pass@localhost:5432/ci
+          NEXT_TELEMETRY_DISABLED: "1"
