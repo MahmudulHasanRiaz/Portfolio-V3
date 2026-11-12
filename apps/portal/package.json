@@ -1,0 +1,28 @@
+{
+  "name": "@repo/portal",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@repo/database": "*",
+    "@repo/portal-pkg": "*",
+    "@repo/ui": "*",
+    "@repo/workflows": "*",
+    "next": "^16.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "lucide-react": "^0.400.0"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "*",
+    "@repo/eslint-config": "*",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.8.0"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "extends": "./tooling/typescript/base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "references": [
+    { "path": "apps/web" },
+    { "path": "apps/dashboard" },
+    { "path": "apps/portal" },
+    { "path": "packages/ui" },
+    { "path": "packages/auth" },
+    { "path": "packages/database" },
+    { "path": "packages/validation" },
+    { "path": "packages/seo" },
+    { "path": "packages/email" },
+    { "path": "packages/analytics" },
+    { "path": "packages/cms" },
+    { "path": "packages/crm" },
+    { "path": "packages/search" },
+    { "path": "packages/freelance" },
+    { "path": "packages/events" },
+    { "path": "packages/finance" },
+    { "path": "packages/portal" },
+    { "path": "packages/proposals" },
+    { "path": "packages/notifications" },
+    { "path": "packages/shared" }
+  ]
+}

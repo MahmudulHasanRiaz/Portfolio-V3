@@ -1,0 +1,170 @@
+/* ==========================================================================
+ * Portfolio-V2 PORTAL (apps/portal) theme — alias layer.
+ *
+ * The portal's pages and shell reference their own variable names
+ * (--text-primary, --text-muted, --bg-primary, --bg, --accent, ...),
+ * which NO shared file defines: packages/ui/src/styles/tokens.css only
+ * defines the --background/--foreground/--muted/--border/--brand family
+ * (plus --text-*, --font-weight-*, --leading-*, --spacing-*, --radius-*,
+ * --shadow-*, --container-*). Until this file, the portal's body text,
+ * page backgrounds, input surfaces and accent buttons all rendered in
+ * browser-default colors. This layer defines the missing names — and
+ * ONLY those names, so bundle order against tokens.css can never flip
+ * a shared token.
+ *
+ * Palette mirrors the PR #40 public-theme language (same surfaces,
+ * borders, type stacks and layered shadows, adapted to a client tool):
+ * light (:root default) is a designed warm-paper/white system, dark is
+ * its own deep ink-navy system, NOT an inversion of light. The portal
+ * has no theme switcher today, so light is the live mode; the dark
+ * block exists so a future switcher (or data-theme) works on day one.
+ * Brand: Electric Blue ramp (PRD); light accent deepened one step
+ * (#2563eb) for AA-safe presence, same as PR #40.
+ * ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* --- LIGHT THEME (default, live mode) --- */
+:root {
+  color-scheme: light;
+
+  /* Page < sunken < surface < raised */
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-active: #f1f5f9;
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-sunken: #f1f5f9;
+
+  --text-primary: #0f172a;
+  --text-muted: #475569;
+
+  --accent: #2563eb;
+  --accent-foreground: #ffffff;
+
+  --border-strong: #cbd5e1;
+
+  /* Layered shadows, tinted with ink-navy instead of pure black */
+  --portal-shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05), 0 1px 3px 0 rgb(15 23 42 / 0.05);
+  --portal-shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.08), 0 2px 6px -2px rgb(15 23 42 / 0.05);
+  --portal-shadow-lg: 0 12px 32px -8px rgb(15 23 42 / 0.14), 0 4px 12px -4px rgb(15 23 42 / 0.06);
+}
+
+/* --- DARK THEME: deep ink-navy, layered blue-slate surfaces --- */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg-primary: #0a0f1e;
+  --bg-secondary: #101a30;
+  --bg-active: #141f38;
+  --bg: #101a30;
+  --surface: #101a30;
+  --surface-raised: #16233f;
+  --surface-sunken: #060a15;
+
+  --text-primary: #eef2f9;
+  --text-muted: #9aa8c3;
+
+  --accent: #3b82f6;
+  --accent-foreground: #ffffff;
+
+  --border-strong: #33456b;
+
+  --portal-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4), 0 1px 3px 0 rgb(0 0 0 / 0.3);
+  --portal-shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.5), 0 2px 6px -2px rgb(0 0 0 / 0.35);
+  --portal-shadow-lg: 0 12px 32px -8px rgb(0 0 0 / 0.6), 0 4px 12px -4px rgb(0 0 0 / 0.4);
+}
+
+/* --- Base --- */
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  /* DM Sans first (tokens.css stack); Inter as fallback. No font package
+   * is installed for the portal (no new dependencies in this slice), so
+   * DM Sans renders when available on the system, as in tokens.css. */
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+button {
+  font: inherit;
+}
+
+/* Low-specificity heading defaults (:where = 0 specificity, so any
+ * component class or inline style overrides these effortlessly). */
+:where(h1, h2) {
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+:where(h3, h4) {
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+
+::selection {
+  background-color: var(--brand-200);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] ::selection {
+  background-color: var(--brand-800);
+  color: var(--text-primary);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+  }
+}
