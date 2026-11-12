@@ -1,0 +1,126 @@
+---
+// Brand logo — original logos only, never hand-drawn.
+// - Simple Icons slug  -> ONE self-hosted sprite (src/assets/icons.svg,
+//   see scripts/generate-icons.mjs); a slug missing from the sprite
+//   falls back to the CDN image (https://cdn.simpleicons.org/<slug>)
+// - "wikimedia:<url>"  -> real official logo from Wikimedia Commons
+// - "woocommerce-w"    -> the latest WooCommerce "W" lettermark (inline SVG)
+// - null               -> honest plain name chip, never a fake logo
+// Dark logos render white in dark mode only (class logo-dark-invert).
+import {
+	LOCAL_LOGO_OVERRIDES,
+	WIKIMEDIA_LOGOS,
+	WOOCOMMERCE_W_PATH,
+	simpleIconsUrl,
+} from "../data/site";
+import { ICON_SPRITE_URL, hasSpriteIcon } from "../lib/icons";
+
+interface Props {
+	icon: string | null;
+	name: string;
+	size?: number;
+	darkInvert?: boolean;
+	class?: string;
+	/** Decorative: the name is already announced by adjacent visible text
+	    or an ancestor label, so the logo carries no accessible name. */
+	decorative?: boolean;
+}
+
+const { icon, name, size = 20, darkInvert = false, class: cls = "", decorative = false } = Astro.props;
+
+// Logos that are dark-on-transparent and need inverting in dark mode.
+// Entries are the icon values BrandIcon receives: Simple Icons slugs,
+// plus the two `wikimedia:` canonical values for JioSaavn and Boomplay
+// (dark wordmarks that blend into a dark background — reported on
+// /platforms, 2026-11-10). The invert check runs on the canonical
+// `icon`, before the Boomplay local-file override, so the live API
+// value is covered too.
+export const DARK_INVERT_SLUGS = new Set([
+	"nextdotjs",
+	"express",
+	"fastify",
+	"rust",
+	"vercel",
+	"prisma",
+	"mysql",
+	"css",
+	"wordpress",
+	"github",
+	"tiktok",
+	"threads",
+	"x",
+	`wikimedia:${WIKIMEDIA_LOGOS.jiosaavn}`,
+	`wikimedia:${WIKIMEDIA_LOGOS.boomplay}`,
+]);
+
+const invert = darkInvert || (icon !== null && DARK_INVERT_SLUGS.has(icon));
+const imgClass = `${invert ? "logo-dark-invert" : ""} ${cls}`.trim();
+
+// Render-time logo override: an oversized remote logo (Boomplay) is
+// swapped for its local optimized file. The data keeps the canonical
+// value, so the live API value is covered too.
+const resolvedIcon =
+	icon !== null ? (LOCAL_LOGO_OVERRIDES[icon] ?? icon) : null;
+---
+
+{
+	resolvedIcon === "woocommerce-w" ? (
+		<svg
+			viewBox="0 0 88 47.5"
+			width={size}
+			height={size}
+			role={decorative ? undefined : "img"}
+			aria-label={decorative ? undefined : name}
+			aria-hidden={decorative ? "true" : undefined}
+			class={cls}
+		>
+			<path d={WOOCOMMERCE_W_PATH} fill="#873EFF" />
+		</svg>
+	) : resolvedIcon !== null && resolvedIcon.startsWith("wikimedia:") ? (
+		<img
+			src={resolvedIcon.slice("wikimedia:".length)}
+			alt={decorative ? "" : name}
+			width={size}
+			height={size}
+			loading="lazy"
+			decoding="async"
+			class={imgClass}
+		/>
+	) : resolvedIcon !== null && resolvedIcon.startsWith("/") ? (
+		<img
+			src={resolvedIcon}
+			alt={decorative ? "" : name}
+			width={size}
+			height={size}
+			loading="lazy"
+			decoding="async"
+			class={imgClass}
+		/>
+	) : resolvedIcon !== null && hasSpriteIcon(resolvedIcon) ? (
+		<svg
+			viewBox="0 0 24 24"
+			width={size}
+			height={size}
+			role={decorative ? undefined : "img"}
+			aria-label={decorative ? undefined : name}
+			aria-hidden={decorative ? "true" : undefined}
+			class={imgClass}
+		>
+			<use href={`${ICON_SPRITE_URL}#${resolvedIcon}`} />
+		</svg>
+	) : resolvedIcon !== null ? (
+		<img
+			src={simpleIconsUrl(resolvedIcon)}
+			alt={decorative ? "" : name}
+			width={size}
+			height={size}
+			loading="lazy"
+			decoding="async"
+			class={imgClass}
+		/>
+	) : (
+		<span class={cls} style={`font-size:${Math.max(11, size - 6)}px;font-weight:700;`}>
+			{name}
+		</span>
+	)
+}

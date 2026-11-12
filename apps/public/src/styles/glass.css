@@ -1,0 +1,5064 @@
+/* Glass design tokens — day one.
+   Full-white light (#ffffff), full-dark dark (#050807), mint/teal accent.
+   Sections are big rounded glass cards in a centred column.
+   Ported from the approved React preview design. */
+
+/* Li Ador Noirrit — Bangla webfont (user-supplied, self-hosted in
+   public/fonts/). Plus Jakarta Sans has no Bengali glyphs, so Bengali
+   text falls through to this font in the --font stack below; Latin text
+   stays in Plus Jakarta Sans Variable — self-hosted via Fontsource
+   (see Layout.astro), NOT Google Fonts, so no render-blocking
+   third-party stylesheet (PageSpeed 2026-11-10: 530ms). font-display:
+   swap so text never blocks. */
+@font-face {
+	font-family: "Li Ador Noirrit";
+	src: url("/fonts/li-ador-noirrit-300.woff2") format("woff2");
+	font-weight: 300;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "Li Ador Noirrit";
+	src: url("/fonts/li-ador-noirrit-400.woff2") format("woff2");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "Li Ador Noirrit";
+	src: url("/fonts/li-ador-noirrit-600.woff2") format("woff2");
+	font-weight: 600;
+	font-style: normal;
+	font-display: swap;
+}
+@font-face {
+	font-family: "Li Ador Noirrit";
+	src: url("/fonts/li-ador-noirrit-700.woff2") format("woff2");
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+:root {
+	--bg: #ffffff;
+	--bg-wash: #f2f7f5;
+	--ink: #0c1a15;
+	--ink-dim: #5b6f67;
+	/* A11y (2026-11-09): --ink-faint was #8a9a93 = 2.95:1 on white —
+	   axe flagged .grid-meta (12px). #5a7268 = 5.20:1 on white,
+	   4.80:1 on --bg-wash. --accent was #0d9488: white text on it is
+	   3.74:1 — axe flagged every .btn. #0b7c74 = 5.06:1, and as text
+	   on white also 5.06:1 (was 3.74:1). One step darker teal only. */
+	--ink-faint: #5a7268;
+	--card: rgba(255, 255, 255, 0.72);
+	--card-border: rgba(12, 26, 21, 0.08);
+	--accent: #0b7c74;
+	--accent-strong: #0f766e;
+	--accent-soft: rgba(13, 148, 136, 0.1);
+	--accent-wash: rgba(13, 148, 136, 0.06);
+	--border-glow-soft: rgba(13, 148, 136, 0.35);
+	--shadow: 0 18px 45px rgba(12, 26, 21, 0.08);
+	--shadow-soft: 0 2px 12px rgba(12, 26, 21, 0.06);
+	--radius: 24px;
+	--radius-sm: 14px;
+	--radius-xs: 8px;
+	--max-col: 1120px;
+	--font: "Plus Jakarta Sans Variable", "Li Ador Noirrit", system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #050807;
+		--bg-wash: #08110d;
+		--ink: #eef5f2;
+		--ink-dim: #93a89e;
+		/* A11y (2026-11-09): --ink-faint was #6b8078 = 4.77:1 on the
+		   page bg but 4.19:1 on a dark glass card (~#141a17), where
+		   .grid-meta sits. #7d948a = 6.20:1 on bg, 5.44:1 on glass. */
+		--ink-faint: #7d948a;
+		--card: rgba(255, 255, 255, 0.06);
+		--card-border: rgba(255, 255, 255, 0.09);
+		--accent: #2dd4bf;
+		--accent-strong: #5eead4;
+		--accent-soft: rgba(45, 212, 191, 0.12);
+		--accent-wash: rgba(45, 212, 191, 0.07);
+		--border-glow-soft: rgba(45, 212, 191, 0.35);
+		--shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
+		--shadow-soft: 0 2px 12px rgba(0, 0, 0, 0.35);
+	}
+}
+
+[data-theme="light"] {
+	--bg: #ffffff;
+	--bg-wash: #f2f7f5;
+	--ink: #0c1a15;
+	--ink-dim: #5b6f67;
+	/* A11y (2026-11-09): see :root — same token fixes as above. */
+	--ink-faint: #5a7268;
+	--card: rgba(255, 255, 255, 0.72);
+	--card-border: rgba(12, 26, 21, 0.08);
+	--accent: #0b7c74;
+	--accent-strong: #0f766e;
+	--accent-soft: rgba(13, 148, 136, 0.1);
+	--accent-wash: rgba(13, 148, 136, 0.06);
+	--border-glow-soft: rgba(13, 148, 136, 0.35);
+	--shadow: 0 18px 45px rgba(12, 26, 21, 0.08);
+	--shadow-soft: 0 2px 12px rgba(12, 26, 21, 0.06);
+}
+
+[data-theme="dark"] {
+	--bg: #050807;
+	--bg-wash: #08110d;
+	--ink: #eef5f2;
+	--ink-dim: #93a89e;
+	/* A11y (2026-11-09): see prefers-color-scheme dark :root above. */
+	--ink-faint: #7d948a;
+	--card: rgba(255, 255, 255, 0.06);
+	--card-border: rgba(255, 255, 255, 0.09);
+	--accent: #2dd4bf;
+	--accent-strong: #5eead4;
+	--accent-soft: rgba(45, 212, 191, 0.12);
+	--accent-wash: rgba(45, 212, 191, 0.07);
+	--border-glow-soft: rgba(45, 212, 191, 0.35);
+	--shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
+	--shadow-soft: 0 2px 12px rgba(0, 0, 0, 0.35);
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html {
+	scroll-behavior: smooth;
+	/* Mobile layout lock (6-point round, 2026-11-08): the page must never
+	   shift sideways on mobile. overflow-x: clip (not hidden) on html/body
+	   is the safety net behind the globe-tag clamp (worker F).
+	   NOTE (2026-11-09, pull-to-refresh fix): do NOT add
+	   overscroll-behavior-y: none here — it disables pull-to-refresh
+	   (an overscroll gesture). The slow footer spring-back it once
+	   guarded was the scroll-lock gap + header stuck loop, both fixed
+	   separately; the remaining native rubber-band is standard mobile
+	   behaviour. */
+	overflow-x: clip;
+}
+
+body {
+	margin: 0;
+	overflow-x: clip;
+	background: var(--bg);
+	color: var(--ink);
+	font-family: var(--font);
+	line-height: 1.6;
+	-webkit-font-smoothing: antialiased;
+}
+
+a {
+	color: var(--accent-strong);
+}
+
+img,
+video {
+	max-width: 100%;
+}
+
+button {
+	font-family: inherit;
+	cursor: pointer;
+}
+
+input,
+select,
+textarea {
+	font-family: inherit;
+	font-size: 15px;
+	color: var(--ink);
+}
+
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+.page {
+	max-width: var(--max-col);
+	margin: 0 auto;
+	padding: 16px;
+}
+
+/* Header-to-hero gap (preview, measured 2026-11-08 via artifact
+   inspection 4858a00c): 20px at 390px, 24px at 768px and above.
+   The gap is padding only — the preview puts it on <main>
+   (pt-5 = 20px below 640px, sm:pt-6 = 24px at 640px+), with no
+   bottom margin on the header and no top margin on the hero. The
+   pill is the lowest header edge at every width, so this padding
+   is exactly the pill-bottom → hero-top distance. The hero's own
+   24px internal padding-top is separate and stays untouched. */
+main {
+	padding-top: 20px;
+}
+
+@media (min-width: 640px) {
+	main {
+		padding-top: 24px;
+	}
+}
+
+.glass {
+	background: var(--card);
+	border: 1px solid var(--card-border);
+	border-radius: var(--radius);
+	box-shadow: var(--shadow);
+	backdrop-filter: blur(18px) saturate(1.4);
+	-webkit-backdrop-filter: blur(18px) saturate(1.4);
+	padding: 24px;
+}
+
+.muted {
+	color: var(--ink-dim);
+}
+
+.accent {
+	color: var(--accent-strong);
+}
+
+/* A11y (2026-11-09): keyboard focus — several links/buttons had no
+   visible focus style at all (.btn, nav links, .deck-card, globe
+   tags, picker rows). Every link/button now gets a teal ring on
+   keyboard focus. Components with their own :focus-visible ring
+   (corner-btn, pill-rotate-btn, chev-btn, deck-dot, home-fab,
+   picker-resume-btn, release-card-link) keep theirs — their
+   class-scoped rules outrank this one. */
+a:focus-visible,
+button:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+/* ---------- Buttons (subtle hover, desktop-only) ---------- */
+.btn {
+	display: inline-block;
+	border-radius: 13px;
+	padding: 8px 20px;
+	font-size: 13px;
+	font-weight: 600;
+	line-height: 1.4;
+	text-decoration: none;
+	background: var(--accent);
+	color: #fff;
+	border: 1px solid transparent;
+	transition:
+		background-color 200ms ease,
+		transform 200ms ease,
+		box-shadow 200ms ease,
+		border-color 200ms ease;
+}
+
+/* A11y (2026-11-09): dark mode — white text on the bright teal
+   --accent (#2dd4bf) is 1.86:1. Every SOLID-teal control with light
+   text therefore goes dark (#03211c, 9.11:1 on #2dd4bf, 11.46:1 on the
+   #5eead4 hover) in dark mode, exactly like .hero-badge already did.
+   Light mode needs no override: the darkened --accent (#0b7c74)
+   gives white text 5.06:1.
+   SCOPE (fixed same day): .btn-ghost/.btn-quiet are TRANSPARENT
+   (ink text) and .globe-filters .chip.active is a LIGHT pill
+   (bg-wash + ink text) — the first version of this rule caught them
+   too and turned them near-invisible in dark mode (1.06:1 / 1.12:1).
+   .btn is therefore :not(.btn-ghost):not(.btn-quiet), and the globe
+   active chip gets its ink text back below. */
+[data-theme="dark"] .btn:not(.btn-ghost):not(.btn-quiet),
+[data-theme="dark"] .chip.active,
+[data-theme="dark"] .picker-resume-btn,
+[data-theme="dark"] .pill-rotate-btn,
+[data-theme="dark"] .audio-badge {
+	color: #03211c;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .btn:not(.btn-ghost):not(.btn-quiet),
+	:root:not([data-theme="light"]) .chip.active,
+	:root:not([data-theme="light"]) .picker-resume-btn,
+	:root:not([data-theme="light"]) .pill-rotate-btn,
+	:root:not([data-theme="light"]) .audio-badge {
+		color: #03211c;
+	}
+}
+
+/* Globe active chip: a light pill, NOT solid teal — it keeps ink text
+   in dark mode. Specificity must beat the rules above, which is why
+   this repeats the theme selectors instead of relying on the plain
+   .globe-filters .chip.active rule further down the file. */
+[data-theme="dark"] .globe-filters .chip.active {
+	color: var(--ink);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .globe-filters .chip.active {
+		color: var(--ink);
+	}
+}
+
+.btn-ghost {
+	background: transparent;
+	color: var(--ink);
+	border-color: var(--card-border);
+}
+
+.btn-quiet {
+	background: transparent;
+	color: var(--ink-dim);
+	border-color: transparent;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.btn:hover {
+		background: var(--accent-strong);
+		transform: translateY(-1px);
+		box-shadow: 0 6px 20px rgba(13, 148, 136, 0.25);
+	}
+	.btn-ghost:hover {
+		background: var(--accent-wash);
+		border-color: var(--accent-soft);
+		box-shadow: var(--shadow-soft);
+	}
+	.btn-quiet:hover {
+		background: var(--accent-wash);
+	}
+}
+
+/* ---------- Section scaffolding ---------- */
+.section {
+	margin-top: 16px;
+	/* Anchor jumps (header nav, #contact) must land below the sticky
+	   pill instead of sliding the heading underneath it. */
+	scroll-margin-top: 96px;
+}
+
+.section-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+	margin: 0 0 16px;
+}
+
+.section-head h2 {
+	margin: 0;
+	font-size: 20px;
+	line-height: 1.3;
+	letter-spacing: -0.01em;
+}
+
+.section-head p {
+	margin: 4px 0 0;
+	font-size: 14px;
+}
+
+.view-all {
+	font-size: 13px;
+	font-weight: 600;
+	white-space: nowrap;
+	text-decoration: none;
+}
+
+.empty-state {
+	padding: 32px 16px;
+	text-align: center;
+	color: var(--ink-dim);
+	font-size: 14px;
+}
+
+/* ---------- Header ---------- */
+.site-header {
+	position: sticky;
+	/* Animation isolation (worker I): layout containment + stacking
+	   isolation. The pill breathe (box-shadow), arc flow
+	   (stroke-dashoffset) and label crossfade (transform/opacity) are
+	   paint/compositor-only and cannot shift page layout; containment
+	   guarantees it. `layout` only — never `paint`/`strict` here: the
+	   arcs hang outside the pill and must stay visible. */
+	contain: layout style;
+	isolation: isolate;
+	/* Preview: sticky top-2 (8px) mobile, top-3 (12px) at sm+ — the
+	   pill row sticks 8/12px below the viewport top. The old single
+	   12px value put the stuck row 4px too low on mobile. */
+	top: 8px;
+	z-index: 40;
+	/* NO top padding: the page container already supplies 16px, so the
+	   corner buttons land at y=16 mobile / y=20 sm+ (preview probe).
+	   The old 8px padding pushed everything 8px too low. */
+	padding-top: 0;
+	pointer-events: none;
+}
+
+/* Preview container is px-6 (24px) at sm+: the header's content edges
+   sit 8px further in than the page's 16px padding, so the corner
+   buttons land at x=24 (768px) / x=104 (1280px) / x=184 (1440px).
+   Header-only padding (the .page padding stays 16px — other sections
+   are out of scope this round); symmetric, so the pill stays centred. */
+@media (min-width: 640px) {
+	.site-header {
+		top: 12px;
+		padding-left: 8px;
+		padding-right: 8px;
+	}
+}
+
+/* NO full-width sticky band and NO background on the sticky row
+   (preview): only the ~38px pill row plus the two flank buttons are
+   sticky; the rest of the row stays transparent, so page content
+   scrolls visibly beneath the gaps and only briefly under the pill
+   itself (normal floating-pill behavior). A frosted band here was
+   tried and removed — it obscured content instead of helping. The
+   stuck pill's own stronger glass + deeper glow (below) is what
+   keeps it readable. */
+
+.header-top {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	/* Preview: top row pt-4 (16px) mobile, pt-5 (20px) sm+ — the
+	   buttons land at y=16 / y=20. The 4px sm+ top padding lives here
+	   (not on the header). The row keeps its FULL height in both
+	   states (see the stuck rule below) — collapsing it changed the
+	   header's in-flow height and made scrollY oscillate around
+	   the stuck threshold (a stuck/un-stuck feedback loop). */
+	height: 32px;
+	/* No side padding: the corner buttons sit flush with the header
+	   edges (preview probe: lang x=16, theme x=326 at 390px). The 4px
+	   padding pushed them inward and stole 8px from the pill's room —
+	   part of why the pill overlapped the buttons when stuck. */
+	padding: 0;
+	overflow: hidden;
+	transition: opacity 250ms ease;
+}
+
+@media (min-width: 640px) {
+	.header-top {
+		/* 44px total (border-box: 4px top padding + 40px buttons) so
+		   the row bottom lands at 60px and the pill at y=44 (preview).
+		   The old 40px total put the pill 4px too high (y=40). */
+		height: 44px;
+		padding-top: 4px;
+	}
+}
+
+/* Stuck (scrolled) header: the top row fades out but KEEPS its
+   height — it is never collapsed. Collapsing it to height 0 changed
+   the header's in-flow height by 20px (mobile) / 28px (sm+) every
+   time `stuck` toggled, and the document's scroll anchoring moved
+   scrollY by the same amount, which re-toggled `stuck` — a feedback
+   loop (scrollY oscillated 30 → 2 → 30 … near the 24px threshold).
+   With a constant header height the loop cannot happen. The pill
+   reaches the top of the sticky row by translating up instead (see
+   .site-header.is-stuck .pill-stack), so its visual position is
+   unchanged. The faded-out buttons are fully inert: opacity 0,
+   pointer-events none, tabIndex -1 and aria-hidden (set in
+   SiteHeader.tsx). */
+.site-header.is-stuck .header-top {
+	opacity: 0;
+}
+
+.site-header.is-stuck .header-top .corner-btn {
+	pointer-events: none;
+}
+
+.lang-hint {
+	text-align: center;
+	font-size: 12px;
+	color: var(--ink-dim);
+	margin: 4px 0 0;
+}
+
+.site-header.is-stuck .lang-hint {
+	display: none;
+}
+
+.corner-btn {
+	height: 32px;
+	width: 48px;
+	pointer-events: auto;
+	/* padding: 0 — Chrome's UA default button padding (6px/side) sat
+	   OUTSIDE the collapsed width:0, holding the hidden stuck buttons
+	   at 14px wide (12px padding + 2px border) instead of 0. */
+	padding: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--radius-sm);
+	border: 1px solid var(--card-border);
+	background: transparent;
+	color: var(--accent);
+	font-size: 13px;
+	font-weight: 600;
+	transition: background-color 200ms ease;
+	/* No browser-default (blue) focus outline on the corner buttons —
+	   the moon button showed a blue ring in the live screenshot. */
+	outline: none;
+}
+
+.corner-btn:focus {
+	outline: none;
+}
+
+/* Keyboard focus still gets a visible ring — teal, never blue. */
+.corner-btn:focus-visible {
+	outline: none;
+	box-shadow:
+		0 0 0 2px var(--bg),
+		0 0 0 4px var(--accent);
+}
+
+/* Desktop corner buttons are 40x64px at sm+ (640px, preview — the old
+   768px breakpoint showed the small 32x48 buttons at 640–767px). */
+@media (min-width: 640px) {
+	.corner-btn {
+		height: 40px;
+		width: 64px;
+	}
+}
+
+/* Theme toggle crossfade: Sun/Moon swap with rotate/scale/opacity. */
+.corner-btn .theme-icon-wrap {
+	position: relative;
+	display: inline-flex;
+	width: 16px;
+	height: 16px;
+}
+
+.corner-btn .theme-icon {
+	position: absolute;
+	inset: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 0;
+	transform: rotate(-90deg) scale(0.6);
+	transition:
+		opacity 300ms ease,
+		transform 300ms ease;
+}
+
+.corner-btn .theme-icon.active {
+	opacity: 1;
+	transform: rotate(0deg) scale(1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.corner-btn:hover {
+		background: var(--accent-wash);
+	}
+}
+
+.pill-stack {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	/* Preview: the pill is pulled up into the top-row band at ALL
+	   widths (-mt-3 = -12px mobile, sm:-mt-4 = -16px) so pill +
+	   corner buttons read as ONE row, not two separate rows. The old
+	   rule pulled up only at ≥1024px (-28px, too much), which is why
+	   mobile showed a clear two-row header (pill y=82 vs preview
+	   y=36). The margin is the SAME in both states — it must never
+	   change, or the header's in-flow height changes and the
+	   stuck/un-stuck scroll feedback loop comes back. The stuck
+	   move is a transform instead (below), so the pill still glides
+	   smoothly from y=36 to y=8 over 350ms. */
+	margin-top: -12px;
+	transition: transform 350ms ease;
+}
+
+@media (min-width: 640px) {
+	.pill-stack {
+		margin-top: -16px;
+	}
+}
+
+/* Stuck: translate the pill up by exactly the top row's height so it
+   lands at the top of the sticky row (the same visual position the
+   old collapse gave it). Mobile: top row 32px, pill pulled up 12px,
+   so the pill top sits at 32 − 12 = 20px → translate −20px. sm+:
+   top row 44px, pill pulled up 16px → 44 − 16 = 28px → −28px.
+   A transform never changes layout, so the header's in-flow height
+   stays 56px (mobile) / 64px (sm+) in both states and scrolling
+   can never re-toggle `stuck`. */
+.site-header.is-stuck .pill-stack {
+	transform: translateY(-20px);
+}
+
+@media (min-width: 640px) {
+	.site-header.is-stuck .pill-stack {
+		transform: translateY(-28px);
+	}
+}
+
+.sticky-pill {
+	position: relative;
+	pointer-events: auto;
+	/* Animation isolation: `layout` containment (no paint — the arcs
+	   are absolutely positioned outside the pill) + stacking isolation,
+	   so the breathe glow can never bleed into neighbouring sections. */
+	contain: layout style;
+	isolation: isolate;
+	display: flex;
+	align-items: center;
+	/* Preview proportions (measured): 36px tall, 4px gaps, 4px side
+	   padding — hamburger 22 + gap 4 + profile button 160 + gap 4 +
+	   chevron 22 + padding 8 = 220px at 390px. The old 38px/6px/8px
+	   made the pill taller and wider than the preview. */
+	gap: 4px;
+	height: 36px;
+	padding: 0 4px;
+	border-radius: var(--radius-sm);
+	background: var(--card);
+	/* Single luminous teal border (NOT a double border): the border
+	   itself is teal-tinted; there is no extra box-shadow ring. The
+	   luminous detail comes from ::before (top edge) + ::after (bottom
+	   segment) + the inset highlight + the outer glow. */
+	border: 1px solid var(--border-glow-soft);
+	box-shadow: var(--shadow);
+	backdrop-filter: blur(18px) saturate(1.4);
+	-webkit-backdrop-filter: blur(18px) saturate(1.4);
+	animation: pill-breathe 3s ease-in-out infinite;
+}
+
+/* Luminous pill detail: a 2px gradient top edge (10%-90%) and a 68px
+   bright bottom-center segment that shimmers (opacity 0.7-1). */
+.sticky-pill::before {
+	content: "";
+	position: absolute;
+	top: -1px;
+	left: 10%;
+	right: 10%;
+	height: 2px;
+	border-radius: 2px;
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(45, 212, 191, 0.9),
+		transparent
+	);
+	pointer-events: none;
+}
+
+.sticky-pill::after {
+	content: "";
+	position: absolute;
+	bottom: -1px;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 68px;
+	height: 2px;
+	border-radius: 2px;
+	background: #2dd4bf;
+	box-shadow: 0 0 8px rgba(45, 212, 191, 0.9);
+	animation: pill-segment-shimmer 2.4s ease-in-out infinite;
+	pointer-events: none;
+}
+
+@keyframes pill-segment-shimmer {
+	0%,
+	100% {
+		opacity: 0.7;
+	}
+	50% {
+		opacity: 1;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.sticky-pill::after {
+		animation: none;
+	}
+}
+
+/* Stuck (scrolled) header: the breathe animation pauses and the glow
+   deepens. Note the paused breathe animation still owns box-shadow, so
+   the extra 26px glow rides on filter (drop-shadow is not animated). */
+.site-header.is-stuck .sticky-pill {
+	animation-play-state: paused;
+	box-shadow:
+		var(--shadow),
+		inset 0 1px 0 rgba(45, 212, 191, 0.85),
+		0 0 26px rgba(13, 148, 136, 0.35);
+	filter: drop-shadow(0 0 26px rgba(13, 148, 136, 0.35));
+}
+
+@keyframes pill-breathe {
+	0%,
+	100% {
+		box-shadow:
+			var(--shadow),
+			inset 0 1px 0 rgba(45, 212, 191, 0.5),
+			0 0 12px rgba(13, 148, 136, 0.14);
+	}
+	50% {
+		box-shadow:
+			var(--shadow),
+			inset 0 1px 0 rgba(45, 212, 191, 0.85),
+			0 0 22px rgba(13, 148, 136, 0.35);
+	}
+}
+
+.sticky-pill .pill-icon {
+	display: inline-flex;
+	align-items: center;
+	color: var(--accent);
+}
+
+/* Profile label button — FIXED width (preview w-40/44/56: 160px mobile,
+   176px sm, 224px lg), content centred. The width never changes when
+   the label cycles between "Software Engineer" and "Know Me", so the
+   pill width never shifts and the surrounding elements never move. */
+.pill-profile-btn {
+	flex: none;
+	width: 160px;
+	height: 22px;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--ink);
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+@media (min-width: 640px) {
+	.pill-profile-btn {
+		width: 176px;
+	}
+}
+
+@media (min-width: 1024px) {
+	.pill-profile-btn {
+		width: 224px;
+	}
+}
+
+/* Label crossfade (preview): both profile labels stay mounted; the
+   active one is visible, the previous one slides UP (-8px) and fades
+   while the new one slides up FROM below (+8px) — 450ms ease-in-out.
+   No remount, so scrolling never resets or flickers the animation. */
+.pill-label-stack {
+	position: relative;
+	display: block;
+	width: 100%;
+	height: 22px;
+	overflow: hidden;
+	/* Animation isolation: label slides are transform/opacity only;
+	   paint containment matches the existing overflow clipping. */
+	contain: layout paint;
+}
+
+.pill-label-slide {
+	position: absolute;
+	inset: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	font-size: 13px;
+	font-weight: 600;
+	white-space: nowrap;
+	opacity: 0;
+	transform: translateY(8px);
+	transition:
+		opacity 450ms ease-in-out,
+		transform 450ms ease-in-out;
+	pointer-events: none;
+}
+
+.pill-label-slide.active {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+.pill-label-slide.leaving {
+	opacity: 0;
+	transform: translateY(-8px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.pill-label-slide {
+		transition: none;
+	}
+}
+
+/* Rotation toggle in the pill (preview: teal play button). A small
+   teal-filled rounded square; Play = paused, tap to resume. */
+.pill-rotate-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	/* Preview: the in-pill resume button is 20x20px. */
+	width: 20px;
+	height: 20px;
+	flex: none;
+	padding: 0;
+	border: 0;
+	border-radius: 7px;
+	background: var(--accent);
+	color: #fff;
+	cursor: pointer;
+}
+
+.pill-rotate-btn:hover {
+	background: var(--accent-strong);
+}
+
+.pill-rotate-btn:focus-visible {
+	outline: none;
+	box-shadow:
+		0 0 0 2px var(--bg),
+		0 0 0 4px var(--accent);
+}
+
+.sticky-pill .pill-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--accent);
+	flex: none;
+}
+
+.sticky-pill .pill-chev {
+	color: var(--ink-dim);
+	display: inline-flex;
+}
+
+.pill-menu-btn {
+	background: none;
+	border: 0;
+	/* 2px padding: the 18px hamburger icon makes a 22px button
+	   (preview). */
+	padding: 2px;
+	color: var(--ink);
+	display: inline-flex;
+	align-items: center;
+}
+
+/* Preview: at md (768px) the hamburger hides and the 5 nav links
+   show instead; the label button + chevron still open the picker. */
+@media (min-width: 768px) {
+	.pill-hamb-btn {
+		display: none;
+	}
+}
+
+/* Hamburger polish (2026-11-09, home-shortcut round): the preview's
+   mark is a 12px icon in a 22px button (App.tsx:353) — the live 18px
+   icon was 50% heavier and read as a chunky button. The button stays
+   exactly 22px (preview) with the mark centred inside it, so the
+   pill's size and layout never change; only the mark gets thinner,
+   smaller and more minimal. */
+.pill-hamb-btn {
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	justify-content: center;
+}
+
+/* Open → X morph: both marks stay mounted and crossfade (opacity +
+   scale + rotate only, 200ms) — a smooth morph, never a swap flash.
+   Menu exits counter-clockwise, X enters clockwise. Reduced-motion
+   users get an instant swap (transition off). */
+.pill-hamb-btn .hamb-morph {
+	position: relative;
+	width: 12px;
+	height: 12px;
+	display: inline-flex;
+	flex: none;
+}
+
+.pill-hamb-btn .hamb-icon {
+	position: absolute;
+	inset: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 0;
+	transform: scale(0.6) rotate(-90deg);
+	transition:
+		opacity 200ms ease,
+		transform 200ms ease;
+}
+
+.pill-hamb-btn .hamb-icon--x {
+	transform: scale(0.6) rotate(90deg);
+}
+
+.pill-hamb-btn .hamb-icon.is-active {
+	opacity: 1;
+	transform: scale(1) rotate(0deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.pill-hamb-btn .hamb-icon {
+		transition: none;
+	}
+}
+
+/* Floating "back home" button (2026-11-09, home shortcut): a small
+   glass circle with a teal Home icon, fixed bottom-right. It is
+   NEVER in the header pill and never on the homepage (rendered only
+   off-home by Layout.astro). Visibility is driven by the .is-visible
+   class from its inline script: shown only once the visitor has
+   scrolled down a bit, hidden while a modal is open and while the
+   footer is in the button's zone. z-index 40 sits below the modal
+   backdrop (60) and the header panels (50), so even in the single
+   frame before the script hides it, a modal still covers it.
+   Entrance is transform + opacity only (rise + fade, 220ms);
+   reduced-motion users get an instant show/hide. */
+.home-fab {
+	position: fixed;
+	right: 16px;
+	bottom: 16px;
+	z-index: 40;
+	width: 44px;
+	height: 44px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	background: var(--card);
+	border: 1px solid var(--card-border);
+	box-shadow: var(--shadow);
+	backdrop-filter: blur(18px) saturate(1.4);
+	-webkit-backdrop-filter: blur(18px) saturate(1.4);
+	color: var(--accent-strong);
+	text-decoration: none;
+	opacity: 0;
+	transform: translateY(8px) scale(0.92);
+	visibility: hidden;
+	pointer-events: none;
+	transition:
+		opacity 220ms ease,
+		transform 220ms ease,
+		visibility 220ms;
+}
+
+.home-fab.is-visible {
+	opacity: 1;
+	transform: translateY(0) scale(1);
+	visibility: visible;
+	pointer-events: auto;
+}
+
+.home-fab:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.home-fab {
+		transition: none;
+	}
+}
+
+/* The chevron button needs 4px padding so the 14px icon makes a 22px
+   button (preview), matching the hamburger's 22px. */
+.sticky-pill .pill-chev-btn {
+	padding: 4px;
+}
+
+/* Connecting arcs (preview): two arcs, one in each gap between the
+   pill and a corner button, arching UP (hill) from the pill to the
+   button — the three header pieces read as ONE connected composition.
+   Each arc is absolutely positioned on the pill (right/left: 100%),
+   54px tall, top: 50% shifted up 72% of its own height, so it hangs
+   above the pill row in BOTH states and never strikes through page
+   content. Base opacity 0.16, flowing light 0.55, dasharray 64/336
+   of pathLength 400, 4s loop, right arc half a cycle behind (-2s).
+   The old single 96px SVG centred above the pill connected to
+   NOTHING (base 0.12 / flow 0.45, wrong pathLength 110) — the
+   designer saw "no connecting lines" in all four states. */
+.header-arc {
+	position: absolute;
+	top: 50%;
+	transform: translateY(-72%);
+	width: 32px;
+	height: 54px;
+	overflow: visible;
+	pointer-events: none;
+	z-index: 1;
+	/* Animation isolation: the flowing-light dashoffset animation is
+	   paint-only; layout containment keeps it inside this element. */
+	contain: layout style;
+}
+
+.header-arc-left {
+	right: 100%;
+}
+
+.header-arc-right {
+	left: 100%;
+}
+
+@media (min-width: 420px) {
+	.header-arc {
+		width: 44px;
+	}
+}
+
+@media (min-width: 640px) {
+	.header-arc {
+		width: 96px;
+	}
+}
+
+@media (min-width: 1024px) {
+	.header-arc {
+		width: 112px;
+	}
+}
+
+.header-arc .arc-base {
+	fill: none;
+	stroke: var(--accent);
+	stroke-opacity: 0.16;
+	stroke-width: 2;
+}
+
+.header-arc .arc-flow {
+	fill: none;
+	stroke: var(--accent);
+	stroke-opacity: 0.55;
+	stroke-width: 2.5;
+	stroke-linecap: round;
+	stroke-dasharray: 64 336;
+	filter: drop-shadow(0 0 4px var(--accent));
+	animation: arc-flow 4s linear infinite;
+}
+
+/* The second arc runs the same 4s loop, half a cycle behind. */
+.header-arc-right .arc-flow {
+	animation-delay: -2s;
+}
+
+@keyframes arc-flow {
+	to {
+		stroke-dashoffset: -400;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.header-arc .arc-flow {
+		animation: none;
+	}
+}
+
+.header-picker {
+	position: absolute;
+	left: 50%;
+	transform: translateX(-50%);
+	/* 6px below the pill (preview). The picker is positioned on the
+	   pill itself, so at sm+ it can anchor to the pill's left edge. */
+	top: calc(100% + 6px);
+	width: 328px;
+	max-width: calc(100vw - 32px);
+	background: var(--bg);
+	border: 1px solid var(--card-border);
+	border-radius: var(--radius-sm);
+	box-shadow: var(--shadow);
+	padding: 8px;
+	z-index: 50;
+	pointer-events: auto;
+}
+
+/* Preview: at sm+ the picker is 288px wide, anchored to the pill's
+   left edge (not centred). The max-width is a hard guard so the panel
+   can never leave the viewport even if its anchor ever shifts (e.g.
+   a browser that lays the pill out off-centre) — 288px < 100vw - 16px
+   at every width this rule applies to, so it changes nothing normally. */
+@media (min-width: 640px) {
+	.header-picker {
+		left: 0;
+		transform: none;
+		width: 288px;
+		max-width: calc(100vw - 16px);
+	}
+}
+
+.header-picker .picker-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	min-height: 40px;
+	padding: 6px 10px;
+	border: 0;
+	border-radius: var(--radius-xs);
+	background: transparent;
+	color: var(--ink);
+	font-size: 14px;
+	font-weight: 500;
+	text-align: left;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.header-picker .picker-row .picker-icon {
+	color: var(--accent);
+	display: inline-flex;
+	flex: none;
+}
+
+/* Mobile menu sub-rows (2026-11-10 nav round): the Work sub-menu
+   items (Projects, Case Studies, Posts) sit nested beneath the Work
+   row — indented, slightly smaller and dimmer, so the grouping reads
+   at a glance. The .menu-group wrapper is a plain span (no layout
+   of its own) so the rows keep the picker's exact flow. */
+.header-picker .menu-group {
+	display: contents;
+}
+
+.header-picker .picker-row.picker-subrow {
+	min-height: 36px;
+	padding-left: 28px;
+	font-size: 13px;
+	color: var(--ink-dim);
+}
+
+.header-picker .picker-row.active {
+	background: var(--accent-soft);
+}
+
+/* Selected profile marker (preview): a teal CHECKMARK on the right —
+   not a dot. Pushed to the row's far edge. */
+.header-picker .picker-row .picker-check {
+	margin-left: auto;
+	display: inline-flex;
+	flex: none;
+	color: var(--accent);
+}
+
+/* "Resume auto-rotation" (preview): big full-width teal button at the
+   bottom of the picker, play icon + label. */
+.picker-resume-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	width: 100%;
+	margin-top: 8px;
+	padding: 11px 12px;
+	border: 0;
+	border-radius: 12px;
+	background: var(--accent);
+	color: #fff;
+	font-size: 14px;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.picker-resume-btn:hover {
+	background: var(--accent-strong);
+}
+
+.picker-resume-btn:focus-visible {
+	outline: none;
+	box-shadow:
+		0 0 0 2px var(--bg),
+		0 0 0 4px var(--accent);
+}
+
+/* Stuck (scrolled) header: the two corner buttons flank the pill at
+   the same x positions as the top row. The pill itself stays in
+   .pill-stack (it glides up by transform when stuck). The buttons
+   sit at top: 0 — the same y as the stuck pill (preview: buttons and
+   pill both start at y=8 mobile / y=12 sm+). They are ALWAYS rendered
+   (preview's in-row copies): unstuck they collapse to width 0 +
+   opacity 0, and when stuck they EXPAND to full width over 350ms
+   ease-out, so the normal→sticky transition is one smooth,
+   coordinated move — never an abrupt pop-in. */
+.stuck-corners {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	/* No side padding — same as .header-top: buttons flush with the
+	   header edges (preview probe x=16 / x=326 at 390px). */
+	padding: 0;
+	pointer-events: none;
+	/* Animation isolation: the corner buttons animate `width` 0→48/64px
+	   on stick — a layout property, but this box is absolutely
+	   positioned, so the width change cannot move any in-flow element
+	   or the page scroll; it is contained here. A transform substitute
+	   (scaleX) would squash the "BN" label / icon mid-transition, so
+	   the width transition is kept deliberately. */
+	contain: layout style;
+}
+
+/* At sm+ the header itself carries 8px side padding, and an
+   absolutely-positioned box ignores it (left: 0 = the padding-box
+   edge) — so the stuck buttons sat 8px too far out (x=16 vs 24).
+   Inset the corners by the same 8px. */
+@media (min-width: 640px) {
+	.stuck-corners {
+		left: 8px;
+		right: 8px;
+	}
+}
+
+.stuck-corners .corner-btn {
+	flex: none;
+	/* min-width: 0 — flex items refuse to shrink below content size
+	   (the "BN" text / icon held the collapsed buttons at 14px wide
+	   instead of 0). */
+	min-width: 0;
+	pointer-events: none;
+	width: 0;
+	opacity: 0;
+	overflow: hidden;
+	border-color: transparent;
+	/* border-width: 0 — with padding: 0 (see .corner-btn) the border
+	   alone still held the collapsed button at 2px; 0 makes it a true 0. */
+	border-width: 0;
+	transition:
+		width 350ms ease-out,
+		opacity 250ms ease,
+		border-color 250ms ease,
+		background-color 200ms ease;
+}
+
+.site-header.is-stuck .stuck-corners .corner-btn {
+	width: 48px;
+	opacity: 1;
+	pointer-events: auto;
+	border-color: var(--card-border);
+	border-width: 1px;
+}
+
+@media (min-width: 640px) {
+	.site-header.is-stuck .stuck-corners .corner-btn {
+		width: 64px;
+	}
+}
+
+/* Language button: mobile shows only the target language, desktop EN/BN
+   (preview: EN/BN from sm/640px, same breakpoint as the 64x40 buttons). */
+.lang-desktop {
+	display: none;
+}
+
+@media (min-width: 640px) {
+	.lang-mobile {
+		display: none;
+	}
+	.lang-desktop {
+		display: inline;
+	}
+}
+
+/* Desktop nav links inside the sticky pill — hidden on mobile. */
+.pill-nav {
+	display: none;
+	align-items: center;
+	gap: 2px;
+	margin-left: 4px;
+	padding-left: 8px;
+	border-left: 1px solid var(--card-border);
+}
+
+@media (min-width: 768px) {
+	.pill-nav {
+		display: inline-flex;
+	}
+}
+
+.pill-nav a {
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--ink-dim);
+	text-decoration: none;
+	/* 7px horizontal (was 8px): part of the measured shave that keeps
+	   the pill inside the stuck row at 768px in the paused state. */
+	padding: 4px 7px;
+	border-radius: var(--radius-xs);
+	white-space: nowrap;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.pill-nav a:hover {
+		background: var(--accent-wash);
+		color: var(--ink);
+	}
+}
+
+/* Work sub-menu (2026-11-10 nav round): the "Work" pill-nav link
+   carries a glass dropdown with the archive pages (Projects, Case
+   Studies, Posts). The wrapper is a plain inline-flex span — no new
+   button or icon in the pill, so the header stays thin and premium.
+   The panel opens on hover and on keyboard focus (:focus-within), so
+   it works for mouse and keyboard alike; the Work label itself stays
+   a plain link to /#projects. The ::before bridge covers the 6px gap
+   between the link and the panel, so moving the pointer down never
+   drops the hover. The panel reuses the picker's glass tokens
+   (background, border, radius, shadow) so it reads as the same
+   component family. Reduced-motion kills the fade/slide (see the
+   reduced-motion block below). */
+.nav-dropdown {
+	position: relative;
+	display: inline-flex;
+}
+
+.nav-dropdown-panel {
+	position: absolute;
+	top: calc(100% + 6px);
+	left: 50%;
+	transform: translateX(-50%) translateY(-4px);
+	min-width: 180px;
+	max-width: calc(100vw - 16px);
+	padding: 6px;
+	border: 1px solid var(--card-border);
+	border-radius: var(--radius-sm);
+	background: var(--bg);
+	box-shadow: var(--shadow);
+	z-index: 60;
+	opacity: 0;
+	visibility: hidden;
+	pointer-events: none;
+	transition:
+		opacity 200ms ease-out,
+		transform 200ms ease-out,
+		visibility 200ms;
+}
+
+/* Invisible hover bridge over the gap between link and panel. */
+.nav-dropdown-panel::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 100%;
+	height: 8px;
+}
+
+.nav-dropdown:hover .nav-dropdown-panel,
+.nav-dropdown:focus-within .nav-dropdown-panel {
+	opacity: 1;
+	visibility: visible;
+	transform: translateX(-50%) translateY(0);
+	pointer-events: auto;
+}
+
+.nav-dropdown-link {
+	display: flex;
+	align-items: center;
+	width: 100%;
+	min-height: 36px;
+	padding: 6px 10px;
+	border-radius: var(--radius-xs);
+	color: var(--ink);
+	font-size: 13px;
+	font-weight: 500;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.nav-dropdown-link:hover {
+		background: var(--accent-wash);
+		color: var(--ink);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.nav-dropdown-panel {
+		transition: none;
+	}
+}
+
+/* ---------- Hero ---------- */
+.hero {
+	position: relative;
+	display: grid;
+	/* Mobile: photo above the copy, generous gap so the designation
+	   badge (which hangs 16px below the photo) never crowds the name. */
+	gap: 36px;
+	/* Mobile text is centered; left-aligned from lg. */
+	text-align: center;
+}
+
+@media (min-width: 1024px) {
+	.hero {
+		text-align: left;
+	}
+}
+
+@media (min-width: 1024px) {
+	.hero {
+		grid-template-columns: 5fr 7fr;
+		/* Vertically centered (preview): top-aligned copy left a large
+		   dead white void below the CTAs on desktop. */
+		align-items: center;
+		gap: 44px;
+	}
+}
+
+/* The copy column must be allowed to shrink inside the grid, or the
+   nowrap hero name can blow the grid out and unbalance the card. */
+.hero-copy {
+	min-width: 0;
+}
+
+.hero-photo-wrap {
+	position: relative;
+	max-width: 22rem;
+	margin: 0 auto;
+	width: 100%;
+}
+
+/* Desktop: the photo takes the full 5fr column (preview lg:max-w-none). */
+@media (min-width: 1024px) {
+	.hero-photo-wrap {
+		max-width: none;
+	}
+}
+
+.hero-photo-frame {
+	position: relative;
+	aspect-ratio: 4 / 5;
+	overflow: visible;
+	/* Animation isolation: `layout` only + stacking isolation. NEVER
+	   `paint`/`strict` or overflow clipping here — the runlight trace
+	   sits at inset −7px OUTSIDE the photo by design and the badge
+	   hangs 16px below it; paint containment would cut both. The
+	   runlight animates stroke-dashoffset (paint-only) and the badge
+	   letters transform/opacity, so nothing here can move layout. */
+	contain: layout style;
+	isolation: isolate;
+}
+
+/* The hero <img> renders inside a <picture> (AVIF/WebP sources):
+   the wrapper must fill the frame exactly like the <img> did, or
+   the photo shrinks to the <picture>'s inline size. No visual
+   change — same box, same image. */
+.hero-photo-frame picture {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+/* Preview: the portrait is SHARP-cornered — border-radius 0, no rounding
+   at all (user decision, 2026-11-08 ~18:12; the earlier 4px "essentially
+   square" was a misreading of the radius-free decision). object-position
+   favors the speaker's face/upper body so the podium bar at the bottom
+   of the photo does not dominate. */
+.hero-photo-frame img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	object-position: 50% 20%;
+	border-radius: 0;
+	border: 1px solid var(--card-border);
+	box-shadow:
+		0 0 0 1px rgba(255, 255, 255, 0.14),
+		0 24px 48px -12px rgba(0, 0, 0, 0.45),
+		0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+/* Bottom gradient overlay inside the photo frame (preview: black/25). */
+.hero-photo-gradient {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 42%;
+	background: linear-gradient(to top, rgba(0, 0, 0, 0.25), transparent);
+	border-radius: 0;
+	pointer-events: none;
+}
+
+/* Floating stat chips — positioned against the HERO CARD (the .hero
+   section, position:relative), NOT the photo: top-right and
+   bottom-right corners of the card, overlapping its edge slightly,
+   fully visible (the card has no overflow clipping). Solid opaque
+   pills, dark bold number + smaller grey label, like the preview.
+   Hidden on mobile (preview: hidden below md) — shown from lg. */
+.hero-photo-float {
+	display: none;
+}
+
+@media (min-width: 1024px) {
+	/* The float container is ABSOLUTELY positioned over the hero card
+	   (not a grid item): as a third grid child it auto-placed into a
+	   second row, adding a 44px phantom row-gap of dead white space at
+	   the bottom of the hero card on desktop. Out of the grid flow the
+	   card's height is set only by the photo + copy, like the preview. */
+	.hero-photo-float {
+		display: block;
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		/* Animation isolation: the float chips animate translateY only;
+		   layout containment keeps them inside the hero card. */
+		contain: layout style;
+	}
+
+	.hero-photo-float-card {
+		position: absolute;
+		z-index: 3;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 10px 16px;
+		border-radius: 16px;
+		background: #ffffff;
+		border: 1px solid var(--card-border);
+		box-shadow:
+			0 18px 45px rgba(13, 60, 50, 0.12),
+			0 2px 8px rgba(13, 60, 50, 0.06);
+		/* Animation isolation: hero-float is transform-only. */
+		contain: layout style;
+	}
+
+	.hero-photo-float-card:first-child {
+		top: -20px;
+		right: 24px;
+		animation: hero-float 5s ease-in-out infinite;
+	}
+
+	.hero-photo-float-card:last-child {
+		bottom: -20px;
+		right: 40px;
+		animation: hero-float 7s ease-in-out infinite;
+	}
+
+	.hero-photo-float-card strong {
+		font-size: 18px;
+		line-height: 1.1;
+		color: var(--ink);
+		white-space: nowrap;
+	}
+
+	.hero-photo-float-card span {
+		/* A11y (2026-11-09): 11px → 12px. Ink-dim already passes
+		   (5.36:1 light / 7.98:1 dark); only the size was sub-12px. */
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--ink-dim);
+		white-space: nowrap;
+	}
+}
+
+/* Dark mode: the chips stay solid and opaque — dark surface, not white. */
+[data-theme="dark"] .hero-photo-float-card {
+	background: #101815;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .hero-photo-float-card {
+		background: #101815;
+	}
+}
+
+@keyframes hero-float {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-7px);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.hero-photo-float-card {
+		animation: none;
+	}
+}
+
+/* The rotating-designation badge hangs off the photo's bottom edge —
+   half on the photo, half below it. z-index above the runlight trace
+   (whose bottom edge passes behind the badge) and above the photo, so
+   no decorative line can ever cross the badge text. The badge itself
+   is fully opaque, so the trace stays hidden behind it. */
+.hero-badge-anchor {
+	position: absolute;
+	left: 50%;
+	bottom: -16px;
+	transform: translateX(-50%);
+	z-index: 4;
+	display: flex;
+	justify-content: center;
+	pointer-events: none;
+	/* Animation isolation: the badge sits above the runlight trace
+	   (z-index 4) and must never let the trace paint over it. */
+	isolation: isolate;
+}
+
+/* The runlight SVG must sit EXACTLY 7px outside the photo on ALL FOUR
+   sides. `inset: -7px` alone does NOT do that: the SVG is a replaced
+   element with an intrinsic aspect ratio from its viewBox (100:125),
+   so the browser derives its height from its width via that ratio and
+   IGNORES `bottom: -7px`. The box is 14px wider than the photo, so the
+   ratio-derived height is 17.5px taller (14 x 5/4) and the bottom edge
+   lands 10.5px below the photo instead of 7px — the visible trace sat
+   ~8.9px below the photo vs ~5.4px on the other three sides (the
+   user-reported doubled bottom gap). Explicit width + height make the
+   intrinsic ratio irrelevant: the box is exactly the photo +/- 7px on
+   every side, and the trace inside (preserveAspectRatio="none") is
+   uniform. Animation, dasharray, opacity and glow are untouched. */
+.hero-runlight {
+	position: absolute;
+	top: -7px;
+	left: -7px;
+	width: calc(100% + 14px);
+	height: calc(100% + 14px);
+	pointer-events: none;
+}
+
+/* Running light around the photo's perimeter (preview): a faint
+   continuous trace + a SHORT SOFT teal segment travelling around it
+   (inset −7px, outside the photo edge). The segment is soft — 0.38
+   opacity, round caps, ~3px with a glow — never a hard thin line.
+   Restored 2026-11-08 ~18:12: the first fix round had wrongly removed
+   it, mistaking it for the stray hard dash on the photo's left/top
+   edge (that artifact stays removed — this is the soft perimeter
+   runlight only). */
+.hero-runlight .trace-base {
+	fill: none;
+	stroke: var(--accent);
+	stroke-opacity: 0.1;
+	stroke-width: 1.5;
+}
+
+.hero-runlight .trace-glow {
+	fill: none;
+	stroke: var(--accent);
+	stroke-opacity: 0.38;
+	stroke-width: 3;
+	stroke-linecap: round;
+	/* pathLength 400 on the rect: a 56-unit segment (~14% of the
+	   perimeter) travelling the full loop in ~7s. */
+	stroke-dasharray: 56 344;
+	animation: hero-runlight-travel 7s linear infinite;
+	filter: drop-shadow(0 0 3px rgba(13, 148, 136, 0.6));
+}
+
+@keyframes hero-runlight-travel {
+	to {
+		stroke-dashoffset: -400;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.hero-runlight .trace-glow {
+		animation: none;
+	}
+}
+
+/* Designation badge — a SOLID TEAL pill (preview ground truth): opaque
+   teal fill, white uppercase bold text, white icon, white blinking
+   cursor. NOT a glass/outline pill: the old translucent accent-wash
+   background let the runlight trace show through the text and made
+   the pill unreadable. Single fine light rim + inset top highlight +
+   soft teal drop shadow. */
+.hero-badge {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 32px;
+	padding: 6px 16px;
+	border-radius: 999px;
+	border: 1px solid rgba(255, 255, 255, 0.28);
+	background: var(--accent);
+	color: #ffffff;
+	/* A11y (2026-11-09): 11px → 12px on mobile (≥640px already 13px).
+	   Contrast fixed by the darkened --accent (5.06:1). The width
+	   sizer reserves the longest designation at the same size, so the
+	   pill still never grows/shrinks while typing. */
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	white-space: nowrap;
+	/* Clips the typing letters' rise-in so none ever spills outside
+	   the pill (preview's badge row is overflow-hidden too). */
+	overflow: hidden;
+	/* Animation isolation: paint containment matches the overflow clip;
+	   the typing letters animate transform/opacity/filter only. */
+	contain: layout paint;
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.35),
+		inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+		0 12px 28px rgba(13, 148, 136, 0.35),
+		0 3px 8px rgba(13, 60, 50, 0.18);
+}
+
+@media (min-width: 640px) {
+	.hero-badge {
+		padding: 8px 16px;
+		font-size: 13px;
+	}
+}
+
+/* Dark mode: the pill is the bright teal, so the text goes dark (same
+   as the preview) to stay readable — white on bright teal is not. */
+[data-theme="dark"] .hero-badge {
+	color: #03211c;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .hero-badge {
+		color: #03211c;
+	}
+}
+
+/* Width sizer: the longest designation (+ cursor replica), invisible,
+   reserves the badge width so the pill never grows/shrinks while
+   typing. The live content is absolutely centered over it. */
+.hero-badge .badge-sizer {
+	visibility: hidden;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.hero-badge .badge-visible {
+	position: absolute;
+	inset: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+}
+
+.hero-badge .badge-icon {
+	display: inline-flex;
+	/* White like the text (preview) — the old teal icon vanished
+	   against the teal pill. */
+	color: inherit;
+}
+
+.hero-badge .badge-cursor {
+	display: inline-block;
+	width: 2px;
+	height: 14px;
+	/* White like the text — the old teal cursor was invisible on
+	   the teal pill. */
+	background: currentColor;
+	animation: blink 1.06s ease-in-out infinite;
+	vertical-align: middle;
+}
+
+@keyframes blink {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.12;
+	}
+}
+
+.hero-name {
+	margin: 14px 0 0;
+	font-size: 27px;
+	line-height: 1.2;
+	letter-spacing: -0.02em;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+@media (min-width: 768px) {
+	.hero-name {
+		font-size: 36px;
+	}
+}
+
+/* Bangla clipping fix (2026-11-10, user report): Li Ador Noirrit's
+   below-base vowel signs (ু ূ ৃ) extend ~4px below the 1.2 line box of
+   the hero name, and .hero-name's overflow:hidden (needed for the
+   ellipsis) cuts them — half the ু was missing in the /bn/ hero.
+   Padding-bottom gives the ink room inside the clip (padding) box;
+   the matching negative margin-bottom keeps the layout footprint
+   EXACTLY the same, so nothing moves and no space is added. Scoped to
+   Bangla only, so the English hero is pixel-identical. Measured with
+   canvas ink extents in Playwright: overBelow 3.8px @27px, 3.9px @36px;
+   0.2em = 5.4px / 7.2px covers both with margin for other renderers. Full /bn/ audit (all pages,
+   390/768/1280/1920) found this as the ONLY real clip — card text,
+   badge, pill label, chips, meta, picker rows all verified unclipped. */
+html[lang="bn"] .hero-name {
+	padding-bottom: 0.2em;
+	margin-bottom: -0.2em;
+}
+
+.hero-headline {
+	margin: 10px 0 0;
+	font-size: 20px;
+	line-height: 1.35;
+	letter-spacing: -0.01em;
+}
+
+.hero-desc {
+	margin: 10px 0 0;
+	color: var(--ink-dim);
+	font-size: 15px;
+}
+
+.hero-location {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	margin: 12px 0 0;
+	color: var(--ink-dim);
+	font-size: 13px;
+}
+
+.hero-ctas {
+	display: flex;
+	justify-content: center;
+	gap: 10px;
+	flex-wrap: wrap;
+	margin-top: 18px;
+}
+
+@media (min-width: 1024px) {
+	.hero-location,
+	.hero-ctas {
+		justify-content: flex-start;
+	}
+}
+
+/* ---------- Stats (proof strip) ---------- */
+.proof-strip {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+}
+
+.proof-cell {
+	padding: 24px 8px;
+	text-align: center;
+}
+
+.proof-cell + .proof-cell {
+	border-left: 1px solid var(--card-border);
+}
+
+.proof-cell:nth-child(3) {
+	border-left: 0;
+}
+
+.proof-cell:nth-child(n + 3) {
+	border-top: 1px solid var(--card-border);
+}
+
+@media (min-width: 768px) {
+	.proof-strip {
+		grid-template-columns: repeat(4, 1fr);
+	}
+	.proof-cell {
+		padding: 28px 8px;
+	}
+	.proof-cell:nth-child(n + 3) {
+		border-top: 0;
+	}
+	.proof-cell:nth-child(3) {
+		border-left: 1px solid var(--card-border);
+	}
+	.proof-num {
+		font-size: 48px;
+	}
+}
+
+.proof-num {
+	font-size: 36px;
+	line-height: 1.1;
+	font-weight: 800;
+	color: var(--accent-strong);
+	letter-spacing: -0.02em;
+}
+
+.proof-label {
+	margin-top: 4px;
+	font-size: 13px;
+	color: var(--ink-dim);
+}
+
+/* Stats glass card: tighter vertical padding than the default .glass. */
+.glass.stats-glass {
+	padding-top: 8px;
+	padding-bottom: 8px;
+}
+
+@media (min-width: 768px) {
+	.glass.stats-glass {
+		padding-top: 12px;
+		padding-bottom: 12px;
+	}
+}
+
+/* ---------- Services ---------- */
+.services-grid {
+	display: grid;
+	gap: 12px;
+}
+
+@media (min-width: 640px) {
+	.services-grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+	/* 5th card: same width as the others, centred in its own row —
+	   it must NEVER span the full row (2026-11-10: the full-width
+	   5th card read as a broken/odd layout at intermediate widths). */
+	.services-grid .service-card:nth-child(5) {
+		grid-column: 1 / -1;
+		justify-self: center;
+		width: calc(50% - 6px);
+	}
+}
+
+@media (min-width: 1024px) {
+	.services-grid {
+		grid-template-columns: repeat(6, 1fr);
+	}
+	/* Explicit line placement (not span-only): row 1 is 3 × 2 cols,
+	   row 2 is 2 × 3 cols — the 3+2 fills the grid with no empty cell. */
+	.services-grid .service-card:nth-child(1) {
+		grid-column: 1 / span 2;
+	}
+	.services-grid .service-card:nth-child(2) {
+		grid-column: 3 / span 2;
+	}
+	.services-grid .service-card:nth-child(3) {
+		grid-column: 5 / span 2;
+	}
+	.services-grid .service-card:nth-child(4) {
+		grid-column: 1 / span 3;
+	}
+	.services-grid .service-card:nth-child(5) {
+		grid-column: 4 / span 3;
+		/* Reset the 640px centring: at lg the 5th card fills its
+		   3-col area like card 4 — without this, the 50% width
+		   from the sm rule would shrink it to half its area. */
+		width: auto;
+		justify-self: stretch;
+	}
+}
+
+.service-card {
+	display: flex;
+	gap: 14px;
+	align-items: flex-start;
+	padding: 18px;
+	border-radius: 20px;
+	border: 1px solid var(--card-border);
+	background: var(--card);
+	text-decoration: none;
+	color: inherit;
+	transition:
+		transform 200ms ease,
+		box-shadow 200ms ease,
+		border-color 200ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.service-card:hover {
+		transform: translateY(-2px);
+		box-shadow: var(--shadow);
+		border-color: var(--accent-soft);
+	}
+}
+
+.service-icon {
+	flex: none;
+	width: 48px;
+	height: 48px;
+	border-radius: 16px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--accent-soft);
+	color: var(--accent-strong);
+	/* Frosted teal tile: visible glowing ring + inset top highlight,
+	   so the icon reads clearly instead of washing out. */
+	border: 1px solid var(--border-glow-soft);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.6),
+		0 0 18px rgba(13, 148, 136, 0.28);
+}
+
+.service-icon img {
+	width: 26px;
+	height: 26px;
+	object-fit: contain;
+}
+
+.service-card h3 {
+	margin: 0;
+	font-size: 15px;
+	line-height: 1.4;
+	/* Long titles (WordPress…) wrap cleanly instead of awkward breaks. */
+	overflow-wrap: break-word;
+}
+
+.service-card p {
+	margin: 6px 0 0;
+	font-size: 14px;
+	color: var(--ink-dim);
+}
+
+.service-cue {
+	margin-top: 10px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--accent-strong);
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.service-cue svg {
+	flex: none;
+	transition: transform 200ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.service-card:hover .service-cue svg,
+	.grid-card:hover .service-cue svg {
+		transform: translateX(4px);
+	}
+}
+
+/* ---------- Chips / filters ---------- */
+.chip-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.chip {
+	border: 1px solid var(--card-border);
+	background: transparent;
+	color: var(--ink);
+	border-radius: 999px;
+	padding: 6px 14px;
+	font-size: 13px;
+	/* Preview archive chips are semibold (600), not medium (500). */
+	font-weight: 600;
+	transition:
+		background-color 200ms ease,
+		border-color 200ms ease;
+}
+
+.chip.active {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: #fff;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.chip:hover {
+		background: var(--accent-wash);
+	}
+	.chip.active:hover {
+		background: var(--accent-strong);
+	}
+}
+
+.count-line {
+	margin: 12px 0 0;
+	font-size: 13px;
+	color: var(--ink-dim);
+}
+
+/* ---------- Archive filter (shared ArchiveFilter.astro) ---------- */
+/* The filter row caps the visible chips ("All" + top 5 by count) and
+   puts every option behind a "More" dropdown, so the row never grows
+   into a jungle as categories are added. The menu reuses the nav
+   dropdown's glass tokens (background, border, radius, shadow) so it
+   reads as the same component family. */
+.filter-more-wrap {
+	position: relative;
+	display: inline-flex;
+}
+
+.filter-more .filter-caret {
+	display: inline-block;
+	margin-left: 2px;
+	font-size: 11px;
+	transition: transform 200ms ease;
+}
+
+.filter-more-wrap.open .filter-more .filter-caret {
+	transform: rotate(180deg);
+}
+
+.filter-more-n {
+	opacity: 0.65;
+	font-weight: 500;
+}
+
+.filter-menu {
+	position: absolute;
+	top: calc(100% + 8px);
+	right: 0;
+	min-width: 210px;
+	max-width: calc(100vw - 32px);
+	max-height: 320px;
+	overflow-y: auto;
+	padding: 6px;
+	border: 1px solid var(--card-border);
+	border-radius: var(--radius-sm);
+	background: var(--bg);
+	box-shadow: var(--shadow);
+	z-index: 60;
+	opacity: 0;
+	visibility: hidden;
+	pointer-events: none;
+	transform: translateY(-4px);
+	transition:
+		opacity 200ms ease-out,
+		transform 200ms ease-out,
+		visibility 200ms;
+}
+
+.filter-more-wrap.open .filter-menu {
+	opacity: 1;
+	visibility: visible;
+	transform: translateY(0);
+	pointer-events: auto;
+}
+
+.filter-menu-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	min-height: 36px;
+	padding: 6px 10px;
+	border: 0;
+	border-radius: var(--radius-xs);
+	background: transparent;
+	color: var(--ink);
+	font-size: 13px;
+	font-weight: 500;
+	text-align: left;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.filter-menu-item:hover {
+		background: var(--accent-wash);
+	}
+}
+
+.filter-menu-item[aria-checked="true"] {
+	background: var(--accent-wash);
+	font-weight: 700;
+}
+
+.filter-menu-check {
+	width: 14px;
+	flex: none;
+	visibility: hidden;
+}
+
+.filter-menu-item[aria-checked="true"] .filter-menu-check {
+	visibility: visible;
+}
+
+.filter-menu-label {
+	flex: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.filter-menu-count {
+	color: var(--ink-dim);
+	font-size: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.filter-menu,
+	.filter-more .filter-caret {
+		transition: none;
+	}
+}
+
+/* ---------- Projects carousel (stacked deck) ---------- */
+/* The chevron buttons live at the RIGHT BOTTOM of the carousel, in the
+   indicator row — never in a top row above the deck. The left-top
+   button position was a mistake, removed. */
+
+.chev-btn {
+	width: 36px;
+	height: 36px;
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	border: 1px solid var(--card-border);
+	background: var(--card);
+	color: var(--ink);
+	box-shadow: var(--shadow-soft);
+	transition: background-color 200ms ease;
+}
+
+.chev-btn:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.chev-btn:focus-visible,
+.deck-dot:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.chev-btn:hover:not(:disabled) {
+		background: var(--accent-wash);
+	}
+}
+
+/* The deck reserves room on the right and below for the page stack:
+   the deepest peek steps 60px right and 27px down, so the peek edges
+   never cross the indicator row or the counter text below. */
+.deck {
+	position: relative;
+	perspective: 1200px;
+	margin: 4px 60px 52px 4px;
+	/* Animation isolation: `layout` only + stacking isolation. NEVER
+	   `paint`/`strict` or overflow clipping here — the peek pages fan
+	   OUTSIDE the deck (up to ~36px left, ~15px down) by design. The
+	   flip animates transform/opacity only, so it cannot move layout. */
+	contain: layout style;
+	isolation: isolate;
+}
+
+.deck-card {
+	position: relative;
+	border-radius: var(--radius-sm);
+	border: 1px solid var(--card-border);
+	background: var(--card);
+	overflow: hidden;
+	text-decoration: none;
+	color: inherit;
+	display: block;
+	box-shadow: var(--shadow);
+	will-change: transform, opacity;
+	/* Animation isolation: the flip is transform/opacity only;
+	   paint containment matches the existing overflow clip. */
+	contain: layout paint;
+}
+
+.deck-card .deck-thumb {
+	aspect-ratio: 16 / 10;
+	overflow: hidden;
+	background: var(--bg-wash);
+}
+
+.deck-card .deck-thumb img,
+.deck-card .deck-thumb video {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.deck-card .deck-thumb .thumb-fallback {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 44px;
+	font-weight: 800;
+	color: var(--accent);
+	background: var(--accent-wash);
+}
+
+.deck-card .deck-body {
+	padding: 16px;
+}
+
+.deck-card h3 {
+	margin: 0;
+	font-size: 17px;
+	line-height: 1.35;
+}
+
+.deck-card p {
+	margin: 6px 0 0;
+	font-size: 14px;
+	color: var(--ink-dim);
+	/* Mobile carousel card — same max-2-lines rule as the grid cards. */
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+/* Stacked pages: solid paper cards behind the main card, pivoting on
+   the LEFT edge (the spine) and fanning RIGHT — a deliberate deck, not
+   a sliver. The next project's thumbnail shows faintly (muted under a
+   paper wash) on the page's top band, with title/text lines below it.
+   While the main card is flipping, the peeks fade almost out so the
+   turning card can never double-expose against a second image. */
+.deck-peek {
+	position: absolute;
+	inset: 0;
+	border-radius: var(--radius-sm);
+	border: 1px solid var(--card-border);
+	background: var(--card);
+	box-shadow: var(--shadow-soft);
+	overflow: hidden;
+	pointer-events: none;
+	transition: opacity 250ms ease;
+	/* Animation isolation: peeks move by inline transform/opacity only;
+	   layout containment keeps them inside the deck. */
+	contain: layout style;
+}
+
+.deck--flipping .deck-peek {
+	opacity: 0.06 !important;
+}
+
+.deck-peek .deck-peek-thumb {
+	height: 42%;
+	background-size: cover;
+	background-position: center;
+	opacity: 0.45;
+}
+
+/* Peek video thumbnail: same fill as the background-image thumb. */
+.deck-peek .deck-peek-thumb video {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.deck-peek .deck-peek-thumb--empty {
+	background: var(--accent-wash);
+	opacity: 1;
+}
+
+.deck-peek .deck-peek-lines {
+	padding: 12px 14px;
+	display: grid;
+	gap: 8px;
+}
+
+.deck-peek .deck-peek-line {
+	display: block;
+	height: 8px;
+	border-radius: 4px;
+	background: var(--ink-faint);
+	opacity: 0.35;
+}
+
+.deck-peek .deck-peek-line--title {
+	height: 11px;
+	width: 55%;
+	opacity: 0.5;
+}
+
+.deck-peek .deck-peek-line--short {
+	width: 40%;
+}
+
+/* Bottom indicator row: dots + counter centred, chevrons at right
+   bottom (the original preview position). The spacer balances the
+   chevron group so the centre group is truly centred. */
+.deck-indicator {
+	display: grid;
+	grid-template-columns: 1fr auto 1fr;
+	align-items: center;
+	gap: 12px;
+	margin-top: 14px;
+	/* Animation isolation: the dots animate `width` 10→24px (see
+	   .deck-dot) — a layout property, kept deliberately: a transform
+	   substitute would need every dot to reserve the 24px active width
+	   in layout, widening the indicator row and reflowing the counter.
+	   The shift is confined to this row (≤14px on a 10px dot, estimated
+	   CLS ≤0.0001 — live measurement was blocked in this environment,
+	   see worker I report) and containment here keeps it from affecting
+	   anything outside the row. */
+	contain: layout style;
+}
+
+.deck-indicator-spacer {
+	min-width: 0;
+}
+
+.deck-indicator-center {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 10px;
+	flex-wrap: wrap;
+	min-width: 0;
+}
+
+.deck-nav {
+	display: flex;
+	gap: 8px;
+	justify-self: end;
+}
+
+.deck-dots {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+/* A11y (2026-11-09): axe flagged every dot — 10px target, 12px safe
+   space (needs 24px). The VISIBLE dot stays exactly 10px: the button
+   is now a 24px hit area with a 7px transparent border and
+   background-clip: padding-box, so only the 10px centre paints.
+   (box-sizing is border-box, so width 24px = 10px dot + 2×7px
+   border.) Inactive opacity 0.55 → 0.8: the dot is a UI component
+   (non-text 3:1) — blended ink-dim on white was ~2.2:1, now 3.53:1. */
+.deck-dot {
+	width: 24px;
+	height: 24px;
+	border-radius: 50%;
+	border: 7px solid transparent;
+	background-clip: padding-box;
+	padding: 0;
+	background-color: var(--ink-dim);
+	opacity: 0.8;
+	transition:
+		width 200ms ease,
+		background-color 200ms ease,
+		opacity 200ms ease;
+}
+
+.deck-dot.active {
+	/* Preview active dot is 28px wide (10px tall) — plus the 7px
+	   transparent border each side, so the hit area is 42×24px. */
+	width: 42px;
+	border-radius: 999px;
+	/* background-color, NOT the background shorthand: the shorthand
+	   would reset background-clip to border-box and paint the accent
+	   over the transparent hit-area border too. */
+	background-color: var(--accent);
+	opacity: 1;
+}
+
+.deck-counter {
+	/* Preview counter is 12px semibold dim. */
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--ink-dim);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 44vw;
+}
+
+/* ---------- Projects grid (desktop, >= 1024px) ---------- */
+/* Desktop is NOT one-at-a-time: all projects in a 3-per-row grid with
+   a staggered fade+rise reveal on load and a hover lift. The carousel
+   (dots, chevrons, flip) is mobile-only and hidden at desktop widths. */
+.projects-grid {
+	display: grid;
+	gap: 16px;
+}
+
+@media (min-width: 640px) {
+	.projects-grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+
+@media (min-width: 1024px) {
+	.projects-grid {
+		grid-template-columns: repeat(3, 1fr);
+	}
+	.projects-carousel {
+		display: none;
+	}
+}
+
+.projects-grid-card {
+	animation: grid-rise 0.55s cubic-bezier(0.22, 0.8, 0.3, 1) both;
+	/* Animation isolation: grid-rise is transform/opacity only. */
+	contain: layout style;
+}
+
+@keyframes grid-rise {
+	from {
+		opacity: 0;
+		transform: translateY(18px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.projects-grid-card {
+		animation: none;
+	}
+}
+
+.tag-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 10px;
+}
+
+.tag {
+	font-size: 12px;
+	font-weight: 500;
+	padding: 3px 9px;
+	border-radius: 999px;
+	background: var(--accent-wash);
+	color: var(--accent-strong);
+	white-space: nowrap;
+}
+
+/* ---------- Grids (archive / ventures / posts / case studies) ---------- */
+.card-grid {
+	display: grid;
+	gap: 12px;
+}
+
+@media (min-width: 640px) {
+	.card-grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+
+@media (min-width: 1024px) {
+	.card-grid {
+		grid-template-columns: repeat(3, 1fr);
+	}
+}
+
+.grid-card {
+	display: block;
+	border-radius: var(--radius-sm);
+	border: 1px solid var(--card-border);
+	background: var(--card);
+	overflow: hidden;
+	text-decoration: none;
+	color: inherit;
+	transition:
+		transform 200ms ease,
+		box-shadow 200ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.grid-card:hover {
+		transform: translateY(-2px);
+		box-shadow: var(--shadow);
+	}
+}
+
+.grid-card .grid-thumb {
+	aspect-ratio: 16 / 10;
+	overflow: hidden;
+	background: var(--bg-wash);
+}
+
+.grid-card .grid-thumb img,
+.grid-card .grid-thumb video {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+/* <picture> wrappers from ThumbImage fill their thumb container
+   exactly like the <img> they replace (Batch 2). */
+.grid-card .grid-thumb picture,
+.mini-row .mini-thumb picture {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+.grid-card .grid-thumb .thumb-fallback {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 36px;
+	font-weight: 800;
+	color: var(--accent);
+	background: var(--accent-wash);
+}
+
+.grid-card .grid-body {
+	padding: 14px 16px;
+}
+
+.grid-card h3 {
+	margin: 0;
+	font-size: 15px;
+	line-height: 1.4;
+}
+
+.grid-card p {
+	margin: 6px 0 0;
+	font-size: 13px;
+	color: var(--ink-dim);
+	/* Grid short descriptions show max 2 lines (user decision, 2026-11-08):
+	   the visual 2-line limit is the primary enforcement; the character
+	   cap in truncateShort() is only a text-level safety net above the
+	   preview's longest card copy. */
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.grid-card .grid-meta {
+	margin-top: 8px;
+	font-size: 12px;
+	color: var(--ink-faint);
+	/* Single-line meta — undo the -webkit-box clamp above. */
+	display: block;
+}
+
+/* ---------- Detail pages ---------- */
+.back-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 14px;
+	font-weight: 600;
+	text-decoration: none;
+	margin-bottom: 12px;
+}
+
+.detail-hero {
+	border-radius: var(--radius-sm);
+	overflow: hidden;
+	background: var(--bg-wash);
+}
+
+.detail-hero img,
+.detail-hero video {
+	width: 100%;
+	display: block;
+	/* Preview mold: 16/9 on mobile, 21/9 at sm+. */
+	aspect-ratio: 16 / 9;
+	object-fit: cover;
+}
+
+@media (min-width: 640px) {
+	.detail-hero img,
+	.detail-hero video {
+		aspect-ratio: 21 / 9;
+	}
+}
+
+/* A video facade inside the hero follows the same aspect as the image. */
+.detail-hero .video-facade {
+	aspect-ratio: 16 / 9;
+}
+
+@media (min-width: 640px) {
+	.detail-hero .video-facade {
+		aspect-ratio: 21 / 9;
+	}
+}
+
+.detail-title {
+	margin: 16px 0 0;
+	/* Preview mold: text-3xl mobile, text-4xl at sm+. */
+	font-size: 30px;
+	line-height: 1.25;
+	letter-spacing: -0.01em;
+}
+
+@media (min-width: 640px) {
+	.detail-title {
+		font-size: 36px;
+	}
+}
+
+.detail-meta {
+	margin: 8px 0 0;
+	font-size: 13px;
+	color: var(--ink-dim);
+}
+
+/* Key-info strip (preview mold): a <dl> grid — 2 columns on mobile,
+   3 at sm, 4 at lg. Empty items are never rendered (see KeyStrip). */
+.key-strip {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px 20px;
+	margin: 16px 0 0;
+	padding: 12px 0;
+	border-top: 1px solid var(--card-border);
+	border-bottom: 1px solid var(--card-border);
+	font-size: 13px;
+}
+
+@media (min-width: 640px) {
+	.key-strip {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+@media (min-width: 1024px) {
+	.key-strip {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+}
+
+.key-strip .key-item {
+	min-width: 0;
+}
+
+.key-strip dt {
+	font-size: 12px;
+	color: var(--ink-dim);
+}
+
+.key-strip dd {
+	margin: 2px 0 0;
+	font-size: 14px;
+	font-weight: 600;
+	overflow-wrap: break-word;
+}
+
+.detail-body {
+	margin-top: 16px;
+	font-size: 15px;
+	/* Preview mold: body copy in a max-w-3xl column. */
+	max-width: 48rem;
+}
+
+.detail-body h2 {
+	font-size: 18px;
+	margin: 20px 0 8px;
+}
+
+.detail-body p {
+	margin: 0 0 12px;
+	color: var(--ink-dim);
+}
+
+.detail-body p:first-child {
+	color: var(--ink);
+}
+
+.problem-fix-result {
+	display: grid;
+	gap: 12px;
+	margin-top: 16px;
+}
+
+@media (min-width: 768px) {
+	.problem-fix-result {
+		grid-template-columns: repeat(3, 1fr);
+	}
+}
+
+.pfr {
+	padding: 16px;
+	border-radius: var(--radius-sm);
+	border: 1px solid var(--card-border);
+	background: var(--card);
+}
+
+.pfr h3 {
+	margin: 0 0 6px;
+	font-size: 14px;
+}
+
+.pfr p {
+	margin: 0;
+	font-size: 14px;
+	color: var(--ink-dim);
+}
+
+.media-grid {
+	display: grid;
+	gap: 10px;
+	margin-top: 16px;
+}
+
+.media-grid.cols-1 {
+	grid-template-columns: 1fr;
+}
+
+/* A single gallery image/video is one large figure, max-w-3xl. */
+.media-grid.cols-1 figure {
+	max-width: 48rem;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.media-grid.cols-2 {
+	grid-template-columns: 1fr 1fr;
+}
+
+/* 3–6 items: 2 across on mobile, 3 at sm+. */
+.media-grid.cols-3 {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 640px) {
+	.media-grid.cols-3 {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+.media-grid figure {
+	margin: 0;
+	border-radius: var(--radius-sm);
+	overflow: hidden;
+}
+
+.media-grid img,
+.media-grid video {
+	width: 100%;
+	display: block;
+	aspect-ratio: 16 / 10;
+	object-fit: cover;
+}
+
+/* Prev/next (preview mold): stacked on mobile, two columns at sm+.
+   The next card flips row-reverse and right-aligns. Titles wrap
+   (min-w-0 + break words) instead of truncating at the card edge. */
+.prev-next {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 10px;
+	margin-top: 24px;
+}
+
+@media (min-width: 640px) {
+	.prev-next {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+.prev-next a {
+	min-width: 0;
+	display: flex;
+	flex-direction: row;
+	align-items: flex-start;
+	gap: 12px;
+	padding: 14px 16px;
+	border-radius: var(--radius-sm);
+	border: 1px solid var(--card-border);
+	background: var(--card);
+	text-decoration: none;
+	color: inherit;
+}
+
+.prev-next a .pn-thumb {
+	flex: none;
+	width: 80px;
+	height: 56px;
+	object-fit: cover;
+	border-radius: var(--radius-xs);
+}
+
+/* <picture> wrapper from ThumbImage (local thumbs) — same box as the
+   <img> it replaces, so the flex row does not shift (Batch 2). */
+.prev-next a picture {
+	flex: none;
+	width: 80px;
+	height: 56px;
+}
+
+.prev-next a .pn-body {
+	min-width: 0;
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.prev-next a .pn-label {
+	font-size: 12px;
+	color: var(--ink-dim);
+}
+
+.prev-next a .pn-title {
+	font-size: 14px;
+	font-weight: 600;
+	overflow: hidden;
+	overflow-wrap: break-word;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+}
+
+.prev-next a.next {
+	flex-direction: row-reverse;
+	text-align: right;
+}
+
+.prev-next a.next .pn-body {
+	align-items: flex-end;
+}
+
+.detail-cta {
+	margin-top: 24px;
+	/* Preview mold: rounded-3xl accent-soft band, p-6 → p-8 at sm+. */
+	padding: 24px;
+	border-radius: 24px;
+	border: 1px solid var(--card-border);
+	background: var(--accent-wash);
+	text-align: center;
+}
+
+@media (min-width: 640px) {
+	.detail-cta {
+		padding: 32px;
+	}
+}
+
+.detail-cta h3 {
+	margin: 0 0 6px;
+	font-size: 17px;
+}
+
+.detail-cta p {
+	margin: 0 0 14px;
+	font-size: 14px;
+	color: var(--ink-dim);
+}
+
+.detail-cta .cta-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: center;
+	gap: 12px;
+}
+
+/* Preview detail-page CTAs are 44px pills (px-6 py-3, 14px bold) —
+   NOT the slim 13px hero-button size the base .btn carries. This
+   covers the primary button and the ghost secondary link alike. */
+.detail-cta .btn {
+	padding: 12px 24px;
+	font-size: 14px;
+	font-weight: 700;
+	border-radius: 999px;
+}
+
+/* ---------- Detail pages — Run 13 ---------- */
+.detail-section {
+	margin-top: 24px;
+}
+
+.detail-h2 {
+	margin: 0 0 12px;
+	font-size: 18px;
+	line-height: 1.3;
+	letter-spacing: -0.01em;
+}
+
+/* One-liner lede under the title (venture description, post excerpt). */
+.detail-lede {
+	margin: 12px 0 0;
+	font-size: 16px;
+	line-height: 1.55;
+	color: var(--ink-dim);
+	max-width: 48rem;
+}
+
+/* Metrics band — accent-soft cards, value + label (real figures only). */
+.metrics-band {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 10px;
+	margin-top: 16px;
+}
+
+@media (min-width: 640px) {
+	.metrics-band {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+.metric-card {
+	padding: 16px;
+	border-radius: var(--radius-sm);
+	border: 1px solid var(--card-border);
+	background: var(--accent-soft);
+	text-align: center;
+}
+
+.metric-card strong {
+	display: block;
+	font-size: 24px;
+	line-height: 1.1;
+	font-weight: 800;
+	color: var(--accent-strong);
+	letter-spacing: -0.02em;
+}
+
+.metric-card span {
+	display: block;
+	margin-top: 4px;
+	font-size: 13px;
+	color: var(--ink-dim);
+}
+
+/* "The fix" checklist — teal check marks, one fix point per line. */
+.fix-points {
+	list-style: none;
+	margin: 12px 0 0;
+	padding: 0;
+	display: grid;
+	gap: 8px;
+}
+
+.fix-points li {
+	position: relative;
+	padding-left: 24px;
+	font-size: 14px;
+	color: var(--ink-dim);
+}
+
+.fix-points li::before {
+	content: "✓";
+	position: absolute;
+	left: 0;
+	top: 0;
+	color: var(--accent-strong);
+	font-weight: 800;
+}
+
+/* Media slider — scroll-snap track with glass arrows, progress bar
+   and "N of M" page counter. Works by native scroll even without JS. */
+.media-slider {
+	margin-top: 16px;
+}
+
+.media-track {
+	display: flex;
+	gap: 10px;
+	overflow-x: auto;
+	scroll-snap-type: x mandatory;
+	scrollbar-width: none;
+	-webkit-overflow-scrolling: touch;
+}
+
+.media-track::-webkit-scrollbar {
+	display: none;
+}
+
+.media-slide {
+	flex: none;
+	margin: 0;
+	border-radius: var(--radius-sm);
+	overflow: hidden;
+	scroll-snap-align: start;
+	/* 1 per view on mobile; 2 at sm; per-view count at lg. */
+	flex-basis: 100%;
+}
+
+@media (min-width: 640px) {
+	.media-slide {
+		flex-basis: calc((100% - 10px) / 2);
+	}
+}
+
+@media (min-width: 1024px) {
+	.media-slider[data-per-view="3"] .media-slide {
+		flex-basis: calc((100% - 20px) / 3);
+	}
+	.media-slider[data-per-view="4"] .media-slide {
+		flex-basis: calc((100% - 30px) / 4);
+	}
+	.media-slider[data-per-view="2"] .media-slide {
+		flex-basis: calc((100% - 10px) / 2);
+	}
+}
+
+.media-slide img,
+.media-slide video {
+	width: 100%;
+	display: block;
+	aspect-ratio: 16 / 10;
+	object-fit: cover;
+}
+
+.media-slide figcaption,
+.media-grid figcaption {
+	font-size: 13px;
+	color: var(--ink-dim);
+	padding: 8px 2px 0;
+}
+
+.slider-controls {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-top: 10px;
+}
+
+.slider-progress {
+	flex: 1;
+	height: 4px;
+	border-radius: 999px;
+	background: var(--card-border);
+	overflow: hidden;
+	/* Animation isolation: the fill bar's width transition (detail.js)
+	   is clipped here and cannot shift siblings — the bar lives inside
+	   this overflow:hidden flex child. Converting the fill to
+	   transform: scaleX needs detail.js + DetailMedia.astro (detail
+	   round's files) — reported to the coordinator, not changed here. */
+	contain: layout paint;
+}
+
+.slider-progress > div {
+	height: 100%;
+	background: var(--accent);
+	border-radius: 999px;
+	transition: width 200ms ease;
+}
+
+.slider-counter {
+	font-size: 13px;
+	color: var(--ink-dim);
+	white-space: nowrap;
+}
+
+/* Audio release tile (preview): an accent tile with a LARGE platform
+   logo — never a big empty block with a lone mic icon. */
+.audio-tile {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	aspect-ratio: 16 / 9;
+	border-radius: var(--radius-sm);
+	background: var(--accent-wash);
+	color: var(--accent-strong);
+}
+
+.audio-tile img,
+.audio-tile svg {
+	width: 64px;
+	height: 64px;
+	object-fit: contain;
+	opacity: 0.9;
+}
+
+/* "Listen & watch" — full-width rows: real icon + Watch/Listen label. */
+.platform-list {
+	display: grid;
+	gap: 8px;
+}
+
+.platform-row-link {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 14px;
+	border-radius: var(--radius-sm);
+	border: 1px solid var(--card-border);
+	background: var(--card);
+	color: var(--ink);
+	font-size: 14px;
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.platform-row-link span:last-child {
+	margin-left: auto;
+	color: var(--ink-dim);
+	font-weight: 400;
+}
+
+/* Lyrics keep their line breaks. */
+.lyrics {
+	white-space: pre-line;
+	margin: 0;
+	font-size: 15px;
+	line-height: 1.7;
+	color: var(--ink-dim);
+}
+
+/* Post author card — speaker photo + name + roles + email. */
+.author-card {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	margin-top: 24px;
+	padding: 16px;
+	border-radius: var(--radius-sm);
+	border: 1px solid var(--card-border);
+	background: var(--card);
+}
+
+.author-photo {
+	flex: none;
+	width: 56px;
+	height: 56px;
+	border-radius: 50%;
+	object-fit: cover;
+}
+
+.author-info {
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	font-size: 14px;
+}
+
+.author-info span {
+	font-size: 13px;
+	color: var(--ink-dim);
+}
+
+.author-info a {
+	font-size: 13px;
+	overflow-wrap: break-word;
+}
+
+/* "Play here" / "Play video" — a pill control, not bare text sitting
+   on the thumbnail's bottom edge. */
+.play-label {
+	position: absolute;
+	left: 50%;
+	bottom: 14px;
+	transform: translateX(-50%);
+	padding: 6px 14px;
+	border-radius: 999px;
+	background: rgba(0, 0, 0, 0.55);
+	backdrop-filter: blur(4px);
+	-webkit-backdrop-filter: blur(4px);
+	color: #fff;
+	font-size: 13px;
+	font-weight: 600;
+	white-space: nowrap;
+	pointer-events: none;
+}
+
+/* Video facade without a poster — accent tile behind the play button. */
+.video-facade-tile {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 100%;
+	background: var(--accent-wash);
+	color: var(--accent-strong);
+}
+
+/* ---------- Stack globe ---------- */
+/* Preview heading: large, bold, left-aligned, sub-heading below it
+   (the h2 + p sit in an inner div, Services-style, not side-by-side). */
+#stack .section-head h2 {
+	font-size: 28px;
+	font-weight: 800;
+	letter-spacing: -0.02em;
+}
+
+#stack .section-head p {
+	color: var(--ink-dim);
+}
+
+.globe-wrap {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	/* Animation isolation: the rAF loop writes transforms on the globe's
+	   own tags only; layout containment keeps any of it inside the wrap. */
+	contain: layout style;
+}
+
+.globe-stage {
+	position: relative;
+	/* 100% of the card content (was 96vw): at 390px the 96vw stage
+	   was 374px wide in a ~308px card — it stuck out 41px past the
+	   card's right edge and the right-edge tags ("Prisma", "Rust")
+	   were cut off by the viewport. aspect-ratio keeps it square. */
+	width: min(440px, 100%);
+	aspect-ratio: 1;
+	margin: 0 auto;
+	touch-action: pan-y;
+	/* Animation isolation: `layout` ONLY + stacking isolation. NEVER
+	   `paint` / `content` / `strict` and NEVER overflow: clip here —
+	   the orbit ring sits at inset −7% OUTSIDE the stage by design and
+	   paint containment would cut it (worker F rule). The rAF loop
+	   positions tags with left/top + transform; the final-centre clamp
+	   in StackGlobe.tsx keeps every pill inside the stage, so no tag
+	   can overflow the page. */
+	contain: layout style;
+	isolation: isolate;
+}
+
+.globe-ball {
+	position: absolute;
+	inset: 0;
+	border-radius: 50%;
+	/* Top-left light + teal core glow: a real sphere, not a flat disc.
+	   The mint wash is clearly visible across the whole ball (preview) —
+	   a deeper base + stronger core glow, so the ball never reads as a
+	   pale washed-out disc against the white card. */
+	background:
+		radial-gradient(
+			circle at 32% 26%,
+			rgba(255, 255, 255, 0.85) 0%,
+			rgba(255, 255, 255, 0.25) 32%,
+			transparent 55%
+		),
+		radial-gradient(
+			circle at 50% 58%,
+			rgba(13, 148, 136, 0.32) 0%,
+			rgba(13, 148, 136, 0.14) 48%,
+			transparent 72%
+		),
+		radial-gradient(
+			circle at 50% 50%,
+			transparent 55%,
+			rgba(12, 26, 21, 0.14) 85%,
+			rgba(12, 26, 21, 0.2) 100%
+		),
+		#d9ede5;
+	border: 1px solid rgba(13, 148, 136, 0.45);
+	box-shadow:
+		inset 0 0 60px rgba(13, 148, 136, 0.28),
+		inset -24px -28px 60px rgba(12, 26, 21, 0.14),
+		inset 18px 20px 40px rgba(255, 255, 255, 0.55),
+		0 0 54px rgba(13, 148, 136, 0.18),
+		0 18px 45px rgba(12, 26, 21, 0.1);
+	backdrop-filter: blur(18px) saturate(1.4);
+	-webkit-backdrop-filter: blur(18px) saturate(1.4);
+	overflow: hidden;
+}
+
+/* Dark mode: the sphere needs its own stronger shading — the light
+   teal-on-white values wash out completely on a dark card. */
+[data-theme="dark"] .globe-ball {
+	background:
+		radial-gradient(
+			circle at 32% 26%,
+			rgba(255, 255, 255, 0.28) 0%,
+			rgba(255, 255, 255, 0.08) 32%,
+			transparent 55%
+		),
+		radial-gradient(
+			circle at 50% 58%,
+			rgba(45, 212, 191, 0.28) 0%,
+			rgba(45, 212, 191, 0.1) 48%,
+			transparent 72%
+		),
+		radial-gradient(
+			circle at 50% 50%,
+			transparent 58%,
+			rgba(0, 0, 0, 0.35) 88%,
+			rgba(0, 0, 0, 0.5) 100%
+		),
+		#0a1a15;
+	border-color: rgba(45, 212, 191, 0.55);
+	box-shadow:
+		inset 0 0 60px rgba(45, 212, 191, 0.25),
+		inset -24px -28px 60px rgba(0, 0, 0, 0.5),
+		inset 18px 20px 40px rgba(255, 255, 255, 0.12),
+		0 18px 45px rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .globe-ball {
+		background:
+			radial-gradient(
+				circle at 32% 26%,
+				rgba(255, 255, 255, 0.28) 0%,
+				rgba(255, 255, 255, 0.08) 32%,
+				transparent 55%
+			),
+			radial-gradient(
+				circle at 50% 58%,
+				rgba(45, 212, 191, 0.28) 0%,
+				rgba(45, 212, 191, 0.1) 48%,
+				transparent 72%
+			),
+			radial-gradient(
+				circle at 50% 50%,
+				transparent 58%,
+				rgba(0, 0, 0, 0.35) 88%,
+				rgba(0, 0, 0, 0.5) 100%
+			),
+			#0a1a15;
+		border-color: rgba(45, 212, 191, 0.55);
+		box-shadow:
+			inset 0 0 60px rgba(45, 212, 191, 0.25),
+			inset -24px -28px 60px rgba(0, 0, 0, 0.5),
+			inset 18px 20px 40px rgba(255, 255, 255, 0.12),
+			0 18px 45px rgba(0, 0, 0, 0.5);
+	}
+}
+
+.globe-orbit {
+	position: absolute;
+	border: 1px solid var(--card-border);
+	border-radius: 50%;
+	pointer-events: none;
+	/* Saturn-style ring, flattened and turning very slowly. */
+	transform: rotateX(71deg) rotateZ(0deg);
+	animation: orbit-spin-a 48s linear infinite;
+	/* Animation isolation: orbit-spin-a is transform-only. */
+	contain: layout style;
+}
+
+@keyframes orbit-spin-a {
+	from {
+		transform: rotateX(71deg) rotateZ(0deg);
+	}
+	to {
+		transform: rotateX(71deg) rotateZ(360deg);
+	}
+}
+
+.globe-satellite {
+	position: absolute;
+	top: 0;
+	left: 50%;
+	width: 5px;
+	height: 5px;
+	margin: -2.5px 0 0 -2.5px;
+	border-radius: 50%;
+	background: var(--accent);
+	box-shadow: 0 0 8px var(--accent);
+}
+
+.globe-particle {
+	animation: particle-drift 8s ease-in-out infinite;
+}
+
+@keyframes particle-drift {
+	0%,
+	100% {
+		transform: translate(0, 0);
+		opacity: 0.1;
+	}
+	50% {
+		transform: translate(7px, -10px);
+		opacity: 0.26;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.globe-orbit,
+	.globe-particle {
+		animation: none;
+	}
+	.globe-particle {
+		display: none;
+	}
+}
+
+/* Globe tag hit target (redesign 2026-11-09): the BUTTON is an
+   invisible tap target, ≥24px at every depth (WCAG 2.2 AA target-size
+   minimum). The visual pill lives inside it (.globe-tag-pill) and
+   carries all the pill styling; the button never scales — only the
+   pill does (see StackGlobe pass 3) — so the hit area holds even for
+   back tags at 0.6 scale. */
+.globe-tag {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 24px;
+	min-height: 24px;
+	padding: 4px;
+	background: transparent;
+	border: 0;
+	cursor: pointer;
+	will-change: transform, opacity;
+	overflow: visible;
+}
+
+/* The visual pill — the old .globe-tag styling, verbatim. Only this
+   element scales with depth. */
+.globe-tag-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 3px 7px;
+	border-radius: 999px;
+	/* Opaque background: the old translucent card let the pale sphere
+	   show through, which is what made back tags grey smudges. */
+	background: var(--bg);
+	color: var(--ink);
+	border: 1px solid var(--card-border);
+	box-shadow: 0 2px 8px rgba(12, 26, 21, 0.1);
+	font-size: 10px;
+	font-weight: 600;
+	line-height: 1.2;
+	white-space: nowrap;
+	flex: none;
+	will-change: transform;
+}
+
+/* Logos + names must fit inside the pill, never clip at its edges. */
+.globe-tag-pill img,
+.globe-tag-pill svg {
+	flex: none;
+	flex-shrink: 0;
+	display: block;
+}
+
+/* Small screens: the stage is ~308px at 390px, so the tags shrink
+   (9px, tighter padding) — otherwise 44 full-size pills cannot spread
+   without colliding in the small ball.
+   A11y (redesign 2026-11-09): the hit area is decoupled from the
+   visual pill — the invisible button is ≥24px tall (4px padding +
+   min-height 24px) while the pill keeps its 9px / 10px sizes, so the
+   tags stay keyboard-operable (Tab + Enter) AND meet the 24px
+   target-size minimum. Scale applies to the pill only, never the
+   button. Ink-on-opaque-pill contrast is 17.88:1 light / 18.17:1
+   dark at full opacity, and the front tag (the one a visitor reads)
+   renders ~35% larger. */
+@media (max-width: 639px) {
+	.globe-tag-pill {
+		font-size: 9px;
+		padding: 2px 6px;
+		gap: 3px;
+	}
+	.globe-tag-pill img {
+		width: 10px;
+		height: 10px;
+	}
+	.globe-tag-dot {
+		width: 5px;
+		height: 5px;
+	}
+}
+
+/* Category color dot on every tag — the family marker (and the only
+   marker on plain name chips with no logo, e.g. BullMQ, OAuth). */
+.globe-tag-dot {
+	width: 6px;
+	height: 6px;
+	flex: none;
+	flex-shrink: 0;
+	border-radius: 50%;
+}
+
+.globe-tag-pill img {
+	width: 12px;
+	height: 12px;
+	object-fit: contain;
+}
+
+.globe-tag.front .globe-tag-pill {
+	font-weight: 700;
+	/* Preview spotlight: subtle border + soft halo, NOT a strong teal
+	   border. The front tag reads larger/bolder with a prominent dot. */
+	border-color: rgba(12, 26, 21, 0.16);
+	box-shadow:
+		0 0 24px rgba(13, 148, 136, 0.28),
+		0 8px 20px rgba(12, 26, 21, 0.14);
+}
+
+.globe-tag.front .globe-tag-pill .globe-tag-dot {
+	width: 8px;
+	height: 8px;
+}
+
+.globe-tag.dimmed {
+	/* A11y (2026-11-09): 0.55 blended the ink text to 4.00:1 on white
+	   (fails 4.5:1). 0.75 blends to 7.97:1 light / 10.20:1 dark. This
+	   class is a fallback: when the globe JS runs it sets an inline
+	   opacity per tag (0.08 for filtered-out tags — see StackGlobe),
+	   which wins over this rule. */
+	opacity: 0.75;
+}
+
+.globe-now {
+	margin-top: 12px;
+	font-size: 14px;
+	color: var(--ink-dim);
+	text-align: center;
+}
+
+.globe-now-dot {
+	display: inline-block;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	margin-right: 6px;
+	vertical-align: 1px;
+}
+
+.globe-now b {
+	color: var(--accent-strong);
+}
+
+.globe-card {
+	margin-top: 14px;
+	width: 100%;
+	max-width: 420px;
+	padding: 16px;
+	border-radius: var(--radius-sm);
+	border: 1px solid var(--card-border);
+	background: var(--card);
+	text-align: left;
+}
+
+.globe-card h3 {
+	margin: 0;
+	font-size: 16px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.globe-card h3 img {
+	width: 20px;
+	height: 20px;
+	object-fit: contain;
+}
+
+.globe-card .globe-cat {
+	margin-top: 4px;
+	font-size: 12px;
+	color: var(--ink-dim);
+}
+
+.globe-card .globe-use {
+	margin: 8px 0 0;
+	font-size: 14px;
+	color: var(--ink-dim);
+}
+
+/* Filter row — TOP, below the sub-heading, centered (preview). It is
+   NOT in the bottom area any more. Compact pills; wraps cleanly to two
+   rows on mobile. */
+.globe-filters {
+	justify-content: center;
+	gap: 6px;
+	row-gap: 8px;
+	width: 100%;
+	margin-bottom: 16px;
+}
+
+.globe-filters .chip {
+	display: inline-flex;
+	align-items: center;
+	flex: none;
+	white-space: nowrap;
+	/* A11y (2026-11-09): 10px → 12px, padding 2px 8px → 4px 10px.
+	   The row wraps, so the slightly taller chips change nothing
+	   except row height; the chips stay compact vs archive chips. */
+	padding: 4px 10px;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+/* Preview active chip: a LIGHT pill (light grey/white, dark text,
+   subtle border) — NOT solid teal. Globe-scoped so the global
+   .chip.active used by other sections' filters is untouched. */
+.globe-filters .chip.active {
+	background: var(--bg-wash);
+	color: var(--ink);
+	border-color: rgba(12, 26, 21, 0.14);
+	font-weight: 600;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.globe-filters .chip.active:hover {
+		background: var(--bg-wash);
+	}
+}
+
+/* "Now:" + Spin together on one centered line below the globe. */
+.globe-now-row {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 12px;
+	margin-top: 14px;
+}
+
+.globe-now-row .globe-now {
+	margin-top: 0;
+}
+
+/* Preview Spin: a WHITE pill with a teal rotate icon + "Spin" text —
+   not a solid-teal button, not a filter pill. */
+.spin-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border-radius: 999px;
+	border: 1px solid var(--card-border);
+	background: var(--bg);
+	color: var(--accent-strong);
+	padding: 7px 16px;
+	font-size: 13px;
+	font-weight: 600;
+	box-shadow: 0 2px 10px rgba(12, 26, 21, 0.08);
+	transition:
+		background-color 200ms ease,
+		transform 200ms ease,
+		box-shadow 200ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.spin-btn:hover {
+		background: var(--accent-wash);
+		transform: translateY(-1px);
+		box-shadow: 0 4px 14px rgba(12, 26, 21, 0.12);
+	}
+}
+
+/* Footer line below the Now/Spin row (preview). */
+.globe-hint {
+	margin: 14px 0 0;
+	font-size: 13px;
+	color: var(--ink-dim);
+	text-align: center;
+}
+
+/* Dark-mode logo treatment: dark logos render white in dark mode only.
+   The selector is the bare class (no `img` qualifier): the icons are
+   SVG sprite <use> elements, not <img> — the old `img.` qualifier
+   matched nothing, so the GitHub footer mark and the dark tech logos
+   stayed black and blended into the dark background. */
+[data-theme="dark"] .logo-dark-invert {
+	filter: brightness(0) invert(1);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .logo-dark-invert {
+		filter: brightness(0) invert(1);
+	}
+}
+
+/* ---------- Combined section ---------- */
+/* The two halves live in ONE framed panel (rounded border, no gap):
+   left half on a light grey/mint tint, right half on the card's own
+   surface, with a clear divider between them — two callings, not one
+   jammed block. The closing band joins the frame at the bottom. */
+.combined-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 0;
+	border: 1px solid var(--card-border);
+	border-bottom: 0;
+	border-radius: 24px 24px 0 0;
+	overflow: hidden;
+	background: var(--card);
+}
+
+@media (min-width: 640px) {
+	.combined-grid {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	}
+}
+
+.combined-half {
+	min-width: 0;
+	padding: 20px;
+	background: var(--bg-wash);
+}
+
+@media (min-width: 640px) {
+	.combined-half {
+		padding: 24px;
+	}
+}
+
+/* Second half: white/very-light surface + the vertical divider. */
+.combined-half + .combined-half {
+	background: transparent;
+	border-top: 1px solid var(--card-border);
+}
+
+@media (min-width: 640px) {
+	.combined-half + .combined-half {
+		border-top: 0;
+		border-left: 1px solid var(--card-border);
+	}
+}
+
+.combined-half h3 {
+	margin: 0 0 4px;
+	font-size: 16px;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.combined-half .half-icon {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 44px;
+	height: 44px;
+	border-radius: 16px;
+	background: var(--accent-soft);
+	color: var(--accent-strong);
+}
+
+.combined-half > p {
+	margin: 0 0 12px;
+	font-size: 14px;
+	color: var(--ink-dim);
+}
+
+.artist-points {
+	margin: 0 0 4px;
+	padding: 0;
+	list-style: none;
+	display: grid;
+	gap: 10px;
+}
+
+.artist-points li {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	font-size: 14px;
+	line-height: 1.5;
+	color: var(--ink-dim);
+}
+
+.artist-points li::before {
+	content: "";
+	flex: none;
+	width: 8px;
+	height: 8px;
+	margin-top: 6px;
+	border-radius: 50%;
+	background: var(--accent);
+}
+
+.mini-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	width: 100%;
+	min-width: 0;
+	padding: 10px 12px;
+	border-radius: 14px;
+	border: 1px solid var(--card-border);
+	/* Clean white card (not a plain text row) on the tinted half. */
+	background: var(--bg);
+	color: inherit;
+	text-decoration: none;
+	text-align: left;
+	margin-top: 8px;
+	transition: background-color 200ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.mini-row:hover {
+		background: var(--accent-wash);
+	}
+}
+
+.mini-row .mini-thumb {
+	flex: none;
+	width: 64px;
+	height: 48px;
+	border-radius: 12px;
+	overflow: hidden;
+	background: var(--bg-wash);
+}
+
+.mini-row .mini-thumb img,
+.mini-row .mini-thumb video {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.mini-row .mini-text {
+	flex: 1;
+	min-width: 0;
+}
+
+.mini-row .mini-text b {
+	display: block;
+	font-size: 14px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.mini-row .mini-text span {
+	display: block;
+	font-size: 12px;
+	color: var(--ink-dim);
+	/* Short preview descriptions fit on one line; the ellipsis is
+	   only a safety net, never a mid-sentence cut. */
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.platform-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin-top: 12px;
+}
+
+.platform-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px;
+	border-radius: 999px;
+	border: 1px solid var(--card-border);
+	background: var(--card);
+	color: var(--ink);
+	font-size: 13px;
+	font-weight: 500;
+	text-decoration: none;
+}
+
+.platform-chip img {
+	width: 16px;
+	height: 16px;
+	object-fit: contain;
+}
+
+.combined-cta {
+	/* Mint closing band: full width of the frame, text left, the
+	   teal Know Me button right — a horizontal band, not a centred
+	   stack. */
+	margin-top: 0;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 16px;
+	text-align: left;
+	padding: 20px 24px;
+	border: 1px solid var(--card-border);
+	border-radius: 0 0 24px 24px;
+	background: var(--accent-soft);
+}
+
+.combined-cta p {
+	margin: 0;
+	font-size: 14px;
+	color: var(--ink-dim);
+}
+
+.combined-cta p strong {
+	display: block;
+	font-size: 15px;
+	color: var(--ink);
+}
+
+.combined-cta .btn {
+	flex: none;
+	border-radius: 999px;
+	padding: 12px 24px;
+	/* Preview: the "Know Me" CTA is a 44px pill, 14px bold — not the
+	   slim 13px hero-button size. Padding/radius already match. */
+	font-size: 14px;
+	font-weight: 700;
+}
+
+/* ---------- Releases ---------- */
+/* Releases — the preview's 3-column card grid (NOT full-width rows):
+   aspect-video thumbnail on top + p-4 body with title, type · year
+   meta, up to 6 platform icons opposite the title, and an "Audio only"
+   pill for audio singles. The card carries NO description — the full
+   description lives on the detail page. */
+.release-grid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 16px;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+@media (min-width: 640px) {
+	.release-grid {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+@media (min-width: 1024px) {
+	.release-grid {
+		grid-template-columns: 1fr 1fr 1fr;
+	}
+}
+
+.release-card {
+	overflow: hidden;
+	border-radius: var(--radius);
+	border: 1px solid var(--card-border);
+	background: var(--card);
+	transition: background-color 200ms ease;
+}
+
+.release-card:hover {
+	background: var(--accent-wash);
+}
+
+.release-card-link {
+	display: block;
+	text-decoration: none;
+	color: inherit;
+}
+
+.release-card-link:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+/* Aspect-video thumbnail on top of the card. */
+.release-card-thumb {
+	position: relative;
+	display: block;
+	aspect-ratio: 16 / 9;
+	overflow: hidden;
+	background: var(--bg-wash);
+}
+
+.release-card-thumb img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+/* Play overlay on video thumbnails (preview: h-12 w-12 circle,
+   bg-black/55, backdrop-blur, white play triangle). */
+.release-play {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: 48px;
+	height: 48px;
+	border-radius: 50%;
+	background: rgba(0, 0, 0, 0.55);
+	backdrop-filter: blur(4px);
+	-webkit-backdrop-filter: blur(4px);
+	color: #fff;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	pointer-events: none;
+}
+
+/* Audio-only releases: accent-soft tile with a large Spotify logo
+   (preview), not a small mic tile. */
+.release-audio-tile {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 100%;
+	background: var(--accent-wash);
+}
+
+.release-audio-tile img,
+.release-audio-tile svg {
+	width: 52px;
+	height: 52px;
+	opacity: 0.9;
+}
+
+.release-card-body {
+	display: block;
+	padding: 16px;
+}
+
+.release-card-top {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.release-card-title {
+	display: block;
+	min-width: 0;
+}
+
+.release-title {
+	display: block;
+	font-size: 15px;
+	font-weight: 700;
+	line-height: 1.35;
+	color: var(--ink);
+}
+
+.release-meta {
+	display: block;
+	margin-top: 4px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--ink-dim);
+}
+
+/* Platform icons sit in the free space opposite the title (preview). */
+.release-card-platforms {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: 6px;
+}
+
+.release-card-platforms img,
+.release-card-platforms svg {
+	width: 20px;
+	height: 20px;
+	object-fit: contain;
+}
+
+.release-card-platforms .plat-more {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--ink-dim);
+	padding: 0 4px;
+}
+
+/* Audio-only pill (preview): solid teal pill, white text + music-note
+   icon, 11px bold — NOT a pale wash chip. */
+.audio-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 12px;
+	/* A11y (2026-11-09): 11px → 12px. Contrast fixed by the darkened
+	   --accent (5.06:1 light) + the dark-mode #03211c override. */
+	font-size: 12px;
+	font-weight: 700;
+	padding: 4px 12px;
+	border-radius: 999px;
+	background: var(--accent);
+	color: #fff;
+	white-space: nowrap;
+}
+
+.audio-badge svg {
+	flex: none;
+}
+
+.type-tag {
+	/* A11y (2026-11-09): 11px → 12px. Accent-strong already passes
+	   (5.47:1 light / 13.59:1 dark); only the size was sub-12px. */
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--accent-strong);
+}
+
+.video-facade {
+	position: relative;
+	border-radius: var(--radius-sm);
+	overflow: hidden;
+	background: #000;
+	aspect-ratio: 16 / 9;
+	cursor: pointer;
+	border: 0;
+	padding: 0;
+	width: 100%;
+	display: block;
+}
+
+.video-facade img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+	opacity: 0.85;
+}
+
+.video-facade .play-btn {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	width: 64px;
+	height: 64px;
+	border-radius: 50%;
+	background: rgba(13, 148, 136, 0.92);
+	color: #fff;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 0;
+}
+
+.video-frame {
+	width: 100%;
+	aspect-ratio: 16 / 9;
+	border: 0;
+	border-radius: var(--radius-sm);
+	display: block;
+}
+
+.credits-grid {
+	display: grid;
+	gap: 10px;
+	margin-top: 16px;
+	grid-template-columns: 1fr 1fr;
+}
+
+.credits-grid .credit {
+	padding: 12px 14px;
+	border-radius: var(--radius-xs);
+	border: 1px solid var(--card-border);
+	background: var(--card);
+}
+
+.credits-grid .credit .credit-label {
+	font-size: 12px;
+	color: var(--ink-dim);
+}
+
+.credits-grid .credit .credit-value {
+	margin-top: 2px;
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.platform-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 16px;
+}
+
+/* ---------- Clients wall ---------- */
+/* A horizontal scroll-snap slider, not a grid: the client list grows
+   (5 today), so the wall shows ~2 full cards with the next one
+   peeking at the edge instead of reflowing into endless rows.
+   Mobile shows 1 full card + a peek. Arrows/dots are hidden until
+   JS adds .has-slider on the section — i.e. only when the track
+   actually overflows; with 1–2 clients it is a plain static row.
+   Cells are sized to the wordmark, not huge empty boxes; the
+   wordmark is large, at 75% opacity, full on hover. */
+.clients-nav {
+	display: none;
+	gap: 2px;
+	align-items: center;
+}
+
+[data-clients-slider].has-slider .clients-nav {
+	display: inline-flex;
+}
+
+.clients-arrow {
+	width: 36px;
+	height: 36px;
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--ink-dim);
+	cursor: pointer;
+	border-radius: 50%;
+	transition:
+		color 180ms ease,
+		opacity 180ms ease,
+		transform 180ms ease;
+}
+
+.clients-arrow:hover:not(:disabled) {
+	color: var(--accent);
+}
+
+.clients-arrow:active:not(:disabled) {
+	transform: scale(0.92);
+}
+
+.clients-arrow:disabled {
+	opacity: 0.3;
+	cursor: default;
+}
+
+.clients-arrow:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+.clients-track {
+	display: flex;
+	gap: 12px;
+	overflow-x: auto;
+	scroll-snap-type: x mandatory;
+	overscroll-behavior-x: contain;
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+	cursor: grab;
+}
+
+.clients-track::-webkit-scrollbar {
+	display: none;
+}
+
+.clients-track:active {
+	cursor: grabbing;
+}
+
+.clients-track:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+.clients-dots {
+	display: none;
+	justify-content: center;
+	gap: 6px;
+	margin-top: 14px;
+}
+
+[data-clients-slider].has-slider .clients-dots {
+	display: flex;
+}
+
+.clients-dot {
+	width: 8px;
+	height: 8px;
+	padding: 0;
+	border: 0;
+	border-radius: 999px;
+	background: var(--ink-dim);
+	opacity: 0.35;
+	cursor: pointer;
+	transition:
+		width 200ms ease,
+		opacity 200ms ease,
+		background 200ms ease;
+}
+
+.clients-dot:hover {
+	opacity: 0.7;
+}
+
+.clients-dot.is-active {
+	width: 22px;
+	opacity: 1;
+	background: var(--accent);
+}
+
+.clients-dot:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+.client-cell {
+	flex: 0 0 calc((100% - 12px) / 1.25);
+	scroll-snap-align: start;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 0;
+	padding: 16px 18px;
+	border-radius: 24px;
+	border: 1px solid var(--card-border);
+	background: var(--card);
+	transition:
+		transform 200ms ease,
+		box-shadow 200ms ease;
+}
+
+@media (min-width: 640px) {
+	.client-cell {
+		flex-basis: calc((100% - 24px) / 2.4);
+		padding: 18px 20px;
+	}
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.client-cell:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 8px 24px rgba(13, 148, 136, 0.18);
+	}
+}
+
+.client-cell img {
+	max-height: 36px;
+	max-width: 100%;
+	object-fit: contain;
+}
+
+/* Logo fallback: hidden until its img 404s (JS adds .is-broken),
+   then the wordmark takes the cell — never a broken-image icon. */
+.client-wordmark--fallback {
+	display: none;
+}
+
+.client-cell:has(img.is-broken) img {
+	display: none;
+}
+
+.client-cell:has(img.is-broken) .client-wordmark--fallback {
+	display: block;
+}
+
+.client-wordmark {
+	font-size: 20px;
+	font-weight: 800;
+	letter-spacing: -0.01em;
+	color: var(--ink);
+	text-align: center;
+	overflow-wrap: break-word;
+	opacity: 0.75;
+	transition: opacity 200ms ease;
+}
+
+@media (min-width: 640px) {
+	.client-wordmark {
+		font-size: 26px;
+	}
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.client-cell:hover .client-wordmark {
+		opacity: 1;
+	}
+}
+
+/* ---------- Know Me ---------- */
+.identity-grid {
+	display: grid;
+	gap: 10px;
+	margin-top: 14px;
+}
+
+@media (min-width: 640px) {
+	.identity-grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+	/* No empty slot: the last card spans the full row. This serves both
+	   grids that use .identity-grid — the 5 identity cards (2,2,1-full)
+	   and the 3 public-figure cards (2,1-full). */
+	.identity-grid .identity-cell:last-child {
+		grid-column: 1 / -1;
+	}
+}
+
+@media (min-width: 1024px) {
+	/* Same 3+2 arrangement as the services grid: 5 cards lay out 3+2,
+	   3 cards lay out 3 across — never an empty slot. */
+	.identity-grid {
+		grid-template-columns: repeat(6, 1fr);
+	}
+	.identity-grid .identity-cell:nth-child(1),
+	.identity-grid .identity-cell:nth-child(2),
+	.identity-grid .identity-cell:nth-child(3) {
+		grid-column: span 2;
+	}
+	.identity-grid .identity-cell:nth-child(4),
+	.identity-grid .identity-cell:nth-child(5) {
+		grid-column: span 3;
+	}
+}
+
+.identity-cell {
+	padding: 14px 16px;
+	border-radius: var(--radius-sm);
+	border: 1px solid var(--card-border);
+	background: var(--card);
+}
+
+.identity-cell h3 {
+	margin: 0;
+	font-size: 15px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.identity-cell h3 .id-icon {
+	color: var(--accent);
+	display: inline-flex;
+}
+
+.identity-cell p {
+	margin: 6px 0 0;
+	font-size: 13px;
+	color: var(--ink-dim);
+}
+
+.about-text p {
+	margin: 0 0 12px;
+	color: var(--ink-dim);
+	font-size: 15px;
+}
+
+.about-text p:first-child {
+	color: var(--ink);
+}
+
+/* ---------- Footer ---------- */
+.site-footer {
+	margin-top: 16px;
+	border-radius: var(--radius) var(--radius) 0 0;
+	border: 1px solid var(--card-border);
+	border-top-color: var(--border-glow-soft);
+	border-bottom: 0;
+	background:
+		linear-gradient(var(--accent-wash), var(--accent-wash)),
+		var(--card);
+	box-shadow: var(--shadow);
+	backdrop-filter: blur(18px);
+	-webkit-backdrop-filter: blur(18px);
+	padding: 24px 24px 32px;
+}
+
+.site-footer .footer-identity {
+	margin: 0;
+	font-size: 15px;
+	font-weight: 700;
+}
+
+.site-footer .footer-sub {
+	margin: 4px 0 0;
+	font-size: 13px;
+	color: var(--ink-dim);
+}
+
+.footer-socials {
+	display: flex;
+	gap: 10px;
+	margin-top: 16px;
+	flex-wrap: wrap;
+}
+
+.footer-socials a {
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
+	border: 1px solid var(--card-border);
+	background: var(--card);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--ink);
+	transition:
+		transform 200ms ease,
+		background-color 200ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.footer-socials a:hover {
+		transform: scale(1.05);
+		background: var(--accent-wash);
+	}
+}
+
+.footer-socials a img {
+	width: 20px;
+	height: 20px;
+	object-fit: contain;
+}
+
+.footer-links {
+	margin-top: 16px;
+	padding-top: 16px;
+	/* Divider between the top row and the bottom row. */
+	border-top: 1px solid var(--card-border);
+	font-size: 13px;
+	justify-content: space-between;
+}
+
+.footer-links a {
+	font-weight: 600;
+	text-decoration: none;
+}
+
+/* Bottom-row text link (footer "Contact me" opens the modal). */
+.footer-text-link {
+	background: none;
+	border: 0;
+	padding: 0;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--ink-dim);
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+	text-decoration: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.footer-text-link:hover {
+		color: var(--accent-strong);
+	}
+}
+
+.footer-copyright {
+	margin: 16px 0 0;
+	font-size: 12px;
+	color: var(--ink-faint);
+	text-align: center;
+}
+
+/* ---------- All platforms ---------- */
+.platform-group {
+	margin-top: 16px;
+}
+
+.platform-group h3 {
+	margin: 0 0 4px;
+	font-size: 15px;
+}
+
+/* Group sub-line (preview): one line under each group heading. */
+.platform-blurb {
+	margin: 0 0 14px;
+	font-size: 13px;
+	color: var(--ink-dim);
+}
+
+/* Preview: 2-column compact card grid (sm:grid-cols-2, gap-3) —
+   single column below 640px. */
+.platform-grid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 12px;
+}
+
+@media (min-width: 640px) {
+	.platform-grid {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+.platform-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 14px;
+	border-radius: var(--radius-sm);
+	border: 1px solid var(--card-border);
+	background: var(--card);
+	text-decoration: none;
+	color: inherit;
+}
+
+/* Brand icon in a 44×44px circular tile (preview), logo 22×22px. */
+.platform-row .plat-icon {
+	flex: none;
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--bg-wash);
+	border: 1px solid var(--card-border);
+}
+
+.platform-row .plat-icon img,
+.platform-row .plat-icon svg {
+	width: 22px;
+	height: 22px;
+	object-fit: contain;
+}
+
+.platform-row .plat-text {
+	min-width: 0;
+	flex: 1;
+}
+
+.platform-row .plat-name {
+	font-weight: 700;
+	font-size: 15px;
+}
+
+.platform-row .plat-handle {
+	font-size: 13px;
+	color: var(--ink-dim);
+}
+
+.platform-row .plat-arrow {
+	margin-left: auto;
+	color: var(--ink-dim);
+	flex: none;
+	font-size: 16px;
+	line-height: 1;
+}
+
+/* ---------- Contact form / modal ---------- */
+.modal-backdrop {
+	position: fixed;
+	inset: 0;
+	background: rgba(5, 8, 7, 0.55);
+	backdrop-filter: blur(4px);
+	z-index: 60;
+	display: flex;
+	align-items: flex-end;
+	justify-content: center;
+	/* Animation isolation: the sheet mounts instantly with a skeleton
+	   inside (no entrance animation — a mount is not a transition, so
+	   there is nothing to oscillate). Layout containment + stacking
+	   isolation keep the modal's paint inside its own layer; the sheet
+	   scrolls internally (overflow-y: auto) and body scroll is locked
+	   by the island while open, so opening it cannot move page scroll. */
+	contain: layout style;
+	isolation: isolate;
+}
+
+@media (min-width: 640px) {
+	.modal-backdrop {
+		align-items: center;
+		padding: 24px;
+	}
+}
+
+.modal-sheet {
+	width: 100%;
+	max-width: 520px;
+	max-height: 92vh;
+	overflow-y: auto;
+	background: var(--bg);
+	border: 1px solid var(--card-border);
+	border-radius: var(--radius) var(--radius) 0 0;
+	box-shadow: var(--shadow);
+	padding: 24px;
+	/* Animation isolation: the skeleton→form swap inside the sheet
+	   changes content height once (not an animation); layout
+	   containment keeps it from affecting anything outside the sheet. */
+	contain: layout style;
+}
+
+@media (min-width: 640px) {
+	.modal-sheet {
+		border-radius: var(--radius);
+	}
+}
+
+.modal-sheet h2 {
+	margin: 0;
+	font-size: 19px;
+}
+
+.modal-sheet .modal-sub {
+	margin: 6px 0 0;
+	font-size: 14px;
+	color: var(--ink-dim);
+}
+
+.modal-close {
+	float: right;
+	background: transparent;
+	border: 0;
+	color: var(--ink-dim);
+	font-size: 20px;
+	line-height: 1;
+	padding: 4px 8px;
+}
+
+.form-field {
+	margin-top: 14px;
+}
+
+.form-field label {
+	display: block;
+	font-size: 13px;
+	font-weight: 600;
+	margin-bottom: 5px;
+}
+
+.form-field label .req {
+	color: var(--accent-strong);
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea,
+.form-field .service-select-btn {
+	width: 100%;
+	padding: 12px 16px;
+	border-radius: 12px;
+	border: 1px solid var(--card-border);
+	background: var(--card);
+	outline: none;
+}
+
+/* Email + Phone side by side (preview form): stacked on narrow
+   screens, two columns from 480px up. */
+.form-row-2 {
+	display: grid;
+	gap: 0 12px;
+	grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 480px) {
+	.form-row-2 {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	}
+}
+
+/* Big full-width teal "Send message" button (preview form). */
+.btn-submit-full {
+	width: 100%;
+	border-radius: 999px;
+	padding: 14px 24px;
+	/* Preview submit is 14px bold (48px full-width pill), not 15px. */
+	font-size: 14px;
+	font-weight: 700;
+	text-align: center;
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus,
+.form-field .service-select-btn:focus {
+	border-color: var(--accent);
+}
+
+/* Service listbox (2026-11-10): custom glass listbox like the header
+   profile picker — the native <select>'s open list is the browser/OS
+   default, styleless. The button looks like the other inputs when
+   closed; the panel opens below it. */
+.service-select {
+	position: relative;
+}
+
+.form-field .service-select-btn {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	font: inherit;
+	color: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.form-field .service-select-btn:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+.service-select-value {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.service-select-btn[data-empty="true"] .service-select-value {
+	color: var(--ink-dim);
+}
+
+.service-select-chev {
+	flex: none;
+	color: var(--ink-dim);
+	transition: transform 180ms ease;
+}
+
+.service-select-btn[aria-expanded="true"] .service-select-chev {
+	transform: rotate(180deg);
+}
+
+.service-select-panel {
+	position: absolute;
+	top: calc(100% + 6px);
+	left: 0;
+	right: 0;
+	z-index: 60;
+	max-height: 248px;
+	overflow-y: auto;
+	padding: 6px;
+	background: var(--bg);
+	border: 1px solid var(--card-border);
+	border-radius: 12px;
+	box-shadow: var(--shadow);
+}
+
+.service-select-option {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	padding: 10px 12px;
+	border: 0;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--ink);
+	font-size: 14px;
+	font-weight: 500;
+	text-align: left;
+	cursor: pointer;
+}
+
+.service-select-option:hover,
+.service-select-option[aria-selected="true"] {
+	background: var(--accent-soft);
+}
+
+.service-select-option:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
+}
+
+.service-select-check {
+	margin-left: auto;
+	display: inline-flex;
+	flex: none;
+	color: var(--accent);
+}
+
+.form-field textarea {
+	min-height: 96px;
+	resize: vertical;
+}
+
+.form-hint {
+	margin: 10px 0 0;
+	font-size: 12px;
+	color: var(--ink-dim);
+}
+
+.form-prefer-email {
+	margin: 16px 0 0;
+	font-size: 13px;
+	color: var(--ink-dim);
+	text-align: center;
+}
+
+.form-prefer-email a {
+	font-weight: 600;
+	color: var(--accent-strong);
+	text-underline-offset: 2px;
+}
+
+.form-prefer-email a:hover {
+	text-decoration: underline;
+}
+
+.form-error {
+	margin: 6px 0 0;
+	font-size: 13px;
+	color: #c81e1e;
+}
+
+[data-theme="dark"] .form-error {
+	color: #f87171;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .form-error {
+		color: #f87171;
+	}
+}
+
+.form-success {
+	text-align: center;
+	padding: 32px 8px;
+}
+
+.form-success h3 {
+	margin: 0 0 8px;
+	font-size: 18px;
+}
+
+.form-success p {
+	margin: 0;
+	color: var(--ink-dim);
+	font-size: 14px;
+}
+
+.form-success .btn {
+	margin-top: 16px;
+}
+
+.contact-info {
+	display: grid;
+	gap: 10px;
+	margin-top: 16px;
+}
+
+.contact-info .info-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	font-size: 14px;
+}
+
+.contact-info .info-row a {
+	color: inherit;
+	text-decoration: none;
+	font-weight: 600;
+}
+
+/* ---------- Latest posts ---------- */
+.post-meta {
+	font-size: 12px;
+	color: var(--ink-faint);
+	margin-top: 6px;
+}
+
+/* ---------- Animation isolation — audit summary (worker I) ----------
+   Every animation/transition on the site was audited 2026-11-08:
+   - transform/opacity ONLY (compositor, zero layout): pill-stack glide,
+     label crossfade, theme-icon swap, hero-float, grid-rise, carousel
+     flip + peek fades, deck arrows, service/grid hover lifts, badge
+     blink + letter rise, skel shimmer, btn spinner, orbit spin,
+     particle drift, globe skeleton shimmer.
+   - paint-only (no layout): pill-breathe (box-shadow), arc-flow and
+     hero-runlight-travel (stroke-dashoffset), skel-shimmer-bg
+     (background-position).
+   - layout properties KEPT deliberately, each contained so it cannot
+     move page layout or scroll: stuck corner buttons `width` (absolute
+     box — .stuck-corners), deck dots `width` (confined to
+     .deck-indicator, ~0.0001 CLS), #page-progress `width` (fixed bar —
+     transform conversion needs Layout.astro JS, worker H), slider
+     progress fill `width` (clipped inside .slider-progress — transform
+     conversion needs detail.js + DetailMedia.astro, detail round).
+   - NO global leaks: no bare-element or `*` animation selectors. The
+     `* { transition-duration: 0.01ms !important }` rule in the
+     reduced-motion block is the standard kill-switch, not an animation.
+   - `contain: paint` / `content` / `strict` and overflow clipping are
+     NEVER used on .globe-stage (orbit ring −7%), .hero-photo-frame
+     (runlight −7px, badge −16px) or .deck (peek cards fan outside);
+     those use `contain: layout` (+ `isolation: isolate`) only. */
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+	.hero-badge .badge-cursor,
+	.header-arc .arc-flow,
+	.sticky-pill {
+		animation: none;
+	}
+	* {
+		transition-duration: 0.01ms !important;
+	}
+}

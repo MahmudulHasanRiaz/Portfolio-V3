@@ -1,0 +1,121 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import { getVentures, formatDate, truncateShort } from "../../../lib/content";
+import { applySiteCopy, getDict, langUrl, localizeData, showingLabel } from "../../../lib/i18n";
+import { getSiteSettings } from "../../../lib/settings";
+import ThumbImage from "../../../components/ThumbImage.astro";
+import ArchiveFilter from "../../../components/ArchiveFilter.astro";
+
+const lang = "bn" as const;
+const t = applySiteCopy(getDict(lang), lang, await getSiteSettings());
+
+const venturesRaw = await getVentures();
+const ventures = venturesRaw.map((v) => ({
+	...v,
+	data: localizeData(v.data, lang),
+}));
+// Per-tag counts for the shared archive filter (ArchiveFilter.astro).
+const tagCounts = new Map<string, number>();
+for (const v of ventures)
+	for (const tag of v.data.tags ?? [])
+		tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+const filterItems = [...tagCounts.entries()].map(([value, count]) => ({
+	value,
+	label: value,
+	count,
+}));
+
+// Unsplash card thumbs ship at w=1200 in content/API rows but render at
+// ~360px wide (2x retina ≈ 720px) — request w=800/q=75 instead: measured
+// 124KB → 67KB per image (~46% less). Non-Unsplash URLs pass through.
+const sizedThumb = (url: string | null | undefined, w = 800) =>
+	url?.includes("images.unsplash.com")
+		? url.replace(/w=\d+/, `w=${w}`).replace(/q=\d+/, "q=75")
+		: url;
+---
+
+<Layout
+	title={t.venturesPageTitle}
+	description={t.venturesPageDescription}
+	lang={lang}
+>
+	<p>
+		<a href={langUrl("/", lang)} class="back-link">{t.backHome}</a>
+	</p>
+	<h1 style="margin:0 0 8px;font-size:26px;line-height:1.25;">{t.allVentures}</h1>
+
+	{
+		ventures.length === 0 ? (
+			<section class="glass section">
+				<p class="empty-state">{t.emptyVentures}</p>
+			</section>
+		) : (
+			<>
+				{filterItems.length > 0 ? (
+					<ArchiveFilter
+						id="venture-filters"
+						style="margin-top:16px;"
+						items={filterItems}
+						allLabel={t.allChip}
+						moreLabel={t.moreFilters}
+						mode="card-data-tags"
+						gridSelector="#venture-grid"
+						countSelector="#venture-count"
+						cardSelector=".grid-card"
+					/>
+				) : null}
+				<p class="count-line" id="venture-count" data-count-template={t.showingVentures}>
+					{showingLabel(t.showingVentures, ventures.length, ventures.length)}
+				</p>
+				<section class="card-grid section" id="venture-grid">
+					{ventures.map((venture) => (
+						<a
+							class="grid-card"
+							href={langUrl(`/ventures/${venture.data.slug}`, lang)}
+							data-astro-prefetch="hover"
+							data-tags={(venture.data.tags ?? []).join(",")}
+						>
+							<div class="grid-thumb">
+								{venture.data.thumbnailType === "video" &&
+								venture.data.thumbnail ? (
+									<video
+										src={venture.data.thumbnail}
+										aria-label={venture.data.title}
+										muted
+										loop
+										playsinline
+										autoplay={venture.data.thumbnailAutoplay !== false}
+										preload="metadata"
+									/>
+								) : venture.data.thumbnail ? (
+									<ThumbImage
+										src={venture.data.thumbnail}
+										alt={venture.data.title}
+										widths={[360, 720, 1080]}
+										sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 360px"
+										width={800}
+										height={500}
+									/>
+								) : (
+									<div class="thumb-fallback">
+										{venture.data.title.charAt(0)}
+									</div>
+								)}
+							</div>
+							<div class="grid-body">
+								<h3>{venture.data.title}</h3>
+								{venture.data.description ? (
+									<p>{truncateShort(venture.data.description)}</p>
+								) : null}
+								<p class="grid-meta">
+									{formatDate(venture.data.publishedAt, lang)}
+								</p>
+							</div>
+						</a>
+					))}
+				</section>
+			</>
+		)
+	}
+</Layout>
+

@@ -1,0 +1,78 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import ProjectCard from "../../components/ProjectCard.astro";
+import ArchiveFilter from "../../components/ArchiveFilter.astro";
+import { getProjects } from "../../lib/content";
+import { applySiteCopy, getDict, langUrl, showingLabel } from "../../lib/i18n";
+import { getSiteSettings } from "../../lib/settings";
+
+// Static archive — filters are client-side, driven by the tags on the
+// cards themselves (no framework, tiny inline script below).
+// Fixed strings from the dictionary (same keys as the /bn/ archive).
+const lang = "en" as const;
+const t = applySiteCopy(getDict(lang), lang, await getSiteSettings());
+
+const projects = await getProjects();
+// Per-tag counts for the shared archive filter (ArchiveFilter.astro).
+const tagCounts = new Map<string, number>();
+for (const p of projects)
+	for (const tag of p.data.tags)
+		tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+const filterItems = [...tagCounts.entries()].map(([value, count]) => ({
+	value,
+	label: value,
+	count,
+}));
+const total = projects.length;
+---
+
+<Layout
+	title={t.projectsPageTitle}
+	description={t.projectsPageDescription}
+	lang={lang}
+>
+	<section class="glass">
+		<p style="margin:0 0 8px;">
+			<a class="back-link" href={langUrl("/", lang)}>{t.backHome}</a>
+		</p>
+		<h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;">{t.allProjects}</h1>
+		{
+			projects.length === 0 ? (
+				<p class="empty-state">{t.emptyProjects}</p>
+			) : (
+				<>
+					<ArchiveFilter
+						id="project-filters"
+						items={filterItems}
+						allLabel={t.allChip}
+						moreLabel={t.moreFilters}
+						mode="card-tag-text"
+						gridSelector="[data-project-grid]"
+						countSelector="[data-count-line]"
+						cardSelector=".grid-card"
+					/>
+					<p class="count-line" data-count-line data-count-template={t.showingProjects}>
+						{showingLabel(t.showingProjects, total, total)}
+					</p>
+					<div class="card-grid" data-project-grid style="margin-top:16px;">
+						{projects.map((p) => (
+							<ProjectCard
+								lang={lang}
+								project={{
+									slug: p.data.slug,
+									title: p.data.title,
+									description: p.data.description ?? "",
+									tags: p.data.tags,
+									thumbnail: p.data.thumbnail ?? null,
+									thumbnailType: p.data.thumbnailType ?? null,
+									thumbnailAutoplay: p.data.thumbnailAutoplay ?? null,
+								}}
+							/>
+						))}
+					</div>
+				</>
+			)
+		}
+	</section>
+</Layout>
+

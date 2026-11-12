@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.astro/
+
+# Cloudflare
+.wrangler/
+dev.vars
+.dev.vars
+
+# Env (never commit secrets — deploy hook URL / API tokens go in env only)
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store

@@ -1,0 +1,112 @@
+---
+// All platforms (Bangla) — every verified profile, grouped, each a real
+// link. Group titles/blurbs from the dictionary; platform names,
+// handles and subtitles are proper nouns / the platform's own copy.
+import Layout from "../../layouts/Layout.astro";
+import BrandIcon from "../../components/BrandIcon.astro";
+import { PROFILE, type Platform } from "../../data/site";
+import { getPlatforms } from "../../lib/content";
+import { applySiteCopy, getDict, langUrl, localizeData } from "../../lib/i18n";
+import { getSiteSettings } from "../../lib/settings";
+
+const lang = "bn" as const;
+const t = applySiteCopy(getDict(lang), lang, await getSiteSettings());
+
+// Live rows over the build-time fallback; bn overlay per row
+// (subtitle / handle / note from the API `bn`, English fallback).
+const platforms = (await getPlatforms()).map((p) =>
+	localizeData({ ...p }, lang),
+);
+
+const groups: { key: Platform["group"]; title: string; blurb: string }[] = [
+	{
+		key: "music",
+		title: t.platformsMusic,
+		blurb: t.platformsMusicBlurb,
+	},
+	{
+		key: "social",
+		title: t.platformsSocial,
+		blurb: t.platformsSocialBlurb,
+	},
+	{
+		key: "professional",
+		title: t.platformsProfessional,
+		blurb: t.platformsProfessionalBlurb,
+	},
+];
+
+const sameAs = platforms.flatMap((p) => [p.url]);
+const jsonLd = {
+	"@context": "https://schema.org",
+	"@type": "Person",
+	name: PROFILE.name,
+	inLanguage: "bn",
+	sameAs,
+};
+---
+
+<Layout
+	title={t.platformsPageTitle}
+	description={t.platformsPageDescription}
+	lang={lang}
+>
+	<script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+
+	<section class="glass">
+		<p style="margin:0 0 8px;"><a href={langUrl("/", lang)}>{t.backHome}</a></p>
+		<h1 style="margin:0 0 8px;font-size:24px;">{t.platformsTitle}</h1>
+		<p class="muted" style="margin:0;">
+			{t.platformsIntro}
+		</p>
+	</section>
+
+	{
+		groups.map((group) => {
+			const rows = platforms.filter((p) => p.group === group.key);
+			return (
+				<section class="glass section platform-group">
+					<h3>{group.title}</h3>
+					<p class="platform-blurb">{group.blurb}</p>
+					<div class="platform-grid">
+						{rows.map((platform) => (
+							<a
+								class="platform-row"
+								href={platform.url}
+								target="_blank"
+								rel="noopener noreferrer"
+							>
+								<span class="plat-icon">
+									<BrandIcon
+										icon={platform.icon}
+										name={platform.name}
+										size={22}
+										decorative
+									/>
+								</span>
+								<span class="plat-text">
+									<span class="plat-name">{platform.name}</span>
+									{(platform.subtitle ??
+										platform.handle ??
+										platform.note) && (
+										<span
+											class="plat-handle"
+											style="display:block;"
+										>
+											{platform.subtitle ??
+												platform.handle ??
+												platform.note}
+										</span>
+									)}
+								</span>
+								<span class="plat-arrow" aria-hidden="true">
+									↗
+								</span>
+							</a>
+						))}
+					</div>
+				</section>
+			);
+		})
+	}
+</Layout>

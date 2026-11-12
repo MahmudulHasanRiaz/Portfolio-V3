@@ -1,0 +1,45 @@
+---
+// Key-info strip — the preview's <dl> strip: 2 columns on mobile,
+// 3 at sm, 4 at lg. Items with no value are omitted, never rendered
+// as an empty cell or a "—" placeholder.
+export interface KeyItem {
+	label: string;
+	/** Plain text value, or an {href,label} link item. */
+	value?: string;
+	href?: string;
+}
+
+interface Props {
+	items: Array<KeyItem | null | undefined>;
+}
+
+const { items } = Astro.props;
+const shown = items.filter(
+	(i): i is KeyItem => Boolean(i && (i.value || i.href)),
+);
+---
+
+{
+	shown.length > 0 && (
+		<dl class="key-strip">
+			{shown.map((item) => (
+				<div class="key-item">
+					<dt>{item.label}</dt>
+					<dd>
+						{item.href ? (
+							item.href.startsWith("http") ? (
+								<a href={item.href} target="_blank" rel="noreferrer">
+									{item.value ?? item.href}
+								</a>
+							) : (
+								<a href={item.href}>{item.value ?? item.href}</a>
+							)
+						) : (
+							item.value
+						)}
+					</dd>
+				</div>
+			))}
+		</dl>
+	)
+}

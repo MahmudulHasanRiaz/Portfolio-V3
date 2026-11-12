@@ -1,0 +1,89 @@
+---
+ // Site footer — flush to the bottom of the page (.site-footer has square
+// bottom corners and no bottom margin; the Layout removes the page
+// column's bottom padding). Only the 5 primary platforms here — every
+// platform lives on /platforms instead. NO Spotify in the primaries.
+// Identity line: SE footer keeps the 3 identities from the preview
+// (Software Engineer · Entrepreneur · Islamic Artist); Know Me keeps
+// all 5. Top row: identity left, social icons right on the SAME row.
+// Bottom row: "Contact me →" text link left, "All platforms →" right.
+import BrandIcon from "./BrandIcon.astro";
+import { PROFILE } from "../data/site";
+import { getFooterPrimaries, getPlatforms } from "../lib/content";
+import { langUrl, displayName, type Dict, type Lang } from "../lib/i18n";
+
+interface Props {
+	profile?: "se" | "knowme";
+	lang?: Lang;
+	dict?: Dict;
+}
+
+const { profile = "se", lang = "en", dict } = Astro.props;
+
+// Footer primaries, derived live from `is_primary` + `sort_order`
+// (getFooterPrimaries falls back to the seed five, matched by URL,
+// until the API `platforms` type exists).
+const footerPrimaries = getFooterPrimaries(await getPlatforms());
+
+const sub =
+	profile === "knowme"
+		? (dict?.footerSubKnowMe ??
+			"Software Engineer · Entrepreneur · Nasheed Artist · Hafiz-Alem · Public Figure — Dhaka, Bangladesh")
+		: (dict?.footerSubSe ??
+			"Software Engineer · Entrepreneur · Islamic Artist — Dhaka, Bangladesh");
+
+const year = new Date().getFullYear();
+const contactLabel = dict?.contactMe ?? "Contact me";
+const allPlatformsLabel = dict?.footerAllPlatforms ?? "All platforms →";
+const rightsLabel = dict?.footerRights ?? "All rights reserved.";
+---
+
+<footer class="site-footer">
+	<div
+		style="display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;"
+	>
+		<div style="min-width:0;">
+			{/* Identity line: display name — Bangla on /bn/ pages.
+			    The COPYRIGHT line below keeps the Latin name. */}
+			<p class="footer-identity">{displayName(lang)}</p>
+			<p class="footer-sub">{sub}</p>
+		</div>
+		<div class="footer-socials" style="margin-top:0;flex:none;">
+			{
+				footerPrimaries.map((platform) => (
+					<a
+						href={platform.url}
+						target="_blank"
+						rel="noopener noreferrer"
+						aria-label={platform.name}
+					>
+						<BrandIcon icon={platform.icon} name={platform.name} size={20} />
+					</a>
+				))
+			}
+		</div>
+	</div>
+	<div
+		class="footer-links"
+		style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:space-between;"
+	>
+		<button type="button" class="footer-text-link" data-open-contact>
+			{contactLabel} →
+		</button>
+		<a href={langUrl("/platforms", lang)}>{allPlatformsLabel}</a>
+	</div>
+	<p class="footer-copyright">
+		© {year} {PROFILE.name}. {rightsLabel}
+	</p>
+</footer>
+
+<script>
+	// Footer "Contact me" opens the shared contact modal (see ContactModal).
+	document
+		.querySelector("[data-open-contact]")
+		?.addEventListener("click", () => {
+			window.dispatchEvent(
+				new CustomEvent("open-contact", { detail: { source: "footer" } }),
+			);
+		});
+</script>

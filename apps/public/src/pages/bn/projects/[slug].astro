@@ -1,0 +1,369 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import {
+	getEntry,
+	getLiveEntry,
+	render,
+} from "astro:content";
+import {
+	liveCollectionReachable,
+} from "../../../loaders/public-content";
+import DetailCta from "../../../components/DetailCta.astro";
+import DetailMedia from "../../../components/DetailMedia.astro";
+import DetailVideoFacade from "../../../components/DetailVideoFacade.astro";
+import KeyStrip from "../../../components/KeyStrip.astro";
+import MarkdownBody from "../../../components/MarkdownBody.astro";
+import PrevNext from "../../../components/PrevNext.astro";
+import TechChips from "../../../components/TechChips.astro";
+import { formatDate, getProjects } from "../../../lib/content";
+import {
+	resolveCanonicalBase,
+	absUrl,
+	isRealUrl,
+	mergeDetail,
+	parseBodyBlocks,
+	serviceForTags,
+} from "../../../lib/detail";
+import { optimizedImageUrl, optimizedSrcset } from "../../../lib/images";
+import { applySiteCopy, getDict, langUrl, localizeData } from "../../../lib/i18n";
+import { getSiteSettings } from "../../../lib/settings";
+
+// Bangla live detail route — same live route as the English one.
+// Bangla fields come from the item's optional nested `bn` object (live
+// API or build-time frontmatter); English is the fallback, never a blank.
+// Live detail route — on-demand SSR (2026-11-12, output "server"):
+// every request renders this page in the Worker from the Public
+// Content API. When the API is reachable the live entry is
+// authoritative (a missing live entry 404s); the build-time row is
+// only the outage fallback when the API is unreachable (fix plan §1b).
+// A slug published after a deploy shows instantly — no rebuild.
+// Route caching is in astro.config.mjs + src/middleware.ts.
+const lang = "bn" as const;
+const settings = await getSiteSettings();
+const t = applySiteCopy(getDict(lang), lang, settings);
+
+const { slug } = Astro.params;
+const liveResult = slug
+	? await getLiveEntry("liveProjects", slug).catch(() => undefined)
+	: undefined;
+const liveEntry = liveResult?.entry;
+if (liveEntry) Astro.cache.set(liveEntry);
+// The build-time row is fetched only when the live API is
+// unreachable (see liveReachable above): then its body is the full
+// story when the live row carries only the short description, and
+// its fields fill any gaps the live row leaves empty.
+// When the live API is reachable, the live entry is authoritative:
+	// a missing live entry 404s and the build-time row is never read,
+	// so an archived/draft item cannot render from its static file.
+	// When unreachable, the build-time row is the outage fallback and
+	// mergeDetail() below still fills gaps in the live row.
+	const liveReachable = await liveCollectionReachable("projects");
+	const buildEntry =
+		liveReachable || !slug
+			? undefined
+			: await getEntry("projects", slug);
+const entry = liveEntry ?? buildEntry;
+if (!entry) Astro.response.status = 404;
+
+// Build-time entries render their markdown body; live entries carry the
+// body as a plain `content` string, rendered as blocks below.
+const rendered = buildEntry ? await render(buildEntry) : undefined;
+const Content = rendered?.Content;
+
+interface ProjectData {
+	title: string;
+	description?: string;
+	content?: string;
+	longDescription?: string;
+	tags?: string[];
+	techs?: string[];
+	publishedAt?: string;
+	thumbnail?: string;
+	thumbnailType?: "image" | "video";
+	thumbnailVideoUrl?: string;
+	gallery?: string[];
+	videos?: { url: string; title?: string }[];
+	client?: string;
+	role?: string;
+	year?: string;
+	status?: string;
+	liveUrl?: string;
+}
+
+const liveData = liveEntry?.data as unknown as
+	| Record<string, unknown>
+	| undefined;
+const buildData = buildEntry?.data as unknown as
+	| Record<string, unknown>
+	| undefined;
+const merged = mergeDetail(buildData, liveData) as unknown as
+	| ProjectData
+	| undefined;
+const d = merged
+	? (localizeData(
+			merged as unknown as Record<string, unknown>,
+			lang,
+		) as unknown as ProjectData)
+	: undefined;
+
+// A Bangla story (bn.longDescription / bn.content) wins over the
+// English markdown body — the visitor is on the Bangla page.
+const bnRaw = (merged as unknown as Record<string, unknown> | undefined)?.[
+	"bn"
+] as Record<string, unknown> | undefined;
+const bnStory =
+	typeof bnRaw?.longDescription === "string" && bnRaw.longDescription
+		? bnRaw.longDescription
+		: typeof bnRaw?.content === "string" && bnRaw.content
+			? bnRaw.content
+			: undefined;
+
+// Full story, in priority order: the Bangla story when it exists,
+// then the backend's longDescription, then the build-time markdown
+// body, then the live content string, then the short description
+// (never an invented story).
+const storyBlocks = bnStory
+	? parseBodyBlocks(bnStory)
+	: d?.longDescription
+		? parseBodyBlocks(d.longDescription)
+		: !Content && d?.content
+			? parseBodyBlocks(d.content)
+			: [];
+const showDescriptionFallback =
+	!bnStory &&
+	!Content &&
+	storyBlocks.length === 0 &&
+	Boolean(d?.description);
+
+// Back link returns to origin: a visitor who arrived from a case
+// study ("View the project") goes back to that case study.
+const fromParam = Astro.url.searchParams.get("from") ?? "";
+const fromCaseStudy = fromParam.startsWith("case-study:")
+	? fromParam.slice("case-study:".length)
+	: null;
+const backHref = fromCaseStudy
+	? langUrl(`/case-studies/${fromCaseStudy}`, lang)
+	: langUrl("/projects", lang);
+const backLabel = fromCaseStudy ? t.backCaseStudy : t.backAllProjects;
+
+// Video thumbnail: thumbnailVideoUrl is the video file, thumbnail the
+// poster image; when the thumbnail itself is the video there is no poster.
+const isVideoThumb = d?.thumbnailType === "video";
+const videoSrc = isVideoThumb
+	? (d?.thumbnailVideoUrl ?? d?.thumbnail)
+	: undefined;
+const videoPoster =
+	isVideoThumb &&
+	d?.thumbnailVideoUrl &&
+	d?.thumbnail &&
+	d.thumbnail !== d.thumbnailVideoUrl &&
+	!/\.(mp4|webm|mov|m4v)([?#]|$)/i.test(d.thumbnail)
+		? d.thumbnail
+		: null;
+const coverImage = !isVideoThumb && d?.thumbnail ? d.thumbnail : videoPoster;
+
+// Prev/next by date order (newest first): prev = older, next = newer.
+const allProjectsRaw = await getProjects();
+const allProjects = allProjectsRaw.map((p) => ({
+	...p,
+	data: localizeData(p.data, lang),
+}));
+const currentIndex = allProjects.findIndex((p) => p.data.slug === slug);
+const prevProject =
+	currentIndex >= 0 ? allProjects[currentIndex + 1] : undefined;
+const nextProject =
+	currentIndex > 0 ? allProjects[currentIndex - 1] : undefined;
+const thumbOf = (p: (typeof allProjects)[number] | undefined) =>
+	p?.data.thumbnailType !== "video" && p?.data.thumbnail
+		? p.data.thumbnail
+		: null;
+
+// Canonical base: explicit admin site_url wins; else the request
+// host (Astro.url), else the SITE_URL fallback — see detail.ts.
+const siteBase = resolveCanonicalBase(settings.siteUrl, Astro.url);
+const pageUrl = `${siteBase}/bn/projects/${slug}`;
+const jsonLd = d
+	? {
+			"@context": "https://schema.org",
+			"@graph": [
+				{
+					"@type": "SoftwareApplication",
+					name: d.title,
+					description: d.description,
+					inLanguage: "bn",
+					applicationCategory: "BusinessApplication",
+					url: pageUrl,
+					...(coverImage ? { image: absUrl(optimizedImageUrl(coverImage, 1200), siteBase) } : {}),
+					author: {
+						"@type": "Person",
+						name: "Mahmudul Hasan Riaz",
+						url: siteBase,
+					},
+					...(d.publishedAt ? { datePublished: d.publishedAt } : {}),
+				},
+				{
+					"@type": "BreadcrumbList",
+					itemListElement: [
+						{
+							"@type": "ListItem",
+							position: 1,
+							name: "হোম",
+							item: siteBase,
+						},
+						{
+							"@type": "ListItem",
+							position: 2,
+							name: t.allProjects,
+							item: `${siteBase}/bn/projects`,
+						},
+						{
+							"@type": "ListItem",
+							position: 3,
+							name: d.title,
+							item: pageUrl,
+						},
+					],
+				},
+			],
+		}
+	: null;
+---
+
+<Layout
+	title={
+		d ? `${d.title} — Mahmudul Hasan Riaz` : `${t.notFoundProject} — Mahmudul Hasan Riaz`
+	}
+	description={d?.description}
+	ogType="website"
+	ogImage={coverImage ? absUrl(optimizedImageUrl(coverImage, 1200), siteBase) : null}
+	canonical={pageUrl}
+	lang={lang}
+>
+	{
+		entry && d ? (
+			<section class="glass">
+				{jsonLd && (
+					<script
+						type="application/ld+json"
+						set:html={JSON.stringify(jsonLd)}
+					/>
+				)}
+
+				<a class="back-link" href={backHref}>
+					{backLabel}
+				</a>
+				{d.thumbnail &&
+					(isVideoThumb && videoSrc ? (
+						<div class="detail-hero">
+							<DetailVideoFacade
+								src={videoSrc}
+								poster={videoPoster}
+								title={d.title}
+								lang={lang}
+								dict={t}
+							/>
+						</div>
+					) : (
+						<div class="detail-hero">
+							<img
+								src={optimizedImageUrl(d.thumbnail, 1200)}
+								alt={d.title}
+								fetchpriority="high"
+								decoding="async"
+								srcset={d.thumbnail?.includes("images.unsplash.com") ? `${d.thumbnail.replace(/w=\d+/, "w=800").replace(/q=\d+/, "q=75")} 800w, ${d.thumbnail.replace(/q=\d+/, "q=75")} 1200w` : optimizedSrcset(d.thumbnail, [800, 1200])}
+								sizes="(max-width: 640px) 100vw, 1088px"
+							/>
+						</div>
+					))}
+				<h1 class="detail-title">{d.title}</h1>
+				{d.tags?.length ? (
+					<div class="tag-row" style="margin-top:12px;">
+						{d.tags.map((tag) => (
+							<span class="tag">{tag}</span>
+						))}
+					</div>
+				) : null}
+				<KeyStrip
+					items={[
+						d.client ? { label: t.clientLabel, value: d.client } : null,
+						d.role ? { label: t.roleLabel, value: d.role } : null,
+						{
+							label: t.publishedLabel,
+							value: formatDate(d.publishedAt, lang) || d.year,
+						},
+						d.tags?.length
+							? { label: t.categoryLabel, value: d.tags.join(", ") }
+							: null,
+						d.status ? { label: t.statusLabel, value: d.status } : null,
+						d.liveUrl && isRealUrl(d.liveUrl)
+							? { label: t.liveSiteLabel, value: t.visitSite, href: d.liveUrl }
+							: null,
+					]}
+				/>
+				<section class="detail-section" aria-label={t.aboutProject}>
+					<h2 class="detail-h2">{t.aboutProject}</h2>
+					{bnStory ? (
+						<MarkdownBody blocks={storyBlocks} />
+					) : Content ? (
+						<div class="detail-body">
+							<Content />
+						</div>
+					) : storyBlocks.length > 0 ? (
+						<MarkdownBody blocks={storyBlocks} />
+					) : showDescriptionFallback ? (
+						<div class="detail-body">
+							<p>{d.description}</p>
+						</div>
+					) : null}
+				</section>
+				<TechChips techs={d.techs ?? []} lang={lang} dict={t} />
+				<DetailMedia
+				lang={lang}
+				dict={t}
+					gallery={d.gallery ?? []}
+					videos={d.videos ?? []}
+					exclude={d.thumbnail}
+					altBase={`${d.title} ${t.galleryImage}`}
+				/>
+				<DetailCta
+					title={`${t.wantSystemLike} ${d.title}?`}
+					text={t.projectCtaText}
+					service={serviceForTags(d.tags)}
+					source="project-detail"
+					lang={lang}
+					dict={t}
+				/>
+				<PrevNext
+					prev={
+						prevProject
+							? {
+									href: langUrl(`/projects/${prevProject.data.slug}`, lang),
+									title: prevProject.data.title,
+									thumb: thumbOf(prevProject),
+								}
+							: null
+					}
+					next={
+						nextProject
+							? {
+									href: langUrl(`/projects/${nextProject.data.slug}`, lang),
+									title: nextProject.data.title,
+									thumb: thumbOf(nextProject),
+								}
+							: null
+					}
+					lang={lang}
+					dict={t}
+				/>
+			</section>
+		) : (
+			<section class="glass">
+				<a class="back-link" href={langUrl("/projects", lang)}>
+					{t.backAllProjects}
+				</a>
+				<h1 class="detail-title">{t.notFoundProject}</h1>
+				<p class="empty-state">{t.notPublishedProject}</p>
+			</section>
+		)
+	}
+</Layout>

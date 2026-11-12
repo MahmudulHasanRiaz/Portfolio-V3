@@ -1,0 +1,193 @@
+---
+// Twin SSR fallback — release detail template.
+//
+// The SAME markup as the static release detail page
+// (src/pages/releases/[slug].astro), driven by the view model built in
+// src/lib/twin-detail.ts from the LIVE row only (a twin slug is never
+// in the build-time collections). The static page is the source of
+// truth — keep this in sync with it.
+import BrandIcon from "../BrandIcon.astro";
+import DetailMedia from "../DetailMedia.astro";
+import DetailVideoFacade from "../DetailVideoFacade.astro";
+import PrevNext from "../PrevNext.astro";
+import ReleasePlayer from "../ReleasePlayer";
+import { WIKIMEDIA_LOGOS } from "../../data/site";
+import {
+	langUrl,
+	displayName,
+	pickDict,
+	RELEASE_PLAYER_DICT_KEYS,
+	platformActionLabelLang,
+	type Dict,
+	type Lang,
+} from "../../lib/i18n";
+import type { ReleaseView } from "../../lib/twin-detail";
+import { optimizedImageUrl, optimizedSrcset } from "../../lib/images";
+
+interface Props {
+	view: ReleaseView;
+	lang: Lang;
+	t: Dict;
+}
+
+const { view, lang, t } = Astro.props;
+const data = view.data;
+
+const RELEASE_PLATFORM_ICONS: Record<string, string> = {
+	YouTube: "youtube",
+	Spotify: "spotify",
+	"Apple Music": "applemusic",
+	Deezer: "deezer",
+	Boomplay: `wikimedia:${WIKIMEDIA_LOGOS.boomplay}`,
+	JioSaavn: `wikimedia:${WIKIMEDIA_LOGOS.jiosaavn}`,
+	SoundCloud: "soundcloud",
+};
+---
+
+{!view.found || !data ? (
+	<section class="glass">
+		<a href={langUrl("/releases", lang)} class="back-link">
+			{t.backAllReleases}
+		</a>
+		<h1 class="detail-title">{t.notFoundRelease}</h1>
+		<p class="empty-state">{t.notPublishedRelease}</p>
+	</section>
+) : (
+	<section class="glass">
+		{view.jsonLd ? (
+			<script type="application/ld+json" set:html={JSON.stringify(view.jsonLd)} />
+		) : null}
+
+		<a href={langUrl("/releases", lang)} class="back-link">
+			{t.backAllReleases}
+		</a>
+
+		{view.isVideo && view.youtubeId ? (
+			<ReleasePlayer client:visible youtubeId={view.youtubeId} title={view.title} lang={lang} dict={pickDict(t, RELEASE_PLAYER_DICT_KEYS)} />
+		) : data.thumbnailType === "video" && data.thumbnail ? (
+			<div class="detail-hero">
+				<DetailVideoFacade
+					src={data.thumbnail}
+					poster={null}
+					title={view.title}
+					lang={lang}
+					dict={t}
+				/>
+			</div>
+		) : data.thumbnail ? (
+			<div class="detail-hero">
+				<img
+					src={optimizedImageUrl(data.thumbnail, 1200)}
+					alt={view.title}
+					fetchpriority="high"
+					decoding="async"
+					srcset={data.thumbnail?.includes("images.unsplash.com") ? `${data.thumbnail.replace(/w=\d+/, "w=800").replace(/q=\d+/, "q=75")} 800w, ${data.thumbnail.replace(/q=\d+/, "q=75")} 1200w` : optimizedSrcset(data.thumbnail, [800, 1200])}
+					sizes="(max-width: 640px) 100vw, 1088px"
+				/>
+			</div>
+		) : (
+			<div class="audio-tile" aria-label={t.audioRelease}>
+				{view.firstPlatform &&
+				RELEASE_PLATFORM_ICONS[view.firstPlatform.name] ? (
+					<BrandIcon
+						icon={RELEASE_PLATFORM_ICONS[view.firstPlatform.name]}
+						name={view.firstPlatform.name}
+						size={64}
+					/>
+				) : (
+					<svg
+						width="64"
+						height="64"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.5"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+						<path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+						<line x1="12" x2="12" y1="19" y2="22" />
+					</svg>
+				)}
+			</div>
+		)}
+		<p class="detail-meta">
+			{view.releaseTypeLabel ? (
+				<span class="type-tag">{view.releaseTypeLabel}</span>
+			) : null}
+			{view.year ? ` · ${view.year}` : ""}
+			{` · ${view.isVideo ? t.videoLabel : t.audioLabel}`}
+		</p>
+		<h1 class="detail-title">{view.title}</h1>
+		<p class="detail-meta">{t.authorBy} {displayName(lang)}</p>
+		{!view.isVideo ? (
+			<p style="margin:12px 0 0;">
+				<span class="audio-badge">{t.audioOnly}</span>
+			</p>
+		) : null}
+
+		{view.description ? (
+			<section class="detail-section" aria-label={t.aboutRelease}>
+				<h2 class="detail-h2">{t.aboutRelease}</h2>
+				<div class="detail-body">
+					<p>{view.description}</p>
+				</div>
+			</section>
+		) : null}
+
+		{data.tune || data.lyricist ? (
+			<div class="credits-grid">
+				{data.tune ? (
+					<div class="credit">
+						<div class="credit-label">{t.tune}</div>
+						<div class="credit-value">{data.tune}</div>
+					</div>
+				) : null}
+				{data.lyricist ? (
+					<div class="credit">
+						<div class="credit-label">{t.lyricist}</div>
+						<div class="credit-value">{data.lyricist}</div>
+					</div>
+				) : null}
+			</div>
+		) : null}
+
+		{data.lyrics ? (
+			<section class="detail-section" aria-label={t.lyrics}>
+				<h2 class="detail-h2">{t.lyrics}</h2>
+				<p class="lyrics">{data.lyrics}</p>
+			</section>
+		) : null}
+
+		{view.platforms.length > 0 ? (
+			<section class="detail-section" aria-label={t.listenWatch}>
+				<h2 class="detail-h2">{t.listenWatch}</h2>
+				<div class="platform-list">
+					{view.platforms.map((p) => {
+						const icon = RELEASE_PLATFORM_ICONS[p.name];
+						return (
+							<a
+								class="platform-row-link"
+								href={p.url}
+								target="_blank"
+								rel="noreferrer"
+							>
+								{icon ? (
+									<BrandIcon icon={icon} name={p.name} size={22} decorative />
+								) : null}
+								<span>{platformActionLabelLang(p.name, lang)}</span>
+								<span aria-hidden="true">↗</span>
+							</a>
+						);
+					})}
+				</div>
+			</section>
+		) : null}
+
+		<DetailMedia lang={lang} dict={t} videos={data.videos ?? []} altBase={`${view.title} video`} />
+
+		<PrevNext prev={view.prev} next={view.next} lang={lang} dict={t} />
+	</section>
+)}

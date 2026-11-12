@@ -1,0 +1,80 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { getCaseStudies, truncateShort } from "../../lib/content";
+import { applySiteCopy, getDict, langUrl } from "../../lib/i18n";
+import { getSiteSettings } from "../../lib/settings";
+import ThumbImage from "../../components/ThumbImage.astro";
+
+// Static archive — no filters (one case study now); grid of cards with
+// title + one-line hook, linking to the case-study detail page.
+// Fixed strings from the dictionary (same keys as the /bn/ archive).
+const lang = "en" as const;
+const t = applySiteCopy(getDict(lang), lang, await getSiteSettings());
+
+const studies = await getCaseStudies();
+
+// Unsplash card thumbs ship at w=1200 in content/API rows but render at
+// ~360px wide (2x retina ≈ 720px) — request w=800/q=75 instead: measured
+// 124KB → 67KB per image (~46% less). Non-Unsplash URLs pass through.
+const sizedThumb = (url: string | null | undefined, w = 800) =>
+	url?.includes("images.unsplash.com")
+		? url.replace(/w=\d+/, `w=${w}`).replace(/q=\d+/, "q=75")
+		: url;
+---
+
+<Layout
+	title={t.caseStudiesPageTitle}
+	description={t.caseStudiesPageDescription}
+	lang={lang}
+>
+	<section class="glass">
+		<p style="margin:0 0 8px;">
+			<a class="back-link" href={langUrl("/", lang)}>{t.backHome}</a>
+		</p>
+		<h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;">
+			{t.allCaseStudies}
+		</h1>
+		{
+			studies.length === 0 ? (
+				<p class="empty-state">{t.emptyCaseStudies}</p>
+			) : (
+				<div class="card-grid">
+					{studies.map((s) => (
+						<a class="grid-card" data-astro-prefetch="hover" href={langUrl(`/case-studies/${s.data.slug}`, lang)}>
+							<div class="grid-thumb">
+								{s.data.thumbnailType === "video" && s.data.thumbnail ? (
+									<video
+										src={s.data.thumbnail}
+										aria-label={s.data.title}
+										muted
+										loop
+										playsinline
+										autoplay={s.data.thumbnailAutoplay !== false}
+										preload="metadata"
+									/>
+								) : s.data.thumbnail ? (
+									<ThumbImage
+										src={s.data.thumbnail}
+										alt={s.data.title}
+										widths={[360, 720, 1080]}
+										sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 360px"
+										width={800}
+										height={500}
+									/>
+								) : (
+									<span class="thumb-fallback" aria-hidden="true">
+										{s.data.title.charAt(0)}
+									</span>
+								)}
+							</div>
+							<div class="grid-body">
+								<h3>{s.data.title}</h3>
+								{s.data.description && <p>{truncateShort(s.data.description)}</p>}
+							</div>
+						</a>
+					))}
+				</div>
+			)
+		}
+	</section>
+</Layout>

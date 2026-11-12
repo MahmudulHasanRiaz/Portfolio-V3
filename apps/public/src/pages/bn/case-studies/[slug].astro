@@ -1,0 +1,387 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import { getEntry, getLiveEntry } from "astro:content";
+import {
+	liveCollectionReachable,
+} from "../../../loaders/public-content";
+import DetailCta from "../../../components/DetailCta.astro";
+import DetailMedia from "../../../components/DetailMedia.astro";
+import DetailVideoFacade from "../../../components/DetailVideoFacade.astro";
+import KeyStrip from "../../../components/KeyStrip.astro";
+import MarkdownBody from "../../../components/MarkdownBody.astro";
+import PrevNext from "../../../components/PrevNext.astro";
+import TechChips from "../../../components/TechChips.astro";
+import { formatDate, getCaseStudies, getProjects } from "../../../lib/content";
+import {
+	resolveCanonicalBase,
+	absUrl,
+	dedupeBlocks,
+	mergeDetail,
+	parseBodyBlocks,
+} from "../../../lib/detail";
+import { optimizedImageUrl, optimizedSrcset } from "../../../lib/images";
+import { applySiteCopy, getDict, langUrl, localizeCaseStudy } from "../../../lib/i18n";
+import { getSiteSettings } from "../../../lib/settings";
+
+// Bangla live detail route — same live route as the English one.
+// Bangla fields come from the item's optional nested `bn` object (live
+// API or build-time frontmatter); English is the fallback, never a blank.
+// Live detail route — on-demand SSR (2026-11-12, output "server"):
+// every request renders this page in the Worker from the Public
+// Content API. When the API is reachable the live entry is
+// authoritative (a missing live entry 404s); the build-time row is
+// only the outage fallback when the API is unreachable (fix plan §1b).
+// A slug published after a deploy shows instantly — no rebuild.
+// Route caching is in astro.config.mjs + src/middleware.ts.
+const lang = "bn" as const;
+const settings = await getSiteSettings();
+const t = applySiteCopy(getDict(lang), lang, settings);
+
+const { slug } = Astro.params;
+const liveResult = slug
+	? await getLiveEntry("liveCaseStudies", slug).catch(() => undefined)
+	: undefined;
+const liveEntry = liveResult?.entry;
+if (liveEntry) Astro.cache.set(liveEntry);
+// When the live API is reachable, the live entry is authoritative:
+	// a missing live entry 404s and the build-time row is never read,
+	// so an archived/draft item cannot render from its static file.
+	// When unreachable, the build-time row is the outage fallback and
+	// mergeDetail() below still fills gaps in the live row.
+	const liveReachable = await liveCollectionReachable("case-studies");
+	const buildEntry =
+		liveReachable || !slug
+			? undefined
+			: await getEntry("caseStudies", slug);
+const entry = liveEntry ?? buildEntry;
+if (!entry) Astro.response.status = 404;
+
+interface Metric {
+	value: string;
+	label: string;
+}
+
+interface CaseStudyData {
+	title: string;
+	description?: string;
+	content?: string;
+	tags?: string[];
+	publishedAt?: string;
+	thumbnail?: string;
+	thumbnailType?: "image" | "video";
+	thumbnailVideoUrl?: string;
+	problem?: string;
+	fix?: string;
+	result?: string;
+	fixPoints?: string[];
+	metrics?: Metric[];
+	research?: string;
+	techs?: string[];
+	projectSlug?: string;
+	gallery?: string[];
+	videos?: { url: string; title?: string }[];
+}
+
+const liveData = liveEntry?.data as unknown as
+	| Record<string, unknown>
+	| undefined;
+const buildData = buildEntry?.data as unknown as
+	| Record<string, unknown>
+	| undefined;
+const merged = mergeDetail(buildData, liveData) as unknown as
+	| CaseStudyData
+	| undefined;
+const d = merged
+	? (localizeCaseStudy(
+			merged as unknown as Record<string, unknown>,
+			lang,
+		) as unknown as CaseStudyData)
+	: undefined;
+
+// A Bangla body (bn.content) wins over the English body.
+const bnRaw = (merged as unknown as Record<string, unknown> | undefined)?.[
+	"bn"
+] as Record<string, unknown> | undefined;
+const bnContent =
+	typeof bnRaw?.content === "string" && bnRaw.content
+		? bnRaw.content
+		: undefined;
+
+// The story body, rendered ONCE: the Bangla content when present, else
+// the live content string, else the build-time markdown body. Any
+// paragraph that merely restates the Problem / Fix / Result fields
+// is dropped, so each section appears exactly once. What survives is
+// the hook lede.
+const rawBody = bnContent ?? d?.content ?? buildEntry?.body ?? "";
+const ledeBlocks = dedupeBlocks(parseBodyBlocks(rawBody), [
+	d?.problem,
+	d?.fix,
+	d?.result,
+	d?.description,
+]);
+
+// "Built with" techs: the case study's own list when present, else the
+// linked project's stack (real data, never invented).
+let techs = d?.techs ?? [];
+if (techs.length === 0 && d?.projectSlug) {
+	const projects = await getProjects();
+	const linked = projects.find((p) => p.data.slug === d.projectSlug);
+	if (linked?.data.techs?.length) techs = linked.data.techs;
+}
+
+const isVideoThumb = d?.thumbnailType === "video";
+const videoSrc = isVideoThumb
+	? (d?.thumbnailVideoUrl ?? d?.thumbnail)
+	: undefined;
+const videoPoster =
+	isVideoThumb &&
+	d?.thumbnailVideoUrl &&
+	d?.thumbnail &&
+	d.thumbnail !== d.thumbnailVideoUrl &&
+	!/\.(mp4|webm|mov|m4v)([?#]|$)/i.test(d.thumbnail)
+		? d.thumbnail
+		: null;
+const coverImage = !isVideoThumb && d?.thumbnail ? d.thumbnail : videoPoster;
+
+// Prev/next by date order (newest first): prev = older, next = newer.
+const allStudiesRaw = await getCaseStudies();
+const allStudies = allStudiesRaw.map((s) => ({
+	...s,
+	data: localizeCaseStudy(s.data, lang),
+}));
+const currentIndex = allStudies.findIndex((s) => s.data.slug === slug);
+const prevStudy = currentIndex >= 0 ? allStudies[currentIndex + 1] : undefined;
+const nextStudy = currentIndex > 0 ? allStudies[currentIndex - 1] : undefined;
+const thumbOf = (s: (typeof allStudies)[number] | undefined) =>
+	s?.data.thumbnailType !== "video" && s?.data.thumbnail
+		? s.data.thumbnail
+		: null;
+
+// Canonical base: explicit admin site_url wins; else the request
+// host (Astro.url), else the SITE_URL fallback — see detail.ts.
+const siteBase = resolveCanonicalBase(settings.siteUrl, Astro.url);
+const pageUrl = `${siteBase}/bn/case-studies/${slug}`;
+const jsonLd = d
+	? {
+			"@context": "https://schema.org",
+			"@graph": [
+				{
+					"@type": "Article",
+					headline: d.title,
+					description: d.description,
+					inLanguage: "bn",
+					author: {
+						"@type": "Person",
+						name: "Mahmudul Hasan Riaz",
+						url: siteBase,
+					},
+					mainEntityOfPage: pageUrl,
+					...(coverImage ? { image: absUrl(optimizedImageUrl(coverImage, 1200), siteBase) } : {}),
+				},
+				{
+					"@type": "BreadcrumbList",
+					itemListElement: [
+						{
+							"@type": "ListItem",
+							position: 1,
+							name: "হোম",
+							item: siteBase,
+						},
+						{
+							"@type": "ListItem",
+							position: 2,
+							name: t.allCaseStudies,
+							item: `${siteBase}/bn/case-studies`,
+						},
+						{
+							"@type": "ListItem",
+							position: 3,
+							name: d.title,
+							item: pageUrl,
+						},
+					],
+				},
+			],
+		}
+	: null;
+---
+
+<Layout
+	title={
+		d
+			? `${d.title} — Mahmudul Hasan Riaz`
+			: `${t.notFoundCaseStudy} — Mahmudul Hasan Riaz`
+	}
+	description={d?.description}
+	ogType="article"
+	ogImage={coverImage ? absUrl(optimizedImageUrl(coverImage, 1200), siteBase) : null}
+	canonical={pageUrl}
+	lang={lang}
+>
+	{
+		entry && d ? (
+			<section class="glass">
+				{jsonLd && (
+					<script
+						type="application/ld+json"
+						set:html={JSON.stringify(jsonLd)}
+					/>
+				)}
+
+				<a class="back-link" href={langUrl("/case-studies", lang)}>
+					{t.backAllCaseStudies}
+				</a>
+				{d.thumbnail &&
+					(isVideoThumb && videoSrc ? (
+						<div class="detail-hero">
+							<DetailVideoFacade
+								src={videoSrc}
+								poster={videoPoster}
+								title={d.title}
+								lang={lang}
+								dict={t}
+							/>
+						</div>
+					) : (
+						<div class="detail-hero">
+							<img
+								src={optimizedImageUrl(d.thumbnail, 1200)}
+								alt={d.title}
+								fetchpriority="high"
+								decoding="async"
+								srcset={d.thumbnail?.includes("images.unsplash.com") ? `${d.thumbnail.replace(/w=\d+/, "w=800").replace(/q=\d+/, "q=75")} 800w, ${d.thumbnail.replace(/q=\d+/, "q=75")} 1200w` : optimizedSrcset(d.thumbnail, [800, 1200])}
+								sizes="(max-width: 640px) 100vw, 1088px"
+							/>
+						</div>
+					))}
+				<h1 class="detail-title">{d.title}</h1>
+				{d.tags?.length ? (
+					<div class="tag-row" style="margin-top:12px;">
+						{d.tags.map((tag) => (
+							<span class="tag">{tag}</span>
+						))}
+					</div>
+				) : null}
+				<KeyStrip
+					items={[
+						{
+							label: t.publishedLabel,
+							value: formatDate(d.publishedAt, lang),
+						},
+						d.tags?.length
+							? { label: t.categoryLabel, value: d.tags.join(", ") }
+							: null,
+						d.projectSlug
+							? {
+									label: t.projectLabel,
+									value: t.viewProject,
+									href: langUrl(`/projects/${d.projectSlug}`, lang),
+								}
+							: null,
+					]}
+				/>
+				{ledeBlocks.length > 0 ? (
+					<MarkdownBody blocks={ledeBlocks} />
+				) : null}
+				{(d.problem || d.fix || d.result) && (
+					<div class="problem-fix-result">
+						{d.problem && (
+							<div class="pfr">
+								<h3>{t.problem}</h3>
+								<p>{d.problem}</p>
+							</div>
+						)}
+						{d.fix && (
+							<div class="pfr">
+								<h3>{t.fix}</h3>
+								<p>{d.fix}</p>
+								{d.fixPoints?.length ? (
+									<ul class="fix-points">
+										{d.fixPoints.map((point) => (
+											<li>{point}</li>
+										))}
+									</ul>
+								) : null}
+							</div>
+						)}
+						{d.result && (
+							<div class="pfr">
+								<h3>{t.result}</h3>
+								<p>{d.result}</p>
+							</div>
+						)}
+					</div>
+				)}
+				{d.metrics?.length ? (
+					<div class="metrics-band" aria-label={t.result}>
+						{d.metrics.map((metric) => (
+							<div class="metric-card">
+								<strong>{metric.value}</strong>
+								<span>{metric.label}</span>
+							</div>
+						))}
+					</div>
+				) : null}
+				{d.research ? (
+					<section class="detail-section" aria-label={t.research}>
+						<h2 class="detail-h2">{t.research}</h2>
+						<MarkdownBody text={d.research} />
+					</section>
+				) : null}
+				<TechChips techs={techs} lang={lang} dict={t} />
+				<DetailMedia
+				lang={lang}
+				dict={t}
+					gallery={d.gallery ?? []}
+					videos={d.videos ?? []}
+					exclude={d.thumbnail}
+					altBase={`${d.title} ${t.galleryImage}`}
+				/>
+				<DetailCta
+					title={t.facingSimilar}
+					text={t.caseStudyCtaText}
+					buttonLabel={t.discussSimilarProject}
+					linkHref={
+						d.projectSlug
+							? langUrl(`/projects/${d.projectSlug}?from=case-study:${slug}`, lang)
+							: undefined
+					}
+					linkLabel={d.projectSlug ? t.viewProject : undefined}
+					source="case-study-detail"
+					lang={lang}
+					dict={t}
+				/>
+				<PrevNext
+					prev={
+						prevStudy
+							? {
+									href: langUrl(`/case-studies/${prevStudy.data.slug}`, lang),
+									title: prevStudy.data.title,
+									thumb: thumbOf(prevStudy),
+								}
+							: null
+					}
+					next={
+						nextStudy
+							? {
+									href: langUrl(`/case-studies/${nextStudy.data.slug}`, lang),
+									title: nextStudy.data.title,
+									thumb: thumbOf(nextStudy),
+								}
+							: null
+					}
+					lang={lang}
+					dict={t}
+				/>
+			</section>
+		) : (
+			<section class="glass">
+				<a class="back-link" href={langUrl("/case-studies", lang)}>
+					{t.backAllCaseStudies}
+				</a>
+				<h1 class="detail-title">{t.notFoundCaseStudy}</h1>
+				<p class="empty-state">{t.notPublishedCaseStudy}</p>
+			</section>
+		)
+	}
+</Layout>

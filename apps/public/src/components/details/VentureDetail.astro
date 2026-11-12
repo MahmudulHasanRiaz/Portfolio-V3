@@ -1,0 +1,151 @@
+---
+// Twin SSR fallback — venture detail template.
+//
+// The SAME markup as the static venture detail page
+// (src/pages/ventures/[slug].astro), driven by the view model built in
+// src/lib/twin-detail.ts from the LIVE row only (a twin slug is never
+// in the build-time collections, so there is no markdown body — the
+// body comes from the live `content` string). The static page is the
+// source of truth — keep this in sync with it.
+import DetailCta from "../DetailCta.astro";
+import DetailMedia from "../DetailMedia.astro";
+import DetailVideoFacade from "../DetailVideoFacade.astro";
+import KeyStrip from "../KeyStrip.astro";
+import MarkdownBody from "../MarkdownBody.astro";
+import PrevNext from "../PrevNext.astro";
+import { formatDate } from "../../lib/content";
+import { langUrl, type Dict, type Lang } from "../../lib/i18n";
+import { optimizedImageUrl, optimizedSrcset } from "../../lib/images";
+import type { VentureView } from "../../lib/twin-detail";
+
+interface Props {
+	view: VentureView;
+	lang: Lang;
+	t: Dict;
+}
+
+const { view, lang, t } = Astro.props;
+const data = view.data;
+---
+
+{!view.found || !data ? (
+	<section class="glass">
+		<a class="back-link" href={langUrl("/ventures", lang)}>
+			{t.backAllVentures}
+		</a>
+		<h1 class="detail-title">{t.notFoundVenture}</h1>
+		<p class="empty-state">{t.notPublishedVenture}</p>
+	</section>
+) : (
+	<section class="glass">
+		{view.jsonLd ? (
+			<script type="application/ld+json" set:html={JSON.stringify(view.jsonLd)} />
+		) : null}
+
+		<a href={langUrl("/ventures", lang)} class="back-link">
+			{t.backAllVentures}
+		</a>
+
+		{data.thumbnail &&
+			(view.isVideoThumb && view.videoSrc ? (
+				<div class="detail-hero">
+					<DetailVideoFacade
+						src={view.videoSrc}
+						poster={view.videoPoster}
+						title={view.title}
+						lang={lang}
+						dict={t}
+					/>
+				</div>
+			) : (
+				<div class="detail-hero">
+					<img
+						src={optimizedImageUrl(data.thumbnail, 1200)}
+						alt={view.title}
+						fetchpriority="high"
+						decoding="async"
+						srcset={data.thumbnail?.includes("images.unsplash.com") ? `${data.thumbnail.replace(/w=\d+/, "w=800").replace(/q=\d+/, "q=75")} 800w, ${data.thumbnail.replace(/q=\d+/, "q=75")} 1200w` : optimizedSrcset(data.thumbnail, [800, 1200])}
+						sizes="(max-width: 640px) 100vw, 1088px"
+					/>
+				</div>
+			))}
+		<h1 class="detail-title">{view.title}</h1>
+		{view.tags.length ? (
+			<div class="tag-row" style="margin-top:12px;">
+				{view.tags.map((tag) => (
+					<span class="tag">{tag}</span>
+				))}
+			</div>
+		) : null}
+		{view.description ? <p class="detail-lede">{view.description}</p> : null}
+
+		<KeyStrip
+			items={[
+				{
+					label: t.publishedLabel,
+					value: formatDate(data.publishedAt, lang),
+				},
+				data.stage ? { label: t.stageLabel, value: data.stage } : null,
+				data.location
+					? { label: t.locationLabel, value: data.location }
+					: null,
+				data.teamSize
+					? { label: t.teamSizeLabel, value: data.teamSize }
+					: null,
+				data.foundedDate
+					? {
+							label: t.foundedLabel,
+							value: formatDate(data.foundedDate, lang),
+						}
+					: null,
+				view.tags.length
+					? { label: t.categoryLabel, value: view.tags.join(", ") }
+					: null,
+				view.website
+					? { label: t.websiteLabel, value: t.visitWebsite, href: view.website }
+					: null,
+			]}
+		/>
+
+		{data.metrics?.length ? (
+			<div
+				class="metrics-band"
+				aria-label={t.ventureMetrics}
+			>
+				{data.metrics.map((metric) => (
+					<div class="metric-card">
+						<strong>{metric.value}</strong>
+						<span>{metric.label}</span>
+					</div>
+				))}
+			</div>
+		) : null}
+
+		{view.bodyBlocks.length > 0 ? (
+			<section class="detail-section" aria-label={`${t.aboutVenture} ${view.title}`}>
+				<h2 class="detail-h2">{t.aboutVenture} {view.title}</h2>
+				<MarkdownBody blocks={view.bodyBlocks} />
+			</section>
+		) : null}
+
+		<DetailMedia
+				lang={lang}
+				dict={t}
+			gallery={data.gallery ?? []}
+			videos={data.videos ?? []}
+			exclude={data.thumbnail}
+			altBase={`${view.title} ${t.galleryImage}`}
+		/>
+
+		<DetailCta
+			title={`${t.thinkingVenture} ${view.title}?`}
+			text={t.ventureCtaText}
+			buttonLabel={t.discussSimilarVenture}
+			source="venture-detail"
+			lang={lang}
+			dict={t}
+		/>
+
+		<PrevNext prev={view.prev} next={view.next} lang={lang} dict={t} />
+	</section>
+)}

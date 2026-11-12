@@ -1,0 +1,107 @@
+---
+// Thumbnail image — honest responsive sizes for every thumb context.
+//
+// Three cases, decided by the URL:
+//   1. Local public/ file (the build-time fallback thumbs) → Astro
+//      <Picture>: the build generates AVIF/WebP variants at exactly
+//      the widths the layout displays, so a 124KB 1067px file is
+//      never served for a 72px mini-row or a 360px card.
+//   2. Unsplash URL → plain <img> with a srcset built from the
+//      Unsplash w= parameter (q=75); Unsplash resizes server-side,
+//      so no build-time work is needed.
+//   3. Any other remote URL (live API / files.riaz.com.bd) → the
+//      /api/image route when it is a files.riaz.com.bd URL (AVIF/
+//      WebP, quality 75, widths clamped to the whitelist), else a
+//      plain <img> at the given width/height.
+//
+// The caller passes the layout context (widths + sizes). The
+// width/height attributes are the layout size for the remote
+// fallback; the <Picture> branch uses the asset's own dimensions,
+// and the .grid-thumb / .mini-thumb container governs the crop
+// (aspect-ratio + object-fit: cover), so no layout shift either way.
+import { Picture } from "astro:assets";
+import type { ImageMetadata } from "astro";
+import {
+	optimizedImageUrl,
+	optimizedSrcset,
+	unsplashSrcset,
+} from "../lib/images";
+
+interface Props {
+	src: string;
+	alt: string;
+	/** Responsive widths to generate (local files + Unsplash srcset). */
+	widths: number[];
+	/** sizes attribute, honest to the rendered width. */
+	sizes: string;
+	/** Layout width/height attributes (remote fallback + aspect). */
+	width: number;
+	height: number;
+	loading?: "lazy" | "eager";
+	decoding?: "async" | "sync" | "auto";
+	fetchpriority?: "high" | "low" | "auto";
+	class?: string;
+}
+
+const {
+	src,
+	alt,
+	widths,
+	sizes,
+	width,
+	height,
+	loading = "lazy",
+	decoding = "async",
+	fetchpriority,
+	class: cls,
+} = Astro.props;
+
+// Local thumbnail files, keyed by their public URL path.
+const localImages = import.meta.glob<{ default: ImageMetadata }>(
+	"../../public/{ventures,posts}/*.{jpg,jpeg,png,webp}",
+	{ eager: true },
+);
+const byUrl = new Map<string, ImageMetadata>();
+for (const [path, mod] of Object.entries(localImages)) {
+	byUrl.set(path.replace(/^\.\.\/\.\.\/public/, ""), mod.default);
+}
+const asset = byUrl.get(src);
+
+// Unsplash srcset: same image at the responsive widths, q=75.
+// Only when the URL actually carries a w= parameter to rewrite.
+// A files.riaz.com.bd URL gets the /api/image srcset instead;
+// anything else gets no srcset (plain <img>, original URL).
+const remoteSrcset =
+	unsplashSrcset(src, widths) ?? optimizedSrcset(src, widths);
+const remoteSrc = optimizedImageUrl(src, width);
+---
+
+{
+	asset ? (
+		<Picture
+			src={asset}
+			alt={alt}
+			formats={["avif", "webp"]}
+			widths={widths}
+			sizes={sizes}
+			quality={75}
+			loading={loading}
+			decoding={decoding}
+			fetchpriority={fetchpriority}
+			class={cls}
+		/>
+	) : (
+		<img
+			src={remoteSrc}
+			srcset={remoteSrcset}
+			sizes={remoteSrcset ? sizes : undefined}
+			alt={alt}
+			width={width}
+			height={height}
+			loading={loading}
+			decoding={decoding}
+			fetchpriority={fetchpriority}
+			class={cls}
+		/>
+	)
+}

@@ -1,0 +1,553 @@
+---
+import "../styles/glass.css";
+import "../styles/loading.css";
+// Plus Jakarta Sans — SELF-HOSTED variable font via Fontsource
+// (PageSpeed 2026-11-10: the Google Fonts stylesheet was
+// render-blocking, 530ms on mobile, plus two third-party origins).
+// The CSS import bundles the @font-face rules (font-display: swap,
+// unicode-range subsets) and the woff2 files into /_astro/; the ?url
+// import below resolves the SAME emitted latin file so the preload
+// href always matches — never hardcode the hashed filename.
+import "@fontsource-variable/plus-jakarta-sans";
+import plusJakartaLatin from "@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2?url";
+import { ClientRouter } from "astro:transitions";
+import SiteHeader from "../components/SiteHeader";
+import SiteFooter from "../components/SiteFooter.astro";
+import HomeButton from "../components/HomeButton.astro";
+import ContactModal from "../components/ContactModal";
+import { getSiteSettings } from "../lib/settings";
+import { applySiteCopy, enPath, getDict, langUrl, pickDict, CONTACT_MODAL_DICT_KEYS, SITE_HEADER_DICT_KEYS, type Lang } from "../lib/i18n";
+import { resolveCanonicalBase, absUrl } from "../lib/detail";
+import { optimizedImageUrl } from "../lib/images";
+import { type Service } from "../data/site";
+
+interface Props {
+	title?: string;
+	description?: string;
+	/** Which profile this page belongs to — drives the header switcher + footer line.
+	    Unset → the admin-configured primary identity default (resolved in Layout). */
+	profile?: "se" | "knowme";
+	/** Page language. English at /<page>, Bangla at /bn/<page>. */
+	lang?: Lang;
+	/** Open Graph image (absolute URL). Defaults to the speaker photo.
+	    Pass null to omit og:image entirely (detail pages whose subject
+	    has no cover art must never fall back to the portrait). */
+	ogImage?: string | null;
+	/** Open Graph type. Defaults to "website" (detail pages use "article"). */
+	ogType?: string;
+	/** Canonical URL. Detail pages pass the live-base URL explicitly. */
+	canonical?: string;
+	/** Live-merged services (getServices()) for the contact modal's
+	    service select — pages that already fetch services pass them;
+	    pages that don't leave the modal on build-time SERVICES. */
+	services?: Service[];
+}
+
+const {
+	title = "Mahmudul Hasan Riaz",
+	description = "Software Engineer, Entrepreneur and Nasheed Artist — Dhaka, Bangladesh.",
+	profile,
+	lang = "en",
+	ogImage,
+	ogType = "website",
+	canonical,
+	services,
+} = Astro.props;
+
+// OG image: explicit prop wins, then the admin-managed portrait, then
+// the repo speaker photo. A relative admin URL is resolved against the
+// page origin (OG images must be absolute).
+const settings = await getSiteSettings();
+
+// Primary identity default (admin setting, Wave 2 A1): the resolved
+// default profile — "knowme" when settings.primaryIdentity is
+// "know-me", "se" otherwise (including API unset/unreachable, where
+// the fail-safe default is Software Engineer). Pages that declare no
+// profile (detail / archive pages) follow this default instead of a
+// hardcoded "se", so the header pill + footer always mark exactly the
+// default profile — or the profile page the visitor tapped to.
+const defaultProfile = settings.primaryIdentity === "know-me" ? "knowme" : "se";
+const effectiveProfile = profile ?? defaultProfile;
+const t = applySiteCopy(getDict(lang), lang, settings);
+const settingsPortrait = settings.portraitUrl
+	? settings.portraitUrl.startsWith("/")
+		? `${Astro.url.origin}${settings.portraitUrl}`
+		: settings.portraitUrl
+	: undefined;
+const ogImageUrl =
+	ogImage === null
+		? null
+		: (ogImage ??
+			// Portrait fallback (home / archives / pages with no cover):
+			// a files.riaz.com.bd portrait goes through /api/image at
+			// width 1200 (og:image's recommended width); any other
+			// portrait URL renders unchanged. The local /speaker.jpg
+			// default is untouched.
+			(settingsPortrait
+				? (absUrl(
+						optimizedImageUrl(settingsPortrait, 1200),
+						Astro.url.origin,
+					) ?? settingsPortrait)
+				: undefined) ??
+			`${Astro.url.origin}/speaker.jpg`);
+
+// Favicon: admin-managed URL wins, repo default /favicon.svg otherwise.
+const faviconUrl = settings.faviconUrl ?? "/favicon.svg";
+
+// --- Multilingual SEO (one URL per language, hreflang cluster) --------
+// Canonical = this page's OWN absolute URL, never the other language's
+// (Google: a canonical must point at a page in the SAME language).
+// hreflang: the identical set on BOTH versions — self + the other
+// language + x-default — all ABSOLUTE, built from the canonical base
+// (resolveCanonicalBase): an explicit admin site_url wins (ONE
+// canonical for search engines no matter which host served the page);
+// without an admin override the request host wins (Astro.url.origin —
+// the host that actually served this render), so the page is
+// self-consistent on every domain; SITE_URL is the last resort. No
+// served output here contains a hardcoded domain. NOTE: prerendered
+// pages bake Astro.url.origin (= Astro.site) at BUILD time — only
+// on-demand renders see the live request host; see detail.ts.
+// x-default = the ADMIN-CONFIGURED default language version: default
+// "bn" → the Bangla URL; "en" or "system" → the English URL. The
+// admin setting (settings.defaultLanguage) is read at build/request
+// time and never hardcoded here.
+// The robots meta below is the search-indexing gate for the whole
+// site, both languages alike — driven by the admin toggle
+// (settings.searchIndexingEnabled), not hardcoded.
+const siteBase = resolveCanonicalBase(settings.siteUrl, Astro.url);
+const pathEn = enPath(Astro.url.pathname);
+const urlEn = `${siteBase}${pathEn === "/" ? "/" : pathEn}`;
+const urlBn = `${siteBase}${pathEn === "/" ? "/bn/" : `/bn${pathEn}`}`;
+const xDefaultUrl =
+	settings.defaultLanguage === "bn" ? urlBn : urlEn;
+const canonicalUrl = canonical ?? (lang === "bn" ? urlBn : urlEn);
+const ogLocale = lang === "bn" ? "bn_BD" : "en_US";
+const ogLocaleAlt = lang === "bn" ? "en_US" : "bn_BD";
+
+// Floating home button (2026-11-09, home shortcut): rendered on
+// every page EXCEPT the homepage itself ("/" and "/bn[/]") — there
+// it would point at the page you're already on. A direct <body>
+// child (never inside .page) so no ancestor can disturb its fixed
+// positioning.
+const isHome =
+	Astro.url.pathname === "/" ||
+	Astro.url.pathname === "/bn" ||
+	Astro.url.pathname === "/bn/";
+---
+
+<!doctype html>
+<html lang={lang}>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="description" content={description} />
+		<link rel="icon" type="image/svg+xml" href={faviconUrl} />
+		<link rel="canonical" href={canonicalUrl} />
+		<link rel="alternate" hreflang="en" href={urlEn} />
+		<link rel="alternate" hreflang="bn" href={urlBn} />
+		<link rel="alternate" hreflang="x-default" href={xDefaultUrl} />
+		<!-- Search-indexing gate: admin toggle (settings key
+		     "search_indexing_enabled", read via getSiteSettings()
+		     above — no second fetch). OFF (default) keeps the
+		     in-progress site out of indexes; ON allows indexing.
+		     robots.txt + sitemap.xml.ts honor the same setting. -->
+		<meta
+			name="robots"
+			content={settings.searchIndexingEnabled ? "index, follow" : "noindex, nofollow"}
+		/>
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta property="og:type" content={ogType} />
+		<meta property="og:url" content={canonicalUrl} />
+		<meta property="og:site_name" content="Mahmudul Hasan Riaz" />
+		<meta property="og:locale" content={ogLocale} />
+		<meta property="og:locale:alternate" content={ogLocaleAlt} />
+		{ogImageUrl ? <meta property="og:image" content={ogImageUrl} /> : null}
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content={title} />
+		<meta name="twitter:description" content={description} />
+		{ogImageUrl ? <meta name="twitter:image" content={ogImageUrl} /> : null}
+		<meta name="generator" content={Astro.generator} />
+		{/* Self-hosted font preload (see imports above): exactly ONE
+		    file — the latin variable woff2 used by above-the-fold
+		    text — with crossorigin (mandatory even same-origin;
+		    omitting it double-downloads the font). The Bengali font
+		    (Li Ador Noirrit, public/fonts/) is NOT preloaded: it
+		    loads on demand via its own @font-face rules. */}
+		<link
+			rel="preload"
+			href={plusJakartaLatin}
+			as="font"
+			type="font/woff2"
+			crossorigin
+		/>
+		<title>{title}</title>
+		{/* ISSUE 7A: View Transitions — same-origin navigations swap pages
+		    without a full reload (no more blank full-page load on every
+		    click). Also switches on Astro prefetch: hover-prefetch for all
+		    links by default; card links below carry data-astro-prefetch
+		    explicitly too. */}
+		<ClientRouter />
+		{/* Speculation Rules — prerender, moderate (Batch 2, mobile
+		    speed). Chromium-only progressive enhancement: Safari /
+		    Firefox ignore the rules, nothing regresses there. Same-
+		    origin content links only — no <a> on the site points at
+		    /api/*, a logout, or a checkout (none exist), so no
+		    exclusion list is needed. "moderate" prerenders on hover
+		    (desktop) / viewport heuristics (mobile), capped by the
+		    browser (2 interaction slots); "eager"/"immediate" would
+		    burn bandwidth on pages the visitor never opens. A
+		    prerendered navigation activates near-instantly (~0s LCP
+		    on the second page). The prerender runs the target page's
+		    JS (incl. its /api/settings fetch — public, cached 60s),
+		    which is the bounded cost of the win. */}
+		<script type="speculationrules">
+			{
+				"prerender": [
+					{
+						"where": { "href_matches": "/*" },
+						"eagerness": "moderate"
+					}
+				]
+			}
+		</script>
+		<script is:inline define:vars={{ defaultLanguage: settings.defaultLanguage }}>
+			// First-visit language resolution (client-side ONLY — no
+			// server/edge redirect, so crawlers always reach BOTH
+			// language URLs directly). Fires ONLY when the visitor has
+			// NO stored language preference: a stored choice always
+			// wins, and a /bn/* URL is an explicit choice that is never
+			// redirected away from. "system" reads navigator.language
+			// (bn / bn-BD → Bangla, anything else → English). Runs in
+			// <head> before paint so there is no flash of the wrong
+			// language; without JS nothing happens (noscript-safe).
+			(function () {
+				try {
+					var stored = null;
+					try {
+						stored = localStorage.getItem("site-lang");
+					} catch (e) {}
+					if (stored === "en" || stored === "bn") return;
+					var target = null;
+					if (defaultLanguage === "bn") {
+						target = "bn";
+					} else if (defaultLanguage === "system") {
+						var l = (navigator.language || "").toLowerCase();
+						if (l.indexOf("bn") === 0) target = "bn";
+					}
+					if (target !== "bn") return;
+					var p = location.pathname;
+					if (p === "/bn" || p.indexOf("/bn/") === 0) return;
+					location.replace(
+						"/bn" + p + location.search + location.hash,
+					);
+				} catch (e) {}
+			})();
+		</script>
+		<script is:inline>
+			// Theme: system preference by default; manual toggle overrides + remembered.
+			try {
+				const saved = localStorage.getItem("theme");
+				if (saved === "light" || saved === "dark") {
+					document.documentElement.setAttribute("data-theme", saved);
+				} else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+					document.documentElement.setAttribute("data-theme", "dark");
+				} else {
+					document.documentElement.setAttribute("data-theme", "light");
+				}
+			} catch {
+				/* storage unavailable — CSS media query handles it */
+			}
+		</script>
+		<style is:global>
+			/* Pull-to-refresh fix (2026-11-09): the old
+			   overscroll-behavior-y: none on html/body lived here and
+			   in glass.css — it disabled pull-to-refresh (an overscroll
+			   gesture), so it is REMOVED from both places and must not
+			   come back. The slow footer spring-back it once guarded
+			   was the scroll-lock gap + header stuck loop, both fixed
+			   separately (reference-counted scrollLock.ts; constant
+			   header height, transform-only stuck move). The remaining
+			   native rubber-band is standard mobile behaviour. */
+		</style>
+	</head>
+	<body>
+		{/* Bottom padding removed so the footer attaches flush to the page edge. */}
+		<div class="page" style="padding-bottom:0;">
+			{/* LCP render delay (PageSpeed 2026-11-10: the hero loads in
+			    210ms but paints 1,930ms later — main-thread JS in the
+			    LCP window). The header hydrates on `client:idle`
+			    instead of `client:load`: its SSR HTML is complete, so
+			    it looks identical before hydration, and the
+			    hamburger / theme / language controls follow as soon
+			    as the browser is idle (right after first paint). The
+			    hero badge island also hydrates on `client:idle` (PR #23):
+			    its SSR HTML carries the designation text, so the badge is
+			    never empty, and the typing animation starts as soon as the
+			    browser is idle — the React runtime stays out of the
+			    pre-paint window. */}
+			<SiteHeader
+				current={effectiveProfile}
+				defaultProfile={defaultProfile}
+				lang={lang}
+				currentPath={Astro.url.pathname}
+				dict={pickDict(t, SITE_HEADER_DICT_KEYS)}
+				client:idle
+			/>
+			<main>
+				<slot />
+			</main>
+			<SiteFooter profile={effectiveProfile} lang={lang} dict={t} />
+		</div>
+		<ContactModal lang={lang} dict={pickDict(t, CONTACT_MODAL_DICT_KEYS)} services={services} client:idle />
+		{/* Floating home button — off-home pages only (see isHome
+		    above); the button itself is a plain link home, its
+		    inline script only controls when it is visible. */}
+		{!isHome ? (
+			<HomeButton href={langUrl("/", lang)} label={t.navHome} />
+		) : null}
+		<div id="page-progress" aria-hidden="true"></div>
+		<noscript>
+			<style>
+				.grid-thumb img,
+				.deck-thumb img,
+				.release-card-thumb img,
+				.mini-thumb img {
+					opacity: 1 !important;
+				}
+			</style>
+		</noscript>
+		{/* Shared detail-page wiring (sliders, video facades, contact
+		    buttons) — one deferred script, loaded here so no inline
+		    script ever sits inside <main>. */}
+		<script src="/js/detail.js" defer></script>
+		<script is:inline>
+			// Loading feedback + navigation repair (2026-11-09).
+			// The site is an MPA with <ClientRouter /> View Transitions,
+			// so a link click swaps the page WITHOUT a full reload — and
+			// Astro's swap (node_modules/astro/dist/transitions/
+			// swap-functions.js) breaks three full-load assumptions:
+			//  1. swapRootAttributes() deletes EVERY attribute from
+			//     <html> on every navigation — including the JS-set
+			//     data-theme — and the head theme script only re-runs
+			//     on the FIRST client navigation (Astro dedupes
+			//     identical inline scripts after that). From the 2nd
+			//     in-app navigation on, the theme fell back to
+			//     prefers-color-scheme: dark.
+			//  2. swapBodyElement() REPLACES the <body> node, orphaning
+			//     the MutationObserver that watched the old body — and
+			//     this script itself stops re-running after the 1st
+			//     client navigation. New pages' images never got
+			//     .img-loaded, and loading.css keeps them at opacity 0
+			//     — invisible forever.
+			//  3. pageshow/pagehide never fire on a client navigation,
+			//     so the progress bar never finished.
+			// Fix: do all of it on `astro:page-load`, which Astro fires
+			// on the initial load AND after every View Transition
+			// navigation (router.js:426 + :504). Listeners register
+			// ONCE (window flag — this IIFE re-runs on the 1st client
+			// navigation) and every lookup is fresh, because the bar,
+			// the body and the images are all replaced on every swap.
+			// The work is idempotent, so a double run is harmless.
+			(function () {
+				var SELECTOR =
+					".grid-thumb img, .deck-thumb img, .release-card-thumb img, .mini-thumb img";
+
+				// Fresh lookup every time: #page-progress lives inside
+				// <body> and is replaced on every swap, so a cached
+				// reference goes stale after the first navigation.
+				function getBar() {
+					return document.getElementById("page-progress");
+				}
+				function startNav(el) {
+					var bar = getBar();
+					if (!bar) return;
+					if (bar.classList.contains("is-active")) return;
+					if (el) el.classList.add("is-navigating");
+					bar.classList.remove("is-done");
+					bar.classList.add("is-active");
+					bar.style.width = "18%";
+					var width = 18;
+					// Window-scoped timer: this IIFE runs twice (initial
+					// load + 1st client navigation), so a closure timer
+					// would be un-clearable from the other copy.
+					if (window.__pageProgressTimer) {
+						window.clearInterval(window.__pageProgressTimer);
+					}
+					// Creep toward 90% while the next page loads; the real
+					// navigation (or astro:page-load) ends it. Never
+					// completes on its own, so a slow load never looks
+					// finished early.
+					window.__pageProgressTimer = window.setInterval(function () {
+						var b = getBar();
+						if (!b) return;
+						width = Math.min(90, width + (90 - width) * 0.12);
+						b.style.width = width.toFixed(1) + "%";
+					}, 200);
+				}
+				function finishNav() {
+					if (window.__pageProgressTimer) {
+						window.clearInterval(window.__pageProgressTimer);
+						window.__pageProgressTimer = null;
+					}
+					var bar = getBar();
+					if (!bar) return;
+					bar.style.width = "100%";
+					bar.classList.add("is-done");
+					bar.classList.remove("is-active");
+					window.setTimeout(function () {
+						var b = getBar();
+						if (b) b.style.width = "0";
+					}, 250);
+				}
+
+				// Full stylesheet: since the 2026-11-12 switch to output
+				// "server", Astro inlines the whole built stylesheet
+				// into every page (build.inlineStylesheets: "always" —
+				// the old build-time critters step is gone, there is no
+				// preload link and no $loadcss loader anymore). This
+				// function is kept as a no-op backstop: if a future
+				// change ever brings back an external stylesheet, it
+				// re-applies the preload link on every page-load so a
+				// View Transitions navigation cannot leave the page
+				// running on inlined CSS only (which has no [data-theme]
+				// variable blocks, so the stored theme could not
+				// override the system preference — the 2026-11-10
+				// theme/language order bug). With the full stylesheet
+				// inlined, the [data-theme] blocks are always present
+				// and the bug cannot occur; the guard below still keeps
+				// the initial load to exactly one stylesheet link.
+				function ensureStylesheet() {
+					try {
+						var preload = document.querySelector(
+							'link[rel="preload"][as="style"]',
+						);
+						if (!preload || !preload.href) return;
+						var links = document.querySelectorAll(
+							'link[rel="stylesheet"]',
+						);
+						for (var i = 0; i < links.length; i++) {
+							if (links[i].href === preload.href) return;
+						}
+						var l = document.createElement("link");
+						l.rel = "stylesheet";
+						l.href = preload.href;
+						document.head.appendChild(l);
+					} catch (e) {}
+				}
+
+				// Theme: same resolution as the head script (stored
+				// choice wins, else system preference). Re-applied on
+				// every page-load because swapRootAttributes() strips
+				// data-theme from <html> on every navigation.
+				function applyTheme() {
+					try {
+						var saved = null;
+						try {
+							saved = localStorage.getItem("theme");
+						} catch (e) {}
+						var resolved;
+						if (saved === "light" || saved === "dark") {
+							resolved = saved;
+						} else if (
+							window.matchMedia("(prefers-color-scheme: dark)")
+								.matches
+						) {
+							resolved = "dark";
+						} else {
+							resolved = "light";
+						}
+						document.documentElement.setAttribute(
+							"data-theme",
+							resolved,
+						);
+					} catch (e) {}
+				}
+				function onNavClick(e) {
+					var t = e.target;
+					if (!(t instanceof Element)) return;
+					var link = t.closest("a[href]");
+					if (!link) return;
+					var href = link.getAttribute("href") || "";
+					// Same-page anchors, external links, downloads and new
+					// tabs navigate without a full load — no bar needed.
+					if (
+						href.startsWith("#") ||
+						href.startsWith("mailto:") ||
+						href.startsWith("tel:") ||
+						link.hasAttribute("download") ||
+						link.getAttribute("target") === "_blank" ||
+						(link.getAttribute("href") || "").startsWith("http")
+					)
+						return;
+					if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+					startNav(link);
+				}
+
+				// Image reveal: mark each card image loaded so it fades in
+				// over its skeleton; cached images are already complete.
+				function watchImg(img) {
+					if (img.complete && img.naturalWidth > 0) {
+						img.classList.add("img-loaded");
+						return;
+					}
+					img.addEventListener("load", function () {
+						img.classList.add("img-loaded");
+					});
+					img.addEventListener("error", function () {
+						img.classList.add("img-loaded");
+					});
+				}
+				function watchImages(root) {
+					root.querySelectorAll(SELECTOR).forEach(watchImg);
+				}
+				// React islands mount after this script runs — catch them.
+				// The observer is re-created on every page-load: the old
+				// one watches the previous <body>, which the swap
+				// detached, so it can never fire again.
+				var observer = null;
+				function resetObserver() {
+					if (observer) observer.disconnect();
+					observer = new MutationObserver(function (mutations) {
+						mutations.forEach(function (m) {
+							m.addedNodes.forEach(function (node) {
+								if (!(node instanceof Element)) return;
+								if (node.matches(SELECTOR)) watchImg(node);
+								node
+									.querySelectorAll(SELECTOR)
+									.forEach(watchImg);
+							});
+						});
+					});
+					observer.observe(document.body, {
+						childList: true,
+						subtree: true,
+					});
+				}
+
+				// Runs on the initial load AND after every View
+				// Transition navigation (astro:page-load). Idempotent.
+				function onPageLoad() {
+					finishNav();
+					ensureStylesheet();
+					applyTheme();
+					watchImages(document);
+					resetObserver();
+				}
+
+				// Register once: this IIFE re-runs on the 1st client
+				// navigation (Astro re-executes identical inline
+				// scripts once, then dedupes them), so unguarded
+				// registration would double every listener.
+				if (!window.__siteNavHandlers) {
+					window.__siteNavHandlers = true;
+					document.addEventListener("click", onNavClick);
+					window.addEventListener("pageshow", finishNav);
+					window.addEventListener("pagehide", finishNav);
+					document.addEventListener("astro:page-load", onPageLoad);
+				}
+				onPageLoad();
+			})();
+		</script>
+	</body>
+</html>

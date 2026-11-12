@@ -1,0 +1,272 @@
+---
+import { Picture } from "astro:assets";
+// Fallback portrait — imported from public/ DELIBERATELY (not a
+// src/assets/ duplicate): the file stays the single source for the
+// fallback, the post-detail author avatar and the og:image fallback
+// (site.ts / Layout.astro), so no 147KB binary is committed twice.
+import speakerFallback from "../../public/speaker.jpg";
+import { PROFILE, STATS } from "../data/site";
+import { getStats } from "../lib/content";
+import { getSiteSettings, type SettingsBn } from "../lib/settings";
+import { applySiteCopy, displayName, getDict, type Lang } from "../lib/i18n";
+import HeroDesignation from "./HeroDesignation";
+
+interface Props {
+	profile: "se" | "knowme";
+	lang?: Lang;
+}
+
+const { profile, lang = "en" } = Astro.props;
+const isKnowMe = profile === "knowme";
+
+// Site settings (admin-managed hero copy + chips). The hero portrait
+// is intentionally NOT read from settings.portraitUrl — it is always
+// the static build-time Picture below (LCP exception, see there).
+const settings = await getSiteSettings();
+const t = applySiteCopy(getDict(lang), lang, settings);
+// Floating stat chips — the NUMBERS are live, the suffix words stay in
+// the dictionary (so Bangla keeps working). Chip 1 derives from the
+// live stats (stats[1] = 80+ Projects): the stats section and the chip
+// share one source of truth. Chip 2 has no structured live source —
+// no ordersPerDay metric exists in any DB row or API response (the
+// "2,000–5,000" range lives only in prose), so it reads
+// settings.heroChips[1] (dashboard migration 0031 seed); the number
+// below is only the build-time fallback for an unreachable API, the
+// same role build-time STATS plays for the stats section.
+const stats = await getStats();
+const chipProjects = stats[1]?.value ?? STATS[1].value;
+const chipOrders = settings.heroChips?.[1] ?? "2,000–5,000";
+// Admin Bangla hero copy (settings.bn) wins over the English settings
+// copy on /bn/ pages; the English settings copy (admin-managed) wins
+// over the dictionary; the dictionary is the last resort — never a
+// blank headline. Know Me reads the KNOW-ME keys (bnCopy.knowMeHeadline
+// / bnCopy.knowMeSub, then settings.knowMeHeadline / settings.knowMeSub)
+// — the SE keys are never reused for Know Me (that was the bug: the
+// Know Me page showed the English settings copy on /bn/ because the
+// bn knowMe keys were never read).
+const bnCopy: SettingsBn = lang === "bn" ? (settings.bn ?? {}) : {};
+const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
+const heroHeadline =
+	str(isKnowMe ? bnCopy.knowMeHeadline : bnCopy.heroHeadline) ??
+	str(isKnowMe ? settings.knowMeHeadline : settings.heroHeadline) ??
+	(isKnowMe ? t.knowMeHeadline : t.heroHeadline);
+const heroDesc =
+	str(isKnowMe ? bnCopy.knowMeSub : bnCopy.heroDescription) ??
+	str(isKnowMe ? settings.knowMeSub : settings.heroDescription) ??
+	(isKnowMe ? t.knowMeSub : t.heroDescription);
+const designations =
+	lang === "bn" ? t.designationKnowMe : [...PROFILE.designations];
+---
+
+<section class="glass hero" id="top">
+	<div class="hero-photo-wrap">
+		<div class="hero-photo-frame">
+			{/* Hero portrait — INTENTIONALLY STATIC (LCP exception):
+			    always the build-time Sharp <Picture> from the repo
+			    file (AVIF/WebP, widths 352/576/704/1068, quality
+			    75), NEVER the /api/image route and NEVER live-swapped.
+			    PageSpeed 2026-11-10: routing the hero through
+			    /api/image (PR #26) regressed mobile 100→98 — the
+			    dynamic route (upstream fetch + transform) is slower
+			    than a static asset on cold hit, and the post-load
+			    swap re-painted the LCP element (element render delay
+			    20ms→1,050ms). The admin portraitUrl is ignored here
+			    on purpose; a new portrait takes effect by updating
+			    public/speaker.jpg and deploying. `priority` sets
+			    loading=eager + decoding=sync + fetchpriority high;
+			    `sizes` is honest to the frame (22rem / 352px mobile,
+			    5fr column / ~412px desktop). */}
+			<Picture
+				src={speakerFallback}
+				formats={["avif", "webp"]}
+				widths={[352, 576, 704, 1068]}
+				// sizes is honest to the RENDERED frame (PageSpeed
+				// 2026-11-10: displayed 574 device px at DPR 1.75 ≈
+				// 328 CSS px — the frame is viewport−80px (.page
+				// 16px + .glass 24px padding each side), capped at
+				// 22rem/352px. The old 352px overstated small phones,
+				// so the browser picked the 704w variant (46KB AVIF)
+				// when the 576w (35KB) covers the rendered size —
+				// ~12KB wasted per load. Desktop (412px) and tablet
+				// (352px) unchanged.
+				sizes="(max-width: 412px) 328px, (max-width: 1023px) 352px, 412px"
+				quality={75}
+				priority
+				// LCP render delay (PageSpeed 2026-11-10: the hero
+				// loads in 210ms but paints 1,930ms later): `priority`
+				// sets decoding="sync" by default, which forces the
+				// AVIF decode onto the main thread and blocks the
+				// paint on it. An explicit decoding="async" wins
+				// over that default (Astro resolves with ??=), so
+				// the image still loads eager + fetchpriority high
+				// but decodes off the paint path. No visual change.
+				decoding="async"
+				alt={t.photoAlt}
+				data-hero-photo
+			/>
+			<div class="hero-photo-gradient" aria-hidden="true" />
+			<svg
+				class="hero-runlight"
+				viewBox="0 0 100 125"
+				preserveAspectRatio="none"
+				aria-hidden="true"
+			>
+				{/* Perimeter runlight (preview): faint continuous trace +
+				    a short soft teal segment travelling around it. The
+				    segment is soft (0.38 opacity, round caps, glow) —
+				    never a hard thin line. */}
+				<rect
+					class="trace-base"
+					x="0.5"
+					y="0.5"
+					width="99"
+					height="124"
+					vector-effect="non-scaling-stroke"
+				/>
+				<rect
+					class="trace-glow"
+					x="0.5"
+					y="0.5"
+					width="99"
+					height="124"
+					pathLength="400"
+					vector-effect="non-scaling-stroke"
+				/>
+			</svg>
+		</div>
+		<div class="hero-badge-anchor">
+			<HeroDesignation
+				profile={profile}
+				designations={designations}
+				client:idle
+			/>
+		</div>
+	</div>
+	<div class="hero-copy">
+		<h1 class="hero-name">{displayName(lang)}</h1>
+		{
+			isKnowMe ? (
+				<>
+					<p class="hero-headline">{heroHeadline}</p>
+					<p class="hero-desc">{heroDesc}</p>
+					<div class="hero-ctas">
+						<a class="btn" href="#releases">
+							{t.listenReleases}
+						</a>
+						<a class="btn btn-ghost" href="#follow-connect">
+							{t.followConnect}
+						</a>
+					</div>
+				</>
+			) : (
+				<>
+					<p class="hero-headline">{heroHeadline}</p>
+					<p class="hero-desc">{heroDesc}</p>
+					<p class="hero-location">
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+							<circle cx="12" cy="10" r="3" />
+						</svg>
+						{t.heroLocation}
+					</p>
+					<div class="hero-ctas">
+						<a class="btn" href="#projects">
+							{t.viewMyWork}
+						</a>
+						<button
+							type="button"
+							class="btn btn-ghost"
+							data-contact-source="hero"
+						>
+							{t.contactMe}
+						</button>
+					</div>
+				</>
+			)
+		}
+	</div>
+	{/* Floating stat chips — direct children of the hero CARD (not the
+	    photo): top-right and bottom-right corners of the card, fully
+	    visible, overlapping the card edge slightly like the preview. */}
+	<div class="hero-photo-float" aria-hidden="true">
+		<div class="hero-photo-float-card">
+			<strong>{chipProjects}</strong>
+			<span>{t.projectsShipped}</span>
+		</div>
+		<div class="hero-photo-float-card">
+			<strong>{chipOrders}</strong>
+			<span>{t.ordersDaily}</span>
+		</div>
+	</div>
+</section>
+
+<script is:inline>
+	// Live favicon swap (hybrid live-then-static, live half): after an
+	// admin favicon update, /api/settings returns the new URL and the
+	// browser-tab icon swaps without waiting for a rebuild. The HERO
+	// portrait is deliberately NOT swapped here — it stays the static
+	// build-time Picture (LCP exception, see above): swapping it to
+	// /api/image re-painted the LCP element and regressed mobile
+	// Performance 100→98 (PageSpeed 2026-11-10). DEFERRED until after
+	// window load. Fails silently — no console errors, no visual
+	// change — when the fetch fails or the URL already matches.
+	(function () {
+		function swap() {
+			try {
+				fetch("/api/settings", { signal: AbortSignal.timeout(8000) })
+					.then(function (res) {
+						return res.ok ? res.json() : null;
+					})
+					.then(function (data) {
+						if (!data) return;
+						if (
+							typeof data.faviconUrl === "string" &&
+							data.faviconUrl
+						) {
+							var link = document.querySelector('link[rel="icon"]');
+							if (
+								link &&
+								link.getAttribute("href") !== data.faviconUrl
+							) {
+								link.setAttribute("href", data.faviconUrl);
+							}
+						}
+					})
+					.catch(function () {});
+			} catch {
+				/* fetch unavailable — rendered favicon stays */
+			}
+		}
+		if (document.readyState === "complete") swap();
+		else window.addEventListener("load", swap);
+	})();
+</script>
+
+<script>
+	// Opens the contact modal (ContactModal island listens for "open-contact").
+	// Guarded against double-binding: Services.astro runs the same script,
+	// so an element already bound by the other instance is skipped.
+	document
+		.querySelectorAll("[data-contact-source]:not([data-contact-bound])")
+		.forEach((el) => {
+			el.setAttribute("data-contact-bound", "");
+			el.addEventListener("click", () => {
+				const target = el as HTMLElement;
+				const detail: { service?: string; source?: string } = {};
+				if (target.dataset.service) detail.service = target.dataset.service;
+				if (target.dataset.contactSource)
+					detail.source = target.dataset.contactSource;
+				window.dispatchEvent(new CustomEvent("open-contact", { detail }));
+			});
+		});
+</script>

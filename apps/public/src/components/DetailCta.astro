@@ -1,0 +1,63 @@
+---
+// Centered CTA box at the bottom of a detail page. The button dispatches
+// the "open-contact" event the ContactModal island listens for, carrying
+// the optional service pre-selection and the source section. An optional
+// link (e.g. case study → "View the project") renders beside the button.
+import { getDict, type Dict, type Lang } from "../lib/i18n";
+
+interface Props {
+	title: string;
+	text: string;
+	service?: string;
+	source: string;
+	buttonLabel?: string;
+	linkHref?: string;
+	linkLabel?: string;
+	lang?: Lang;
+	dict?: Dict;
+}
+
+const {
+	title,
+	text,
+	service,
+	source,
+	buttonLabel,
+	linkHref,
+	linkLabel,
+	lang = "en",
+	dict,
+} = Astro.props;
+const t = dict ?? getDict(lang);
+const ctaLabel = buttonLabel ?? t.contactMe;
+---
+
+<div class="detail-cta">
+	<h3>{title}</h3>
+	<p>{text}</p>
+	<div class="cta-actions">
+		<button
+			type="button"
+			class="btn"
+			data-open-contact
+			data-service={service}
+			data-source={source}
+		>
+			{ctaLabel}
+		</button>
+		{linkHref && linkLabel && (
+			<a class="btn btn-ghost" href={linkHref}>
+				{linkLabel}
+			</a>
+		)}
+	</div>
+</div>
+
+{/*
+	No inline script here: every [data-open-contact] button on the page
+	is wired by the shared public/js/detail.js (delegated listener,
+	loaded once by the Layout), so no script text ever sits inside
+	<main>. The button dispatches "open-contact" with the optional
+	service pre-selection and source section; the ContactModal island
+	listens for it.
+*/}
