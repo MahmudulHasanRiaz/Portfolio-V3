@@ -1,0 +1,39 @@
+{
+  "name": "@repo/database",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./repository/search": "./src/repository/search.ts",
+    "./repository/search-analytics": "./src/repository/search-analytics.ts",
+    "./repository/seo": "./src/repository/seo.ts",
+    "./services/search-indexer": "./src/services/search-indexer.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "db:push": "drizzle-kit push",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "tsx src/seed/index.ts",
+    "db:seed-identity": "tsx src/seed/seed-identity.ts",
+    "db:create-user": "tsx src/seed/create-user.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "*",
+    "@repo/typescript-config": "*",
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
+    "drizzle-kit": "^0.30.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0"
+  }
+}

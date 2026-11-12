@@ -1,0 +1,17 @@
+-- Ventures: founded year only (0035).
+--
+-- Some ventures have a known founding year but no exact date (e.g.
+-- Commercians 2024, Panjabi Club / ZAMMAM 2022 — years only). The
+-- `founded_date` column is a Postgres `date`, so a year cannot be
+-- stored there — and faking it as 01/01 is refused. This migration
+-- adds a nullable `founded_year` integer; `founded_date` is kept for
+-- full dates. Saving a year clears the date and vice versa (enforced
+-- in the venture profile form, not by a DB constraint, so either
+-- column can be NULL independently).
+--
+-- No seed values, no backfill: existing rows keep founded_year NULL
+-- and their founded_date untouched. Re-runnable (IF NOT EXISTS) and
+-- additive only — nothing else is touched. The public API exposes
+-- `foundedYear` and uses `${foundedYear}-01-01` for ordering only,
+-- never for display.
+ALTER TABLE "ventures" ADD COLUMN IF NOT EXISTS "founded_year" integer;
