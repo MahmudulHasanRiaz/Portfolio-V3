@@ -1,0 +1,455 @@
+/* Dashboard globals — Tailwind CSS v4 + space ("Admin Dashboard") tokens.
+ *
+ * ROOT-CAUSE FIX: @repo/ui components use Tailwind utility classes
+ * (bg-brand, rounded-lg, border-border, shadow-sm, h-10, px-4, flex, ...),
+ * but the project had NO Tailwind setup anywhere (no config, no directives,
+ * no compiled CSS — only the `tailwind-merge` utility lib), so the shared
+ * components rendered unstyled. Tailwind v4 is now set up properly:
+ *  - tailwindcss + @tailwindcss/postcss are devDependencies of
+ *    @repo/dashboard; postcss.config.mjs wires the plugin (Next 16 /
+ *    Turbopack picks it up automatically). tw-animate-css provides the
+ *    animate-in / fade-* / zoom-* / slide-* utilities @repo/ui uses.
+ *  - `@import "tailwindcss"` below generates the utilities; `@theme inline`
+ *    maps them onto the space palette via the runtime CSS variables.
+ *
+ * THEME / DARK MODE: utilities reference the CSS variables (e.g.
+ * --color-brand: var(--brand)) through `@theme inline`, so they are NOT
+ * frozen at build time — they follow the :root / [data-theme="dark"]
+ * overrides below at runtime. The `dark:` variant is bound to the
+ * dashboard's [data-theme="dark"] attribute on <html> (not a .dark class).
+ *
+ * CONTENT SOURCES: Tailwind v4 auto-detects classes, but the @source lines
+ * below pin both trees explicitly — apps/dashboard/src AND packages/ui/src —
+ * so @repo/ui's classes are always generated.
+ *
+ * TOKENS: the @repo/ui tokens.css import stays FIRST (it must — @import has
+ * to precede other rules — and it guarantees the token set is present on
+ * every dashboard page, including auth pages that import no @repo/ui
+ * component). The :root / [data-theme="dark"] blocks below then OVERRIDE
+ * those tokens dashboard-scoped with the space palette (teal accent, NOT
+ * the public site's Electric Blue). packages/ui/src/styles/tokens.css is
+ * untouched — the public site keeps its own brand.
+ *
+ * Theme convention: :root is the light theme, designed on its own palette —
+ * NOT an inverted dark theme. [data-theme="dark"] overrides live below.
+ * The dashboard theme provider sets data-theme from localStorage
+ * ("dashboard-theme") or the OS preference, and the root layout runs a
+ * pre-paint init script so the first paint already matches the stored /
+ * system theme.
+ */
+@import "@repo/ui/src/styles/tokens.css";
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Content sources — BOTH trees, so @repo/ui's classes are generated too. */
+@source "../../";
+@source "../../../../packages/ui/src";
+
+/* The `dark:` variant follows the dashboard's data-theme attribute on <html>. */
+@custom-variant dark ([data-theme="dark"] &);
+
+/* Tailwind theme — mapped onto the space palette via the runtime CSS
+ * variables from section 1. `@theme inline` is deliberate: utilities
+ * emit var(--brand) etc. directly instead of frozen build-time values,
+ * so light/dark flips under [data-theme="dark"] at runtime. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-ink: var(--accent-ink);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+
+  /* Semantic hues + soft washes */
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-red: var(--red);
+  --color-red-soft: var(--red-soft);
+  --color-blue: var(--blue);
+  --color-blue-soft: var(--blue-soft);
+  --color-violet: var(--violet);
+  --color-violet-soft: var(--violet-soft);
+
+  /* Radii — cards 14px, controls 9-10px, pills 999px, modals 16px */
+  --radius: var(--radius);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  /* Shadows — flat cards: border + shadow-sm only, NO gradients */
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+
+  /* Type — DM Sans (self-hosted via @fontsource, already installed). */
+  --font-sans: "DM Sans", "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+}
+
+
+/* ------------------------------------------------------------------ */
+/* 1. Dashboard-scoped tokens — space palette ("Admin Dashboard")      */
+/* ------------------------------------------------------------------ */
+:root {
+  /* Page + surfaces (light) */
+  --background: #f4f6f5;
+  --foreground: #101613;
+  --surface: #ffffff;
+  --surface-2: #e9edeb;
+
+  /* Text */
+  --muted: #e9edeb;
+  --muted-foreground: #3d4742;
+  --muted-text: #6b7671;
+  --faint: #97a29c;
+
+  --border: #dfe6e1;
+  --input: #dfe6e1;
+  --ring: #0c7c6c;
+
+  /* Brand — teal (space accent), NOT the public site's Electric Blue */
+  --brand: #0c7c6c;
+  --brand-foreground: #ffffff;
+  --brand-50: #e2f2ee;
+  --brand-100: #c8e6de;
+  --brand-200: #9ed2c6;
+  --brand-300: #6db8a8;
+  --brand-400: #3a9c88;
+  --brand-500: #0c7c6c;
+  --brand-600: #096355;
+  --brand-700: #075e50;
+  --brand-800: #06493e;
+  --brand-900: #053a32;
+
+  /* Space accent tokens */
+  --accent: var(--muted);
+  --accent-foreground: var(--foreground);
+  --accent-soft: #e2f2ee;
+  --accent-strong: #096355;
+  --accent-ink: #075e50;
+  --accent-text: #075e50;
+
+  /* shadcn-style surface tokens (components reference these) */
+  --card: var(--surface);
+  --card-foreground: var(--foreground);
+  --popover: var(--surface);
+  --popover-foreground: var(--foreground);
+  --secondary: #e9edeb;
+  --secondary-foreground: var(--foreground);
+
+  /* Semantic — teal doubles as success in this system */
+  --destructive: #b3372f;
+  --destructive-foreground: #ffffff;
+  --success: #0c7c6c;
+  --success-foreground: #ffffff;
+  --warning: #b45309;
+  --warning-foreground: #ffffff;
+
+  /* Semantic hues + soft washes (light) */
+  --amber: #b45309;
+  --amber-soft: #fdf0dd;
+  --red: #b3372f;
+  --red-soft: #fbe9e7;
+  --blue: #2563eb;
+  --blue-soft: #e5edfd;
+  --violet: #6d4fc2;
+  --violet-soft: #eee9fa;
+
+  /* Radii — cards 14px, controls 9-10px, pills 999px, modals 16px */
+  --radius: 14px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
+
+  /* Shadows — flat cards: border + shadow-sm only, NO gradients */
+  --shadow-sm: 0 1px 2px rgba(16, 22, 19, 0.05);
+  --shadow-md: 0 8px 24px -8px rgba(16, 22, 19, 0.14);
+  --shadow-lg: 0 24px 64px -16px rgba(16, 22, 19, 0.28);
+  --shadow-xl: 0 32px 80px -16px rgba(16, 22, 19, 0.32);
+
+  /* ---- Dashboard variable aliases (existing inline-style pages) ---- */
+  --text-primary: var(--foreground);
+  --text-secondary: var(--muted-foreground);
+  --text-muted: var(--muted-foreground);
+
+  --bg: var(--background);
+  --bg-primary: var(--background);
+  --bg-secondary: var(--muted);
+  --bg-muted: var(--muted);
+  --bg-tertiary: var(--border);
+  --bg-card: var(--surface);
+  --bg-active: var(--accent-soft);
+
+  --surface-card: var(--surface);
+  --surface-muted: var(--muted);
+  --surface-hover: #eef2ef;
+
+  --border-color: var(--border);
+
+  --accent-primary: var(--brand);
+  --accent-info: var(--brand);
+  --accent-success: var(--success);
+  --accent-warning: var(--warning);
+  --accent-danger: var(--destructive);
+  --accent-9: var(--brand-500);
+  --accent-10: var(--brand-600);
+}
+
+[data-theme="dark"] {
+  /* Page + surfaces (dark) — cards lift off the page bg, they are NOT
+   * the page bg: --bg-card/--surface-card = #111613 surface. */
+  --background: #0a0e0c;
+  --foreground: #eef3f0;
+  --surface: #111613;
+  --surface-2: #171d1a;
+
+  --muted: #171d1a;
+  --muted-foreground: #8b978f;
+  --muted-text: #8b978f;
+  --faint: #5c6862;
+
+  --border: #212a26;
+  --input: #212a26;
+  --ring: #2fbfa5;
+
+  --brand: #2fbfa5;
+  --brand-foreground: #06231d;
+  --brand-50: #123129;
+  --brand-100: #173d33;
+  --brand-200: #1d4d40;
+  --brand-300: #247a66;
+  --brand-400: #2a9c82;
+  --brand-500: #2fbfa5;
+  --brand-600: #5fd3bd;
+  --brand-700: #7fe3cb;
+  --brand-800: #a5ecdb;
+  --brand-900: #c8f4e9;
+
+  --accent-soft: #123129;
+  --accent-strong: #5fd3bd;
+  --accent-ink: #7fe3cb;
+  --accent-text: #7fe3cb;
+
+  --secondary: #171d1a;
+
+  --destructive: #ef8a80;
+  --destructive-foreground: #2b0f0d;
+  --success: #2fbfa5;
+  --success-foreground: #06231d;
+  --warning: #e5a44b;
+  --warning-foreground: #2b1d05;
+
+  /* Semantic hues + soft washes (dark) */
+  --amber: #e5a44b;
+  --amber-soft: #2b2210;
+  --red: #ef8a80;
+  --red-soft: #331a17;
+  --blue: #7aa5f8;
+  --blue-soft: #152238;
+  --violet: #b39df0;
+  --violet-soft: #221d38;
+
+  /* Shadows — black-based, deeper */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 24px 64px -16px rgba(0, 0, 0, 0.7);
+  --shadow-xl: 0 32px 80px -16px rgba(0, 0, 0, 0.75);
+
+  /* Cards/surfaces lift off the dark page background (#0a0e0c). */
+  --bg-card: var(--surface);
+  --surface-card: var(--surface);
+  --surface-hover: var(--surface-2);
+  /* Active sidebar item reads against the muted sidebar: accent wash. */
+  --bg-active: var(--accent-soft);
+}
+
+/* ------------------------------------------------------------------ */
+/* 2. Base                                                             */
+/* ------------------------------------------------------------------ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14.5px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+code,
+pre {
+  font-family: var(--font-mono);
+}
+
+/* Headings — H1 per space spec; card titles / KPI values are set by the
+ * components' own text-* utilities (15px/800 and 29px/800). */
+h1 {
+  font-size: clamp(21px, 1.2vw + 15px, 27px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin: 0;
+}
+
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Form controls: 40px height comes from the h-10 utility on the @repo/ui
+ * Input; focus here is the space spec — accent border + 3px accent-soft
+ * ring — for native controls that carry no utility classes. */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+
+/* ------------------------------------------------------------------ */
+/* 3. Motion / overlay polish (space spec)                             */
+/* ------------------------------------------------------------------ */
+@keyframes ui-page-enter {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ui-shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+/* Page enter: 0.28s fade + 7px rise. */
+main {
+  animation: ui-page-enter 0.28s ease-out both;
+}
+
+/* Skeleton shimmer: 1.15s. The @repo/ui Skeleton renders as
+ * `animate-pulse rounded-md bg-muted`; the .skeleton class is the
+ * opt-in shimmer variant for dashboard pages. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--muted);
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  animation: ui-shimmer 1.15s infinite;
+}
+
+[data-theme="dark"] .skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+}
+
+/* Modal / palette backdrop: 50% black + blur. Radix overlays render with
+ * the bg-black/80 utility; the blur is layered on here. */
+[class~="bg-black/80"] {
+  backdrop-filter: blur(4px);
+}
+
+/* Toasts are ink-bg pills bottom-right via the @repo/ui Toast classes
+ * (bg-foreground / text-background utilities cover them). */
+
+/* Focus ring for interactive elements that carry no utility classes. */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
