@@ -1,0 +1,87 @@
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import * as schema from "../schema";
+
+export async function seedCrm(db: PostgresJsDatabase<typeof schema>) {
+  const leadsData = [
+    {
+      fullName: "Fatima Begum",
+      email: "fatima@example.com",
+      phone: "+8801712345678",
+      company: "Artisan Crafts Ltd.",
+      country: "Bangladesh",
+      budget: "$10,000 - $15,000",
+      timeline: "3 months",
+      projectType: "Web Development",
+      inquiryType: "new_project",
+      message: "We need an e-commerce website to sell handmade crafts online. Looking for something with inventory management and payment gateway integration.",
+      leadSource: "website",
+      status: "new" as const,
+    },
+    {
+      fullName: "Kamal Hossain",
+      email: "kamal@techbd.com",
+      phone: "+8801711111111",
+      company: "TechBD Solutions",
+      country: "Bangladesh",
+      budget: "$25,000 - $40,000",
+      timeline: "4-5 months",
+      projectType: "SaaS Platform",
+      inquiryType: "new_project",
+      message: "Interested in building a SaaS platform for school management. Need multi-tenant architecture and role-based access control.",
+      leadSource: "referral",
+      status: "contacted" as const,
+      followUpDate: "2026-06-15",
+      followUpNotes: "Sent proposal draft. Waiting for feedback from their board.",
+    },
+    {
+      fullName: "Sarah Ahmed",
+      email: "sarah@designstudio.co",
+      phone: "+8801722222222",
+      company: "Sarah Design Studio",
+      country: "Bangladesh",
+      budget: "$5,000 - $8,000",
+      timeline: "6-8 weeks",
+      projectType: "Web Development",
+      inquiryType: "new_project",
+      message: "Need a portfolio website with a built-in blog and client portal to share design proofs.",
+      leadSource: "google",
+      status: "qualified" as const,
+      followUpDate: "2026-06-10",
+      followUpNotes: "Great fit for our portfolio template. Scheduled discovery call for next week.",
+    },
+    {
+      fullName: "Rafiq Islam",
+      email: "rafiq@greenagri.org",
+      phone: "+8801733333333",
+      company: "Green Agri Foundation",
+      country: "Bangladesh",
+      budget: "$50,000+",
+      timeline: "6 months",
+      projectType: "Web Development",
+      inquiryType: "new_project",
+      message: "Looking for a complete digital transformation partner. Need website, donor management system, and impact tracking dashboard.",
+      leadSource: "linkedin",
+      status: "proposal_sent" as const,
+      followUpDate: "2026-06-08",
+      followUpNotes: "Proposal sent on June 1. They are reviewing with stakeholders. Follow up mid-June.",
+    },
+    {
+      fullName: "Nusrat Jahan",
+      email: "nusrat@innovatebd.com",
+      phone: "+8801744444444",
+      company: "InnovateBD",
+      country: "Bangladesh",
+      budget: "$20,000 - $30,000",
+      timeline: "3-4 months",
+      projectType: "Web Development",
+      inquiryType: "new_project",
+      message: "Need a complete brand website with CMS, blog, and integration with their existing CRM.",
+      leadSource: "referral",
+      status: "won" as const,
+    },
+  ];
+
+  await db.insert(schema.leads).values(leadsData as any);
+
+  console.log("Seeded 5 CRM leads in various pipeline stages");
+}

@@ -1,0 +1,92 @@
+export const MEDIA_CONFIG = {
+  allowedMimeTypes: [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/avif",
+    "image/gif",
+    "image/svg+xml",
+    "application/pdf",
+    "application/zip",
+    "application/gzip",
+    "text/csv",
+    "application/json",
+    "video/mp4",
+    "video/webm",
+    "audio/mpeg",
+    "audio/wav",
+    "audio/ogg",
+  ] as string[],
+
+  allowedExtensions: {
+    "image/jpeg": [".jpg", ".jpeg"],
+    "image/png": [".png"],
+    "image/webp": [".webp"],
+    "image/avif": [".avif"],
+    "image/gif": [".gif"],
+    "image/svg+xml": [".svg"],
+    "application/pdf": [".pdf"],
+    "application/zip": [".zip"],
+    "application/gzip": [".gz", ".tar.gz"],
+    "text/csv": [".csv"],
+    "application/json": [".json"],
+    "video/mp4": [".mp4"],
+    "video/webm": [".webm"],
+    "audio/mpeg": [".mp3"],
+    "audio/wav": [".wav"],
+    "audio/ogg": [".ogg"],
+  } as Record<string, string[]>,
+
+  mimeCategory: {
+    "image/jpeg": "image",
+    "image/png": "image",
+    "image/webp": "image",
+    "image/avif": "image",
+    "image/gif": "image",
+    "image/svg+xml": "image",
+    "application/pdf": "document",
+    "application/zip": "archive",
+    "application/gzip": "archive",
+    "text/csv": "document",
+    "application/json": "document",
+    "video/mp4": "video",
+    "video/webm": "video",
+    "audio/mpeg": "audio",
+    "audio/wav": "audio",
+    "audio/ogg": "audio",
+  } as Record<string, string>,
+
+  sizeLimits: {
+    image: 10 * 1024 * 1024,
+    video: 200 * 1024 * 1024,
+    audio: 50 * 1024 * 1024,
+    document: 20 * 1024 * 1024,
+    archive: 50 * 1024 * 1024,
+  } as Record<string, number>,
+
+  variants: {
+    thumbnail: { width: 150, height: 150, fit: "cover" as const },
+    small: { width: 480, height: undefined as number | undefined, fit: "inside" as const },
+    medium: { width: 1024, height: undefined as number | undefined, fit: "inside" as const },
+    large: { width: 2048, height: undefined as number | undefined, fit: "inside" as const },
+  },
+
+  formats: ["webp", "avif", "jpeg"] as string[],
+
+  folders: {
+    base: "uploads",
+    images: "uploads/images",
+    projects: "uploads/projects",
+    services: "uploads/services",
+    posts: "uploads/posts",
+    releases: "uploads/releases",
+    ventures: "uploads/ventures",
+    users: "uploads/users",
+    audio: "uploads/audio",
+    video: "uploads/video",
+    documents: "uploads/documents",
+  } as Record<string, string>,
+} as const;
+
+export type VariantName = keyof typeof MEDIA_CONFIG.variants;
+export type MediaCategory = keyof typeof MEDIA_CONFIG.sizeLimits;

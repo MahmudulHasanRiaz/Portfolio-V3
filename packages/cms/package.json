@@ -1,0 +1,24 @@
+{
+  "name": "@repo/cms",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@repo/database": "*",
+    "@repo/validation": "*",
+    "@repo/shared": "*",
+    "@repo/auth": "*",
+    "@repo/seo": "*"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "*",
+    "@repo/eslint-config": "*",
+    "typescript": "^5.8.0"
+  }
+}
