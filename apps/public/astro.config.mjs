@@ -77,7 +77,7 @@ export default defineConfig({
 	// React 19-only APIs, portals, context or Suspense. No visual or
 	// behavioural change — same islands, same client:* directives.
 	integrations: [preact({ compat: true })],
-	site: "https://portfolio-public.riaaz.workers.dev",
+	site: "https://portfolio-v3-public.riaaz.workers.dev",
 
 	// Cloudflare edge cache provider — emits Cloudflare-CDN-Cache-Control
 	// + Cache-Tag headers so the edge caches live pages and purges by tag.

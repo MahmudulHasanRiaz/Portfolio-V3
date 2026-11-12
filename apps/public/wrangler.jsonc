@@ -13,7 +13,7 @@
 	// OFF (default): every deploy resets the hit rate, so a deploy can
 	// never serve stale HTML — the cache re-warms in minutes.
 	"cache": { "enabled": true },
-	"name": "portfolio-public",
+	"name": "portfolio-v3-public",
 	"observability": { "enabled": true },
 	// Images binding (Cloudflare Images) — the /api/image route
 	// transforms admin remote images on demand through env.IMAGES.
@@ -30,5 +30,5 @@
 	// public, not secrets (a URL and the "1" build flag). NOTE: dashboard
 	// Runtime Variables do NOT reach the build — the build reads this
 	// file, so LIVE_BUILD must be set here.
-	"vars": { "PUBLIC_CONTENT_API_URL": "https://admin.riaz.com.bd", "PUBLIC_CONTENT_LIVE_BUILD": "1" }
+	"vars": { "PUBLIC_CONTENT_API_URL": "https://portfolio-v3-admin.riaaz.workers.dev", "PUBLIC_CONTENT_LIVE_BUILD": "1" }
 }
