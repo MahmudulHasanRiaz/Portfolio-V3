@@ -8,6 +8,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import publicRoutes from "./routes/public";
 import adminRoutes from "./routes/admin";
+import authRoutes from "./routes/auth";
 
 type Env = {
   Bindings: {
@@ -47,6 +48,7 @@ app.get("/health", (c) => c.json({ ok: true }));
 
 app.route("/api/public", publicRoutes);
 app.route("/api/admin", adminRoutes);
+app.route("/api/auth", authRoutes);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));
 app.onError((err, c) => {

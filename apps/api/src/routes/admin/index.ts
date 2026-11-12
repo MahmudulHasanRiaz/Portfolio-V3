@@ -21,6 +21,7 @@ import searchRoutes from "./search";
 import workflowsRoutes from "./workflows";
 import cronRoutes from "./cron";
 import mediaRoutes from "./media";
+import productsRoutes from "./products";
 
 type Env = {
   Bindings: {
@@ -50,5 +51,6 @@ app.route("/", searchRoutes);
 app.route("/workflows", workflowsRoutes);
 app.route("/cron", cronRoutes);
 app.route("/media", mediaRoutes);
+app.route("/products", productsRoutes);
 
 export default app;
