@@ -8,6 +8,19 @@ import contentRoutes from "./content";
 import directoryRoutes from "./directory";
 import releasesRoutes from "./releases";
 import venturesRoutes from "./ventures";
+import settingsRoutes from "./settings";
+import homepageRoutes from "./homepage";
+import usersRoutes from "./users";
+import revisionsRoutes from "./revisions";
+import financeRoutes from "./finance";
+import leadsRoutes from "./leads";
+import proposalsRoutes from "./proposals";
+import abandonedRoutes from "./abandoned";
+import analyticsRoutes from "./analytics";
+import searchRoutes from "./search";
+import workflowsRoutes from "./workflows";
+import cronRoutes from "./cron";
+import mediaRoutes from "./media";
 
 type Env = {
   Bindings: {
@@ -24,5 +37,18 @@ app.route("/content", contentRoutes);
 app.route("/directory", directoryRoutes);
 app.route("/releases", releasesRoutes);
 app.route("/ventures", venturesRoutes);
+app.route("/settings", settingsRoutes);
+app.route("/homepage", homepageRoutes);
+app.route("/", usersRoutes);
+app.route("/", revisionsRoutes);
+app.route("/finance", financeRoutes);
+app.route("/leads", leadsRoutes);
+app.route("/proposals", proposalsRoutes);
+app.route("/abandoned", abandonedRoutes);
+app.route("/analytics", analyticsRoutes);
+app.route("/", searchRoutes);
+app.route("/workflows", workflowsRoutes);
+app.route("/cron", cronRoutes);
+app.route("/media", mediaRoutes);
 
 export default app;
