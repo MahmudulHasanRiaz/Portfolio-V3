@@ -49,6 +49,7 @@ import {
 } from "./integrations";
 import { asc, desc, eq } from "drizzle-orm";
 import { getApiDb } from "../db";
+import { ensureClientsLogoDisplayMode } from "./ensure-schema";
 import {
   homepageSections,
   posts,
@@ -969,6 +970,9 @@ async function listTechnologies(db: Db): Promise<PublicContentItem[]> {
 /** Clients (0027): all rows, sort_order ascending. No status column
  * exists on this table, so nothing is filtered. */
 async function listClients(db: Db): Promise<PublicContentItem[]> {
+  // 0036 auto-apply: create `logo_display_mode` before the first
+  // query that selects it (no manual migration).
+  await ensureClientsLogoDisplayMode(db);
   const rows = await db
     .select()
     .from(clients)
@@ -982,6 +986,10 @@ async function listClients(db: Db): Promise<PublicContentItem[]> {
         title: name,
         name,
         logoUrl: r.logoUrl ?? undefined,
+        // "logo" | "name_logo" | undefined (undefined = NULL = "logo"
+        // default). The Astro loader declares both this camelCase key
+        // and the snake_case twin, so either spelling reaches the page.
+        logoDisplayMode: r.logoDisplayMode ?? undefined,
         website: r.website ?? undefined,
         sortOrder: r.sortOrder ?? undefined,
         bn: bnOf({ name: r.nameBn }),
