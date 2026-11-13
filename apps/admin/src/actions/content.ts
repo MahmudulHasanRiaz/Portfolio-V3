@@ -7,9 +7,7 @@ import type {
   TagData,
   TimelineEventData,
 } from "@repo/cms";
-import { SearchIndexerService } from "@repo/database";
 import { purgePublicCache, type PaginatedResponse } from "@repo/shared";
-import { dispatchTrigger } from "@repo/workflows";
 import { getServerSession } from "@/lib/get-server-session";
 import { HonoApiError, honoFetch } from "@/lib/hono-client";
 
@@ -24,16 +22,18 @@ import { HonoApiError, honoFetch } from "@/lib/hono-client";
 // callers depend on are unchanged.
 //
 // What stays local, and why:
-//  - `dispatchTrigger(..., "content_published", ...)` on publish —
-//    Hono does not wire workflow triggers yet (its TODO), so the admin
-//    keeps dispatching it after a create/update/transition lands on
-//    status "published", exactly as before.
-//  - Search indexing (index on publish, de-index when a published row
-//    leaves published / is archived) and `purgePublicCache` — both live
-//    inside ContentService today and are likewise not wired in Hono
-//    yet, so the admin keeps doing them here, best-effort, mirroring
-//    packages/cms/src/content-service.ts (the maps below are copied
-//    from there; it stays the source of truth).
+//  - `purgePublicCache` — the admin still purges the public-site cache
+//    after a mutation (fetch-based, Workers-safe). Hono also purges via
+//    lib/side-effects, so this is a harmless belt-and-braces extra.
+//  - Workflow triggers (`content_published`) and search indexing
+//    (index on publish, de-index when a published row leaves published
+//    / is archived) are wired in Hono now (apps/api/src/lib/side-effects,
+//    Neon HTTP, Workers-safe) — the admin does NOT dispatch or index
+//    locally any more. The local `dispatchTrigger` (postgres-based) was
+//    awaited without try/catch and would throw on the deployed admin
+//    Worker AFTER the Hono save succeeded, so the UI showed an error
+//    even though the save worked; the local SearchIndexerService calls
+//    were likewise redundant (Hono wires the index).
 //  - FAQ, timeline events and the content taxonomy (set/get categories
 //    and tags per content item) now go to the Hono worker too
 //    (GET/POST/PUT/DELETE /api/admin/faqs, /api/admin/timeline-events
@@ -41,27 +41,12 @@ import { HonoApiError, honoFetch } from "@/lib/hono-client";
 //    @repo/cms services' behaviour, so the return shapes callers
 //    depend on are unchanged.
 
-const searchIndexer = new SearchIndexerService();
-
-/** Search entity type per content type (packages/cms/src/content-service.ts). */
-const ENTITY_TYPE_MAP: Record<string, string> = {
-  pages: "page",
-  posts: "post",
-  services: "service",
-  projects: "project",
-  case_studies: "case_study",
-};
-
 /** Public-site cache tags per content type (packages/cms/src/content-service.ts). */
 const PUBLIC_CACHE_TAGS: Record<string, string> = {
   projects: "projects",
   posts: "posts",
   case_studies: "case-studies",
 };
-
-function getSearchEntityType(typeName: string): string {
-  return ENTITY_TYPE_MAP[typeName] ?? typeName;
-}
 
 function cacheTagsFor(typeName: string): string[] {
   const tag = PUBLIC_CACHE_TAGS[typeName];
@@ -74,11 +59,6 @@ function getUserId(session: Awaited<ReturnType<typeof getServerSession>>): strin
 }
 
 type ContentRow = Record<string, unknown>;
-
-function rowStatus(row: ContentRow | null): string | null {
-  const status = row?.status;
-  return typeof status === "string" ? status : null;
-}
 
 export async function listContent(type: ContentTypeName, params: {
   page?: number; pageSize?: number; search?: string; status?: string;
@@ -114,38 +94,29 @@ export async function getContentById(type: ContentTypeName, id: string): Promise
 
 export async function createContent(type: ContentTypeName, data: Record<string, unknown>): Promise<ContentRow> {
   const session = await getServerSession();
-  const userId = getUserId(session);
+  getUserId(session);
   const result = await honoFetch<ContentRow>(`/api/admin/content/${type}`, {
     method: "POST",
     json: data,
   });
-  // Cross-cutting side effects (see the header note): purge always,
-  // index + workflow trigger when the row lands published.
+  // Cache purge stays local (see the header note); the workflow trigger
+  // and search index are wired in Hono.
   void purgePublicCache(cacheTagsFor(type));
-  if (rowStatus(result) === "published") {
-    searchIndexer.indexEntity(getSearchEntityType(type), result.id as string).catch(() => {});
-    await dispatchTrigger(process.env.DATABASE_URL!, "content_published", result.id as string, { ...result, contentType: type, triggeredBy: userId });
-  }
   return result;
 }
 
 export async function updateContent(type: ContentTypeName, id: string, data: Record<string, unknown>): Promise<ContentRow> {
   const session = await getServerSession();
-  const userId = getUserId(session);
+  getUserId(session);
   const existing = await getContentById(type, id);
   if (!existing) throw new Error(`Content not found: ${id}`);
-  const wasPublished = rowStatus(existing) === "published";
   const result = await honoFetch<ContentRow>(`/api/admin/content/${type}/${id}`, {
     method: "PUT",
     json: data,
   });
+  // Cache purge stays local (see the header note); the workflow trigger
+  // and search index are wired in Hono.
   void purgePublicCache(cacheTagsFor(type));
-  if (rowStatus(result) === "published") {
-    searchIndexer.indexEntity(getSearchEntityType(type), id).catch(() => {});
-    await dispatchTrigger(process.env.DATABASE_URL!, "content_published", id, { ...result, contentType: type, triggeredBy: userId });
-  } else if (wasPublished) {
-    searchIndexer.deleteEntity(getSearchEntityType(type), id).catch(() => {});
-  }
   return result;
 }
 
@@ -154,33 +125,26 @@ export async function deleteContent(type: ContentTypeName, id: string): Promise<
   getUserId(session);
   const existing = await getContentById(type, id);
   if (!existing) throw new Error(`Content not found: ${id}`);
-  const wasPublished = rowStatus(existing) === "published";
   await honoFetch<{ ok: boolean }>(`/api/admin/content/${type}/${id}`, {
     method: "DELETE",
   });
+  // Cache purge stays local (see the header note); the search de-index
+  // is wired in Hono.
   void purgePublicCache(cacheTagsFor(type));
-  if (wasPublished) {
-    searchIndexer.deleteEntity(getSearchEntityType(type), id).catch(() => {});
-  }
 }
 
 export async function transitionContent(type: ContentTypeName, id: string, action: string): Promise<ContentRow> {
   const session = await getServerSession();
-  const userId = getUserId(session);
+  getUserId(session);
   const existing = await getContentById(type, id);
   if (!existing) throw new Error(`Content not found: ${id}`);
-  const wasPublished = rowStatus(existing) === "published";
   const result = await honoFetch<ContentRow>(`/api/admin/content/${type}/${id}/transition`, {
     method: "POST",
     json: { action },
   });
+  // Cache purge stays local (see the header note); the workflow trigger
+  // and search index are wired in Hono.
   void purgePublicCache(cacheTagsFor(type));
-  if (rowStatus(result) === "published") {
-    searchIndexer.indexEntity(getSearchEntityType(type), id).catch(() => {});
-    await dispatchTrigger(process.env.DATABASE_URL!, "content_published", id, { ...result, contentType: type, action, triggeredBy: userId });
-  } else if (wasPublished) {
-    searchIndexer.deleteEntity(getSearchEntityType(type), id).catch(() => {});
-  }
   return result;
 }
 
