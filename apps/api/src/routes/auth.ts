@@ -1,8 +1,7 @@
 // Auth routes — Hono port of
-// apps/admin/src/app/api/auth/user/roles/route.ts.
-// Mounted at /api/auth (see src/index.ts). This is the start of the
-// /api/auth mount; the full Better Auth handler remount
-// (/api/auth/[...all]) is a separate, later piece.
+// apps/admin/src/app/api/auth/user/roles/route.ts, plus the full Better
+// Auth handler remount (the equivalent of the Next.js
+// /api/auth/[...all] route). Mounted at /api/auth (see src/index.ts).
 //
 // Fidelity notes:
 // - No session email -> 401 { roles: [] }.
@@ -20,7 +19,7 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { roles, userRoles, users } from "@repo/database/schema";
 import { getApiDb } from "../db";
-import { getSessionUser } from "../auth";
+import { getAuth, getSessionUser } from "../auth";
 
 type Env = {
   Bindings: {
@@ -73,6 +72,18 @@ app.get("/user/roles", async (c) => {
   } catch {
     return c.json({ roles: [] }, 500);
   }
+});
+
+// Full Better Auth handler — the equivalent of the Next.js
+// /api/auth/[...all] route (sign-in, sign-up, session, sign-out, ...).
+// Registered AFTER /user/roles so the explicit roles route is matched
+// first and is not shadowed by this catch-all. Every other /api/auth/*
+// path is forwarded to Better Auth's standard fetch handler, using the
+// same getAuth() instance (same tables, model names, email+password,
+// session handling) as the admin, so it validates the same session
+// cookies. This is additive: no other route is changed.
+app.all("/*", async (c) => {
+  return getAuth().handler(c.req.raw);
 });
 
 export default app;
