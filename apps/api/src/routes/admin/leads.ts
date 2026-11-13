@@ -55,6 +55,14 @@ import {
   or,
   sql,
 } from "drizzle-orm";
+import { z } from "zod";
+import {
+  createLeadNoteSchema,
+  leadSchema,
+  updateLeadNoteSchema,
+  updateLeadSchema,
+  uuidSchema,
+} from "@repo/validation";
 import {
   leadActivities,
   leadNotes,
@@ -63,6 +71,14 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import {
+  invalidParam,
+  isRecord,
+  parsePagination,
+  readJsonBody,
+  uuidParam,
+  validateBody,
+} from "../../lib/validate";
 import { dispatchTrigger, linkPageViewsToLead, waitUntilOf } from "../../lib/side-effects";
 
 type Env = {
@@ -80,29 +96,104 @@ function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
 }
 
-function parsePage(query: (name: string) => string | undefined): {
-  page: number;
-  pageSize: number;
-} {
-  const page = Number(query("page")) || 1;
-  const pageSize = Number(query("pageSize")) || 20;
-  return { page, pageSize };
+// The lead status enum, reused from the shared lead schema
+// (@repo/validation/crm.ts) — the single source of truth, replacing the
+// hand-maintained VALID_STATUSES list.
+const leadStatusSchema = leadSchema.shape.status;
+
+function isValidDateString(value: string): boolean {
+  return !Number.isNaN(Date.parse(value));
 }
 
-/** Valid statuses for POST /:id/status (mirrors the source allow-list). */
-const VALID_STATUSES: readonly string[] = [
-  "new",
-  "contacted",
-  "qualified",
-  "proposal_sent",
-  "negotiation",
-  "won",
-  "lost",
-  "archived",
-];
+// POST / create validation (LOCAL relaxed schema — deliberately NOT
+// createLeadSchema: the route allows nameless / email-only leads, the
+// status defaults to "new" in the DB, and createdBy is stamped from
+// the session. Every field is optional; types mirror createLeadSchema
+// (email shape, uuids, utm caps). budget is a text column, so a numeric
+// budget is coerced to a string; slaMinutes is an integer column.
+// visitorId is not a lead column — it is destructured out below and
+// used only to link page views. The schema has no id / createdBy /
+// createdAt / updatedAt, so those can never be client-set.
+const createLeadRelaxedSchema = z.object({
+  fullName: z.string().optional(),
+  email: z.string().max(255).email().optional(),
+  phone: z.string().max(50).optional(),
+  company: z.string().optional(),
+  country: z.string().max(100).optional(),
+  budget: z.coerce.string().optional(),
+  timeline: z.string().optional(),
+  projectType: z.string().optional(),
+  inquiryType: z.string().max(50).optional(),
+  message: z.string().optional(),
+  leadSource: z.string().max(50).optional(),
+  status: leadStatusSchema.optional(),
+  assignedUserId: uuidSchema.optional(),
+  followUpDate: z.string().optional(),
+  followUpNotes: z.string().optional(),
+  convertedToProjectId: uuidSchema.optional(),
+  convertedToEventId: uuidSchema.optional(),
+  utmSource: z.string().max(255).optional(),
+  utmMedium: z.string().max(255).optional(),
+  utmCampaign: z.string().max(255).optional(),
+  utmContent: z.string().max(255).optional(),
+  utmTerm: z.string().max(255).optional(),
+  slaMinutes: z.coerce.number().int().optional(),
+  firstResponseAt: z.string().datetime().optional(),
+  responseStatus: z.enum(["within_sla", "warning", "breached"]).optional(),
+  visitorId: z.string().optional(),
+});
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// POST /:id/notes: the shared create schema minus leadId / createdBy
+// (leadId comes from the path, createdBy from the session).
+const createLeadNoteLocalSchema = createLeadNoteSchema.omit({
+  leadId: true,
+  createdBy: true,
+});
+
+// POST /:id/assign: unassign is null / omitted.
+const assignLeadSchema = z.object({
+  assignedUserId: uuidSchema.nullable().optional(),
+});
+
+// POST /:id/status.
+const changeLeadStatusSchema = z.object({ status: leadStatusSchema });
+
+// PATCH /:id/notes/:noteId: the shared update schema minus the
+// server-managed fields.
+const updateLeadNoteLocalSchema = updateLeadNoteSchema.omit({
+  id: true,
+  leadId: true,
+  createdBy: true,
+  createdAt: true,
+});
+
+/** Validated data restricted to keys the client actually sent. Needed
+ *  for PATCH: updateLeadSchema is leadSchema.partial() and its
+ *  slaMinutes field carries a .default(15), which Zod fires even when
+ *  the client sent nothing — without this filter every PATCH would
+ *  silently reset slaMinutes to 15. */
+function sentFields(
+  data: Record<string, unknown>,
+  body: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (key in body) out[key] = value;
+  }
+  return out;
+}
+
+/** Strip server-managed fields from validated data before any DB write. */
+function stripServerFields(
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  const out = { ...data };
+  delete out.id;
+  delete out.createdBy;
+  delete out.createdAt;
+  delete out.updatedAt;
+  return out;
+}
 
 /**
  * Map a dashboard-form body to lead insert/update values.
@@ -163,14 +254,29 @@ app.get("/", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const q = c.req.query;
+    const q = c.req.query.bind(c.req); // NB: query() reads this.url, so it must stay bound to c.req.
     const status = q("status");
     const source = q("source");
     const assignedTo = q("assignedTo");
     const search = q("search");
     const dateFrom = q("dateFrom");
     const dateTo = q("dateTo");
-    const { page, pageSize } = parsePage(q);
+    if (status !== undefined && !leadStatusSchema.safeParse(status).success) {
+      return c.json({ error: "Invalid status" }, 400);
+    }
+    if (
+      assignedTo !== undefined &&
+      !uuidSchema.safeParse(assignedTo).success
+    ) {
+      return c.json({ error: "Invalid uuid" }, 400);
+    }
+    if (dateFrom !== undefined && !isValidDateString(dateFrom)) {
+      return c.json({ error: "Invalid dateFrom" }, 400);
+    }
+    if (dateTo !== undefined && !isValidDateString(dateTo)) {
+      return c.json({ error: "Invalid dateTo" }, 400);
+    }
+    const { page, pageSize } = parsePagination(c);
 
     const conditions: any[] = [];
     if (status) {
@@ -242,8 +348,13 @@ app.post("/", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json()) as Record<string, unknown>;
-    const { visitorId, ...leadData } = body;
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
+    const v = validateBody(body, createLeadRelaxedSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const { visitorId, ...leadData } = stripServerFields(v.data);
     const db = getApiDb();
     const [lead] = await db
       .insert(leads)
@@ -357,7 +468,8 @@ app.get("/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const lead = await getLeadById(db, id);
     if (!lead) return c.json({ error: "Lead not found" }, 404);
@@ -385,10 +497,19 @@ app.patch("/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const v = validateBody(body, updateLeadSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
     const db = getApiDb();
-    const values = leadFields(body, false);
+    const values = leadFields(
+      stripServerFields(sentFields(v.data, body)),
+      false,
+    );
     let lead;
     if (Object.keys(values).length === 0) {
       // No updatable fields — the repository returns the existing row.
@@ -415,7 +536,8 @@ app.delete("/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     await db.delete(leadNotes).where(eq(leadNotes.leadId, id));
     await db.delete(leadActivities).where(eq(leadActivities.leadId, id));
@@ -438,11 +560,13 @@ app.get("/:id/activities", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const rows = await db
       .select()
       .from(leadActivities)
-      .where(eq(leadActivities.leadId, c.req.param("id")))
+      .where(eq(leadActivities.leadId, id))
       .orderBy(asc(leadActivities.createdAt));
     return c.json(rows);
   } catch (err) {
@@ -460,31 +584,25 @@ app.post("/:id/assign", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
-    const { assignedUserId } = (await c.req.json()) as {
-      assignedUserId?: unknown;
-    };
-
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     // assigned_user_id is a uuid column: reject non-uuid values with a
     // 400 instead of letting the ::uuid cast surface a 500. (Better
     // Auth ids are opaque text, not uuids — assignees come from the
     // `users` table via GET /api/users.)
-    if (
-      assignedUserId !== null &&
-      assignedUserId !== undefined &&
-      !UUID_PATTERN.test(String(assignedUserId))
-    ) {
-      return c.json(
-        { error: "assignedUserId must be a valid user id or null" },
-        400,
-      );
-    }
+    const v = validateBody(body, assignLeadSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const assignedUserId = v.data.assignedUserId ?? null;
 
     const db = getApiDb();
     const [lead] = await db
       .update(leads)
       .set({
-        assignedUserId: (assignedUserId as string | null) ?? null,
+        assignedUserId,
         updatedAt: new Date(),
       })
       .where(eq(leads.id, id))
@@ -511,11 +629,13 @@ app.get("/:id/notes", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const rows = await db
       .select()
       .from(leadNotes)
-      .where(eq(leadNotes.leadId, c.req.param("id")))
+      .where(eq(leadNotes.leadId, id))
       .orderBy(desc(leadNotes.createdAt));
     return c.json(rows);
   } catch (err) {
@@ -528,11 +648,17 @@ app.post("/:id/notes", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
-    const { note, isInternal } = (await c.req.json()) as {
-      note?: unknown;
-      isInternal?: unknown;
-    };
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const v = validateBody(body, createLeadNoteLocalSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    // A non-string note (number/object) now 400s in the schema above;
+    // an empty string keeps the old "Note content is required" 400.
+    const { note, isInternal } = v.data;
     if (!note) {
       return c.json({ error: "Note content is required" }, 400);
     }
@@ -541,14 +667,14 @@ app.post("/:id/notes", async (c) => {
       .insert(leadNotes)
       .values({
         leadId: id,
-        note: note as string,
-        isInternal: (isInternal as boolean | undefined) ?? true,
+        note,
+        isInternal: isInternal ?? true,
         createdBy: user.id,
       })
       .returning();
     if (!row) return c.json({ error: "Failed to add note" }, 500);
     await logActivity(db, id, "note_added", "Note added to lead", user.id, {
-      isInternal: (isInternal as boolean | undefined) ?? true,
+      isInternal: isInternal ?? true,
     });
     return c.json(row, 201);
   } catch (err) {
@@ -561,15 +687,24 @@ app.patch("/:id/notes/:noteId", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const noteId = c.req.param("noteId");
-    const { note } = (await c.req.json()) as { note?: unknown };
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const noteId = uuidParam(c, "noteId");
+    if (!noteId) return invalidParam(c, "noteId");
+    const v = validateBody(body, updateLeadNoteLocalSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const { note } = v.data;
     if (!note) {
       return c.json({ error: "Note content is required" }, 400);
     }
     const db = getApiDb();
     const [row] = await db
       .update(leadNotes)
-      .set({ note: note as string })
+      .set({ note })
       .where(eq(leadNotes.id, noteId))
       .returning();
     if (!row) return c.json({ error: "Note not found" }, 404);
@@ -584,8 +719,10 @@ app.delete("/:id/notes/:noteId", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
-    const noteId = c.req.param("noteId");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const noteId = uuidParam(c, "noteId");
+    if (!noteId) return invalidParam(c, "noteId");
     const db = getApiDb();
     const [deleted] = await db
       .delete(leadNotes)
@@ -610,16 +747,15 @@ app.post("/:id/status", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
-    const { status: newStatus } = (await c.req.json()) as {
-      status?: unknown;
-    };
-    if (!newStatus) {
-      return c.json({ error: "Status is required" }, 400);
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
     }
-    if (!VALID_STATUSES.includes(newStatus as string)) {
-      return c.json({ error: `Invalid status: ${newStatus}` }, 400);
-    }
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const v = validateBody(body, changeLeadStatusSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const newStatus = v.data.status;
     const db = getApiDb();
     const [lead] = await db
       .update(leads)

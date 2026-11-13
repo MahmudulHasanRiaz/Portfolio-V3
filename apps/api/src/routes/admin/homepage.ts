@@ -41,6 +41,18 @@ import {
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
 import { purgePublicCache, waitUntilOf } from "../../lib/side-effects";
+import { z } from "zod";
+import { updateHomepageSectionSchema, uuidSchema } from "@repo/validation";
+import {
+  invalidParam,
+  isRecord,
+  readJsonBody,
+  uuidParam,
+  validateBody,
+} from "../../lib/validate";
+
+// Local schema: reorder takes a non-empty list of section ids.
+const reorderSchema = z.object({ ids: z.array(uuidSchema).min(1) });
 
 type Env = {
   Bindings: {
@@ -117,12 +129,12 @@ app.post("/reorder", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json()) as Record<string, unknown>;
-    if (!Array.isArray(body.ids)) {
-      return c.json({ error: "ids must be an array" }, 400);
-    }
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, reorderSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
     const db = getApiDb();
-    const ids = body.ids as unknown[];
+    const ids = v.data.ids;
     for (let i = 0; i < ids.length; i++) {
       await db
         .update(homepageSections)
@@ -158,9 +170,18 @@ app.patch("/sections/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
-    const content = body?.content;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    // Reuse the shared update schema for the content record shape; the
+    // per-section content shape is genuinely ambiguous, so only the
+    // record itself is enforced — no per-section schema is invented.
+    // Server-managed fields (id, createdAt, updatedAt) are in the
+    // partial schema but are never read below, so they cannot be written.
+    const v = validateBody(body, updateHomepageSectionSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const content = v.data.content;
     if (!content || typeof content !== "object" || Array.isArray(content)) {
       return c.json({ error: "content must be an object" }, 400);
     }
@@ -188,7 +209,8 @@ app.post("/sections/:id/toggle", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const [section] = await db
       .select()
@@ -252,7 +274,8 @@ app.post("/versions/:id/restore", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const [version] = await db
       .select()

@@ -9,8 +9,10 @@
 // isAuthorized) — env PUBLIC_CONTENT_API_TOKEN, or a per-integration
 // Bearer token. NO Better Auth on these routes.
 import { Hono } from "hono";
+import { z } from "zod";
 import { leads } from "@repo/database/schema";
 import { getApiDb } from "../db";
+import { isRecord, readJsonBody } from "../lib/validate";
 import {
   getPublicContent,
   getPublicSettings,
@@ -78,7 +80,13 @@ app.get("/content/:type/:slug", async (c) => {
       waitUntilOf(c),
     );
     if (!ok) return c.json({ error: "Unauthorized" }, 401);
-    const item = await getPublicContent(type, decodeURIComponent(slug));
+    let decodedSlug: string;
+    try {
+      decodedSlug = decodeURIComponent(slug);
+    } catch {
+      return c.json({ error: "Invalid slug" }, 400);
+    }
+    const item = await getPublicContent(type, decodedSlug);
     if (!item) return c.json({ error: "Not found" }, 404);
     return c.json(item);
   } catch {
@@ -159,6 +167,29 @@ function validateLead(input: {
   return errors;
 }
 
+// POST /leads body validation (local schema — no shared public-lead
+// schema exists). Mirrors validateLead() below: name required, email
+// OR phone required, BD-mobile shape for phone. The refine paths let
+// Zod failures map back onto the { errors: [{ field, message }] }
+// contract this endpoint has always returned (see the handler).
+const publicLeadSchema = z
+  .object({
+    name: z.string().min(1).max(255),
+    email: z.string().email().max(255).optional(),
+    phone: z.string().max(50).optional(),
+    service: z.string().max(255).optional(),
+    message: z.string().max(2000).optional(),
+  })
+  .refine((d) => !!d.email || !!d.phone, {
+    path: ["contact"],
+    message: "Please give your email or phone number so I can reply.",
+  })
+  .refine((d) => !d.phone || BD_PHONE_RE.test(d.phone.replace(/[\s-]/g, "")), {
+    path: ["phone"],
+    message:
+      "Please give a Bangladeshi mobile number — 01XXXXXXXXX or +8801XXXXXXXXX.",
+  });
+
 // --- Rate limit (10/hour per IP, in-memory) -------------------------
 // TODO (cutover): this Map is per-instance — on Workers each isolate
 // keeps its own count, so the limit is best-effort only under
@@ -205,19 +236,14 @@ app.post("/leads", async (c) => {
         429,
       );
     }
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
+    const body = await readJsonBody(c);
+    if (body === null) {
       return c.json(
         { errors: [{ field: "name", message: "Please tell me your name." }] },
         400,
       );
     }
-    const input =
-      body !== null && typeof body === "object"
-        ? (body as Record<string, unknown>)
-        : {};
+    const input = isRecord(body) ? body : {};
     // Over-long contact values cannot be stored (email varchar(255),
     // phone varchar(50)) — treat them as invalid, same field message.
     const name = asField(input.name);
@@ -225,6 +251,23 @@ app.post("/leads", async (c) => {
     const phoneRaw = asField(input.phone);
     const email = emailRaw.length > 255 ? "invalid" : emailRaw;
     const phone = phoneRaw.length > 50 ? "invalid" : phoneRaw;
+    // Zod check on the extracted (trimmed) values: length caps for
+    // name/service/message, email shape, BD-mobile phone, email-or-phone.
+    // Failures map onto the same { errors: [{ field, message }] } shape.
+    const parsed = publicLeadSchema.safeParse({
+      name,
+      email: email || undefined,
+      phone: phone || undefined,
+      service: asField(input.service) || undefined,
+      message: asField(input.message) || undefined,
+    });
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map((issue) => ({
+        field: (issue.path[0] as string | undefined) ?? "name",
+        message: issue.message,
+      }));
+      return c.json({ errors }, 400);
+    }
     const errors = validateLead({ name, email, phone });
     if (errors.length > 0) {
       return c.json({ errors }, 400);
@@ -233,11 +276,11 @@ app.post("/leads", async (c) => {
     const [inserted] = await db
       .insert(leads)
       .values({
-        fullName: name,
-        email: email || null,
-        phone: phone || null,
-        projectType: asField(input.service) || null,
-        message: asField(input.message) || null,
+        fullName: parsed.data.name,
+        email: parsed.data.email || null,
+        phone: parsed.data.phone || null,
+        projectType: parsed.data.service || null,
+        message: parsed.data.message || null,
         leadSource: "website",
       })
       .returning({ id: leads.id });

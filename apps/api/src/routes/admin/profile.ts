@@ -31,6 +31,25 @@ import { personProfiles, settings } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
 import { DESIGNATIONS_BN_KEY, DESIGNATIONS_KEY } from "../../lib/shared";
+import { z } from "zod";
+import { updatePersonProfileSchema } from "@repo/validation";
+import { isRecord, readJsonBody, validateBody } from "../../lib/validate";
+
+// Local schema for PUT /designations: at most 5 entries per list;
+// titles at most 100 chars, descriptions at most 255 chars. Titles
+// have NO min length: the profile page always sends 5 padded rows
+// (empty `{ title: "", description: "" }` rows included) and
+// cleanDesignations below drops the untitled ones — a min(1) here
+// would 400 every save with an empty row.
+const designationSchema = z.object({
+  title: z.string().max(100),
+  description: z.string().max(255).optional(),
+});
+
+const saveDesignationsSchema = z.object({
+  designations: z.array(designationSchema).max(5).optional(),
+  designationsBn: z.array(designationSchema).max(5).optional(),
+});
 
 type Env = {
   Bindings: {
@@ -163,21 +182,36 @@ app.put("/", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json().catch(() => null)) as Record<
-      string,
-      unknown
-    > | null;
-    const email = asText(body?.email);
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    // The admin UI clears the email by sending "" (or null); the
+    // shared schema's .email() rejects both, so normalize them to
+    // "absent" before validating — asText below then stores null,
+    // exactly as before. Non-empty values still go through the
+    // schema's .email() plus the regex check below.
+    const normalized = { ...body };
+    if (normalized.email === "" || normalized.email === null) {
+      delete normalized.email;
+    }
+    const v = validateBody(normalized, updatePersonProfileSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data;
+    // The shared schema has no length limits, so reuse alone adds no
+    // max-length protection (accepted); the original email regex check
+    // stays as the second gate. Server-managed fields in the partial
+    // schema (id, createdAt, updatedAt) are never read below, so they
+    // cannot be written — only the six profile fields are saved.
+    const email = asText(data.email);
     if (email !== null && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return c.json({ error: "Enter a valid email address" }, 400);
     }
     const values = {
-      fullName: asText(body?.fullName),
+      fullName: asText(data.fullName),
       email,
-      location: asText(body?.location),
-      phone: asText(body?.phone),
-      bioShort: asText(body?.bioShort),
-      bioLong: asText(body?.bioLong),
+      location: asText(data.location),
+      phone: asText(data.phone),
+      bioShort: asText(data.bioShort),
+      bioLong: asText(data.bioLong),
     };
     const db = getApiDb();
     const existing = await db
@@ -226,14 +260,15 @@ app.put("/designations", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json().catch(() => null)) as {
-      designations?: unknown;
-      designationsBn?: unknown;
-    } | null;
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, saveDesignationsSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data;
     const db = getApiDb();
     const [enDef, bnDef] = DESIGNATION_KEYS;
-    const enValue = cleanDesignations(body?.designations);
-    const bnValue = cleanDesignations(body?.designationsBn);
+    const enValue = cleanDesignations(data.designations);
+    const bnValue = cleanDesignations(data.designationsBn);
     for (const { def, value } of [
       { def: enDef, value: enValue },
       { def: bnDef, value: bnValue },

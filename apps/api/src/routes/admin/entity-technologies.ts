@@ -29,6 +29,16 @@ import { asc, eq, inArray } from "drizzle-orm";
 import { projectTechnologies, technologies } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import { z } from "zod";
+import { uuidSchema } from "@repo/validation";
+import { isRecord, readJsonBody, validateBody } from "../../lib/validate";
+
+// Local schema: replace the entity's technology links with the given
+// existing-technology ids (at most 100). cleanIds + the existence
+// check below are kept as-is (dedupe + ignore unknown ids).
+const setEntityTechnologiesSchema = z.object({
+  technologyIds: z.array(uuidSchema).max(100),
+});
 
 type Env = {
   Bindings: {
@@ -130,11 +140,12 @@ app.post("/:entity/:id", async (c) => {
     }
     const id = c.req.param("id");
     if (!UUID_RE.test(id)) return c.json({ error: "Invalid id" }, 400);
-    const body = (await c.req.json().catch(() => null)) as {
-      technologyIds?: unknown;
-    } | null;
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, setEntityTechnologiesSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
     const db = getApiDb();
-    const clean = cleanIds(body?.technologyIds);
+    const clean = cleanIds(v.data.technologyIds);
     // Only link technologies that exist — the join has no FK, so an
     // unknown ID would otherwise become a dangling row.
     const existing =

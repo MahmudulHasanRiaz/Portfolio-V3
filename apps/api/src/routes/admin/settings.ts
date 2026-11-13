@@ -63,7 +63,6 @@ import {
   SITE_COPY_BN_KEY,
   SITE_COPY_KEY,
   SITE_PRIMARY_IDENTITY_DEFAULT,
-  isSitePrimaryIdentity,
   normalizeAvailability,
   normalizeFaviconUrl,
   normalizeHeroPortraitUrl,
@@ -73,10 +72,17 @@ import {
 import {
   DEFAULT_LANGUAGE_DEFAULT,
   DEFAULT_LANGUAGE_KEY,
-  isDefaultLanguage,
   normalizeDefaultLanguage,
 } from "../../lib/default-language";
 import { hashIntegrationToken } from "../../lib/integrations";
+import { z } from "zod";
+import {
+  invalidParam,
+  isRecord,
+  readJsonBody,
+  uuidParam,
+  validateBody,
+} from "../../lib/validate";
 
 type Env = {
   Bindings: {
@@ -91,16 +97,75 @@ const app = new Hono<Env>();
 
 type ApiDb = ReturnType<typeof getApiDb>;
 
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : "Unknown error";
+// ─── Local request schemas (Zod audit, 2026-11-13) ─────────────────────────
+// Zod strips unknown keys, so server-managed fields (id, createdBy,
+// createdAt, updatedAt) can never reach a DB write through these bodies.
+
+const availabilitySchema = z.object({
+  available: z.boolean(),
+  badgeText: z.string().max(100).optional(),
+});
+
+const defaultLanguageSchema = z.object({
+  defaultLanguage: z.enum(["en", "bn", "system"]),
+});
+
+/** URL field: trims, empty string clears to null (existing behaviour),
+ *  otherwise must be a URL of at most 2048 chars. The http(s)-only
+ *  check stays in the handler (z.string().url() alone would also
+ *  accept e.g. ftp://, which the original rejected). */
+function urlOrNullField() {
+  return z.preprocess(
+    (v) =>
+      typeof v === "string" ? (v.trim() === "" ? null : v.trim()) : v,
+    z.string().url().max(2048).nullable(),
+  );
 }
 
-async function parseBody(c: {
-  req: { json: () => Promise<unknown> };
-}): Promise<Record<string, unknown> | null> {
-  const body = await c.req.json().catch(() => null);
-  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
-  return body as Record<string, unknown>;
+const faviconSchema = z.object({ faviconUrl: urlOrNullField() });
+
+const heroPortraitSchema = z.object({ portraitUrl: urlOrNullField() });
+
+const primaryIdentitySchema = z.object({
+  primaryIdentity: z.enum(["developer", "know-me"]),
+});
+
+const searchIndexingSchema = z.object({
+  searchIndexingEnabled: z.boolean(),
+});
+
+const siteCopySchema = z.object({
+  heroHeadline: z.string().max(255).nullable().optional(),
+  heroHeadlineBn: z.string().max(255).nullable().optional(),
+  heroDescription: z.string().max(2000).nullable().optional(),
+  heroDescriptionBn: z.string().max(2000).nullable().optional(),
+  knowMeHeadline: z.string().max(255).nullable().optional(),
+  knowMeHeadlineBn: z.string().max(255).nullable().optional(),
+  knowMeSub: z.string().max(2000).nullable().optional(),
+  knowMeSubBn: z.string().max(2000).nullable().optional(),
+  founderSummary: z.string().max(2000).nullable().optional(),
+  founderSummaryBn: z.string().max(2000).nullable().optional(),
+  siteTitle: z.string().max(255).nullable().optional(),
+  siteDescription: z.string().max(2000).nullable().optional(),
+  aboutP1: z.string().max(5000).nullable().optional(),
+  aboutP2: z.string().max(5000).nullable().optional(),
+  aboutP3: z.string().max(5000).nullable().optional(),
+  aboutP1Bn: z.string().max(5000).nullable().optional(),
+  aboutP2Bn: z.string().max(5000).nullable().optional(),
+  aboutP3Bn: z.string().max(5000).nullable().optional(),
+});
+
+const createIntegrationSchema = z.object({
+  name: z.string().trim().min(1).max(255),
+});
+
+const updateIntegrationSchema = z.object({
+  name: z.string().trim().min(1).max(255).optional(),
+  isActive: z.boolean().optional(),
+});
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : "Unknown error";
 }
 
 // ─── Settings-table helpers ──────────────────────────────────────────────────
@@ -174,11 +239,11 @@ app.put("/availability", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = await parseBody(c);
-    const value = normalizeAvailability(body);
-    if (typeof body?.available !== "boolean") {
-      return c.json({ error: "available must be a boolean" }, 400);
-    }
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, availabilitySchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const value = normalizeAvailability(v.data);
     const db = getApiDb();
     await upsertSetting(
       db,
@@ -216,14 +281,11 @@ app.put("/default-language", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = await parseBody(c);
-    const value = body?.defaultLanguage;
-    if (!isDefaultLanguage(value)) {
-      return c.json(
-        { error: "defaultLanguage must be one of: en, bn, system" },
-        400,
-      );
-    }
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, defaultLanguageSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const value = v.data.defaultLanguage;
     const db = getApiDb();
     await upsertSetting(
       db,
@@ -259,13 +321,13 @@ app.put("/favicon", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = await parseBody(c);
-    const raw = body?.faviconUrl;
-    if (typeof raw !== "string") {
-      return c.json({ error: "faviconUrl must be a string" }, 400);
-    }
-    // Empty string clears the favicon to null.
-    const faviconUrl = raw.trim() === "" ? null : raw.trim();
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, faviconSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    // Empty string clears the favicon to null (via the schema
+    // preprocess); non-null values must still be http(s) URLs.
+    const faviconUrl = v.data.faviconUrl;
     if (faviconUrl !== null && !/^https?:\/\//i.test(faviconUrl)) {
       return c.json({ error: "faviconUrl must be an http(s) URL" }, 400);
     }
@@ -304,13 +366,13 @@ app.put("/hero-portrait", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = await parseBody(c);
-    const raw = body?.portraitUrl;
-    if (typeof raw !== "string") {
-      return c.json({ error: "portraitUrl must be a string" }, 400);
-    }
-    // Empty string clears the portrait to null.
-    const portraitUrl = raw.trim() === "" ? null : raw.trim();
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, heroPortraitSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    // Empty string clears the portrait to null (via the schema
+    // preprocess); non-null values must still be http(s) URLs.
+    const portraitUrl = v.data.portraitUrl;
     if (portraitUrl !== null && !/^https?:\/\//i.test(portraitUrl)) {
       return c.json({ error: "portraitUrl must be an http(s) URL" }, 400);
     }
@@ -351,14 +413,11 @@ app.put("/primary-identity", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = await parseBody(c);
-    const value = body?.primaryIdentity;
-    if (!isSitePrimaryIdentity(value)) {
-      return c.json(
-        { error: "primaryIdentity must be one of: developer, know-me" },
-        400,
-      );
-    }
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, primaryIdentitySchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const value = v.data.primaryIdentity;
     const db = getApiDb();
     await upsertSetting(
       db,
@@ -396,14 +455,11 @@ app.put("/search-indexing", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = await parseBody(c);
-    const value = body?.searchIndexingEnabled;
-    if (typeof value !== "boolean") {
-      return c.json(
-        { error: "searchIndexingEnabled must be a boolean" },
-        400,
-      );
-    }
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, searchIndexingSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const value = v.data.searchIndexingEnabled;
     const db = getApiDb();
     await upsertSetting(
       db,
@@ -448,6 +504,7 @@ const SITE_COPY_BIO_FIELDS = [
 
 /** String body value: undefined = wrong type, null = empty string (clear), string = as given. */
 function asText(value: unknown): string | null | undefined {
+  if (value === null) return null;
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   return trimmed === "" ? null : value;
@@ -508,15 +565,16 @@ app.put("/site-copy", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = await parseBody(c);
-    if (!body) {
-      return c.json({ error: "Invalid request body" }, 400);
-    }
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, siteCopySchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data;
     const db = getApiDb();
     const saved: Record<string, string | null> = {};
     for (const f of SITE_COPY_FIELDS) {
-      if (!(f.bodyKey in body)) continue;
-      const value = asText(body[f.bodyKey]);
+      if (!(f.bodyKey in data)) continue;
+      const value = asText(data[f.bodyKey]);
       if (value === undefined) {
         return c.json({ error: `${f.bodyKey} must be a string` }, 400);
       }
@@ -527,8 +585,8 @@ app.put("/site-copy", async (c) => {
     // the other ~250 site-copy keys are never touched.
     const bioByRow = new Map<string, Record<string, unknown>>();
     for (const f of SITE_COPY_BIO_FIELDS) {
-      if (!(f.bodyKey in body)) continue;
-      const value = asText(body[f.bodyKey]);
+      if (!(f.bodyKey in data)) continue;
+      const value = asText(data[f.bodyKey]);
       if (value === undefined) {
         return c.json({ error: `${f.bodyKey} must be a string` }, 400);
       }
@@ -695,15 +753,6 @@ function generateIntegrationToken(): {
   return { token, tokenPrefix: token.slice(0, 8) };
 }
 
-/** Validate an integration name: non-empty string, max 255 chars. Returns
- *  the trimmed name, or null when invalid. */
-function validName(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const name = value.trim();
-  if (name === "" || name.length > 255) return null;
-  return name;
-}
-
 app.get("/integrations", async (c) => {
   try {
     const user = await requireAuth(c);
@@ -727,14 +776,11 @@ app.post("/integrations", async (c) => {
     if (!user) return c.json({ error: "Unauthorized" }, 401);
     const db = getApiDb();
     await requireIntegrationAdmin(db, user.email);
-    const body = await parseBody(c);
-    const name = validName(body?.name);
-    if (!name) {
-      return c.json(
-        { error: "name must be a non-empty string of at most 255 characters" },
-        400,
-      );
-    }
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, createIntegrationSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const name = v.data.name;
     const { token, tokenPrefix } = generateIntegrationToken();
     const tokenHash = await hashIntegrationToken(token);
     const [row] = await db
@@ -755,10 +801,12 @@ app.get("/integrations/:id", async (c) => {
     if (!user) return c.json({ error: "Unauthorized" }, 401);
     const db = getApiDb();
     await requireIntegrationAdmin(db, user.email);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const [row] = await db
       .select()
       .from(websiteIntegrations)
-      .where(eq(websiteIntegrations.id, c.req.param("id")))
+      .where(eq(websiteIntegrations.id, id))
       .limit(1);
     if (!row) return c.json({ error: "Integration not found" }, 404);
     return c.json({ integration: toListItem(row) });
@@ -774,28 +822,15 @@ async function updateIntegrationHandler(c: Context<Env, "/integrations/:id">) {
     if (!user) return c.json({ error: "Unauthorized" }, 401);
     const db = getApiDb();
     await requireIntegrationAdmin(db, user.email);
-    const id = c.req.param("id");
-    const body = await parseBody(c);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, updateIntegrationSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
     const patch: { name?: string; isActive?: boolean } = {};
-    if (body?.name !== undefined) {
-      if (typeof body.name !== "string") {
-        return c.json({ error: "name must be a string" }, 400);
-      }
-      const name = body.name.trim();
-      if (name === "" || name.length > 255) {
-        return c.json(
-          { error: "name must be a non-empty string of at most 255 characters" },
-          400,
-        );
-      }
-      patch.name = name;
-    }
-    if (body?.isActive !== undefined) {
-      if (typeof body.isActive !== "boolean") {
-        return c.json({ error: "isActive must be a boolean" }, 400);
-      }
-      patch.isActive = body.isActive;
-    }
+    if (v.data.name !== undefined) patch.name = v.data.name;
+    if (v.data.isActive !== undefined) patch.isActive = v.data.isActive;
     // Drizzle's update-set type rejects possibly-undefined values, so
     // each combination is set with a fully concrete literal (the
     // original updates with the same patch object; an empty patch just
@@ -850,9 +885,11 @@ app.delete("/integrations/:id", async (c) => {
     if (!user) return c.json({ error: "Unauthorized" }, 401);
     const db = getApiDb();
     await requireIntegrationAdmin(db, user.email);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const rows = await db
       .delete(websiteIntegrations)
-      .where(eq(websiteIntegrations.id, c.req.param("id")))
+      .where(eq(websiteIntegrations.id, id))
       .returning({ id: websiteIntegrations.id });
     if (rows.length === 0) {
       return c.json({ error: "Integration not found" }, 404);
@@ -870,12 +907,14 @@ app.post("/integrations/:id/regenerate", async (c) => {
     if (!user) return c.json({ error: "Unauthorized" }, 401);
     const db = getApiDb();
     await requireIntegrationAdmin(db, user.email);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const { token, tokenPrefix } = generateIntegrationToken();
     const tokenHash = await hashIntegrationToken(token);
     const [row] = await db
       .update(websiteIntegrations)
       .set({ tokenHash, tokenPrefix, updatedAt: new Date() })
-      .where(eq(websiteIntegrations.id, c.req.param("id")))
+      .where(eq(websiteIntegrations.id, id))
       .returning();
     if (!row) return c.json({ error: "Integration not found" }, 404);
     return c.json({ integration: toListItem(row), token });

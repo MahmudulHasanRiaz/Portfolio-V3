@@ -25,6 +25,19 @@ import { timelineEvents } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
 import {
+  createTimelineEventSchema,
+  updateTimelineEventSchema,
+  uuidSchema,
+} from "@repo/validation";
+import {
+  invalidParam,
+  isRecord,
+  parsePagination,
+  readJsonBody,
+  uuidParam,
+  validateBody,
+} from "../../lib/validate";
+import {
   deleteSearchEntity,
   indexSearchEntity,
   waitUntilOf,
@@ -51,13 +64,23 @@ app.get("/", async (c) => {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
     const db = getApiDb();
-    const q = c.req.query();
-    const page = Number(q.page) || 1;
-    const pageSize = Number(q.pageSize) || 50;
+    const { page, pageSize } = parsePagination(c, { defaultPageSize: 50 });
+    const sourceType = c.req.query("sourceType");
+    if (sourceType !== undefined && sourceType.length > 50) {
+      return c.json({ error: "sourceType must be at most 50 characters" }, 400);
+    }
+    const sourceId = c.req.query("sourceId");
+    if (sourceId !== undefined && !uuidSchema.safeParse(sourceId).success) {
+      return c.json({ error: "sourceId must be a UUID" }, 400);
+    }
+    const eventType = c.req.query("eventType");
+    if (eventType !== undefined && eventType.length > 50) {
+      return c.json({ error: "eventType must be at most 50 characters" }, 400);
+    }
     const conditions: any[] = [];
-    if (q.sourceType) conditions.push(eq(timelineEvents.sourceType, q.sourceType));
-    if (q.sourceId) conditions.push(eq(timelineEvents.sourceId, q.sourceId));
-    if (q.eventType) conditions.push(eq(timelineEvents.eventType, q.eventType));
+    if (sourceType) conditions.push(eq(timelineEvents.sourceType, sourceType));
+    if (sourceId) conditions.push(eq(timelineEvents.sourceId, sourceId));
+    if (eventType) conditions.push(eq(timelineEvents.eventType, eventType));
     const where = conditions.length > 0 ? and(...conditions) : undefined;
     const [countResult] = await db
       .select({ count: count() })
@@ -93,34 +116,38 @@ app.post("/", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json().catch(() => null)) as Record<
-      string,
-      unknown
-    > | null;
-    if (typeof body?.title !== "string" || body.title.trim() === "") {
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    // Reuse the shared create schema — but .partial(): the schema
+    // requires sourceType / sourceId / eventType, while the admin UI
+    // create form (dashboard/content/timeline) never sends sourceType
+    // or sourceId, and the DB columns are all nullable, so the
+    // verbatim schema would 400 every UI create. Title / eventDate
+    // stay required via the non-empty checks below.
+    const v = validateBody(body, createTimelineEventSchema.partial());
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data;
+    // The shared schema leaves title / eventDate as bare strings; the
+    // original required them non-empty, so those checks stay.
+    if (typeof data.title !== "string" || data.title.trim() === "") {
       return c.json({ error: "title is required" }, 400);
     }
-    if (typeof body?.eventDate !== "string" || body.eventDate.trim() === "") {
+    if (typeof data.eventDate !== "string" || data.eventDate.trim() === "") {
       return c.json({ error: "eventDate is required" }, 400);
     }
     const db = getApiDb();
     const [row] = await db
       .insert(timelineEvents)
       .values({
-        sourceType:
-          typeof body.sourceType === "string" ? body.sourceType : undefined,
-        sourceId:
-          typeof body.sourceId === "string" ? body.sourceId : undefined,
-        eventType:
-          typeof body.eventType === "string" ? body.eventType : undefined,
-        title: body.title,
-        description:
-          typeof body.description === "string" ? body.description : undefined,
-        eventDate: body.eventDate,
-        icon: typeof body.icon === "string" ? body.icon : undefined,
-        url: typeof body.url === "string" ? body.url : undefined,
-        sortOrder:
-          typeof body.sortOrder === "number" ? body.sortOrder : undefined,
+        sourceType: data.sourceType,
+        sourceId: data.sourceId,
+        eventType: data.eventType,
+        title: data.title,
+        description: data.description,
+        eventDate: data.eventDate,
+        icon: data.icon,
+        url: data.url,
+        sortOrder: data.sortOrder,
       })
       .returning();
     if (!row) return c.json({ error: "Failed to create timeline event" }, 500);
@@ -136,11 +163,17 @@ app.put("/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json().catch(() => null)) as Record<
-      string,
-      unknown
-    > | null;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, updateTimelineEventSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data;
     const db = getApiDb();
+    // Same 9-field allowlist the raw key-loop copied; the partial
+    // schema's server-managed `id` / `createdAt` are never passed
+    // through, so a client cannot overwrite them.
     const patch: Record<string, unknown> = {};
     for (const key of [
       "sourceType",
@@ -152,13 +185,13 @@ app.put("/:id", async (c) => {
       "icon",
       "url",
       "sortOrder",
-    ]) {
-      if (body?.[key] !== undefined) patch[key] = body[key];
+    ] as const) {
+      if (data[key] !== undefined) patch[key] = data[key];
     }
     const [row] = await db
       .update(timelineEvents)
       .set(patch)
-      .where(eq(timelineEvents.id, c.req.param("id")))
+      .where(eq(timelineEvents.id, id))
       .returning();
     if (!row) return c.json({ error: "Timeline event not found" }, 404);
     void indexSearchEntity(db, "timeline_event", row.id, c.env, waitUntilOf(c));
@@ -174,7 +207,8 @@ app.delete("/:id", async (c) => {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
     const db = getApiDb();
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     await db.delete(timelineEvents).where(eq(timelineEvents.id, id));
     void deleteSearchEntity(db, "timeline_event", id, waitUntilOf(c));
     return c.json({ ok: true });

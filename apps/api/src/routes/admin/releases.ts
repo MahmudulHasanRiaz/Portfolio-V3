@@ -34,6 +34,18 @@
 // (b) dispatched the "release_published" workflow trigger on create, and
 // (c) purged the public site cache via purgePublicCache(["releases", "home"]).
 import { Hono } from "hono";
+import { z } from "zod";
+import {
+  createReleaseLyricSchema,
+  createReleasePlatformSchema,
+  createReleaseSchema,
+  createReleaseVideoSchema,
+  createTimelineEventSchema,
+  updateReleaseLyricSchema,
+  updateReleasePlatformSchema,
+  updateReleaseSchema,
+  uuidSchema,
+} from "@repo/validation";
 import {
   and,
   asc,
@@ -56,9 +68,55 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth, unauthorized } from "../../lib/admin-auth";
+import {
+  invalidParam,
+  isRecord,
+  parsePagination,
+  readJsonBody,
+  uuidParam,
+  validateBody,
+} from "../../lib/validate";
 import { deleteSearchEntity, dispatchTrigger, indexSearchEntity, purgePublicCache, waitUntilOf } from "../../lib/side-effects";
 
 const app = new Hono();
+
+// ─── Validation ──────────────────────────────────────────────────────────────
+// Release sub-resource schemas from @repo/validation. Adaptations (the
+// shared schemas describe the table row, the route body differs):
+// - Lyrics: `releaseId` is server-set from :id, never in the body, so it
+//   is omitted; `status` is a plain varchar(20) in the DB with no known
+//   enum, so it stays a plain string (no enum invented).
+const createLyricBodySchema = createReleaseLyricSchema
+  .omit({ releaseId: true })
+  .extend({ status: z.string().optional() });
+const updateLyricBodySchema = updateReleaseLyricSchema
+  .omit({ releaseId: true })
+  .extend({ status: z.string().optional() });
+// - Timeline: `sourceType`/`sourceId` are server-set ("release" / :id).
+const timelineBodySchema = createTimelineEventSchema.omit({
+  sourceType: true,
+  sourceId: true,
+});
+const deleteTimelineSchema = z.object({ eventId: uuidSchema });
+// - List-query enums (same values as the shared release schemas).
+const releaseStatusSchema = z.enum(["draft", "published", "archived"]);
+const releaseTypeSchema = z.enum([
+  "nasheed",
+  "tilawat",
+  "acting",
+  "podcast",
+  "interview",
+  "documentary",
+]);
+
+/** Server-managed fields are never client-settable: drop them from
+ *  validated data before any DB write. */
+function stripServerManaged(data: Record<string, unknown>): void {
+  delete data.id;
+  delete data.createdBy;
+  delete data.createdAt;
+  delete data.updatedAt;
+}
 
 // Columns of the releases table, keyed by their camelCase property name —
 // used as the allowlist for create/update bodies.
@@ -66,15 +124,6 @@ const RELEASE_COLUMNS = getTableColumns(releases);
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
-}
-
-function parsePage(query: (name: string) => string | undefined): {
-  page: number;
-  pageSize: number;
-} {
-  const page = parseInt(query("page") ?? "1", 10);
-  const pageSize = parseInt(query("pageSize") ?? "20", 10);
-  return { page, pageSize };
 }
 
 /**
@@ -113,7 +162,19 @@ app.get("/", async (c) => {
     const status = c.req.query("status") ?? undefined;
     const type = c.req.query("type") ?? undefined;
     const format = c.req.query("format") ?? undefined;
-    const { page, pageSize } = parsePage((name) => c.req.query(name));
+    if (search !== undefined && search.length > 255) {
+      return c.json({ error: "search must be at most 255 characters" }, 400);
+    }
+    if (status !== undefined && !releaseStatusSchema.safeParse(status).success) {
+      return c.json({ error: "Invalid status" }, 400);
+    }
+    if (type !== undefined && !releaseTypeSchema.safeParse(type).success) {
+      return c.json({ error: "Invalid type" }, 400);
+    }
+    if (format !== undefined && format.length > 50) {
+      return c.json({ error: "format must be at most 50 characters" }, 400);
+    }
+    const { page, pageSize } = parsePagination(c);
     const offset = (page - 1) * pageSize;
 
     const db = getApiDb();
@@ -162,12 +223,23 @@ app.post("/", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    // The dashboard sends `format`; the schema (and column) is
+    // `releaseFormat` — alias before validation so it is not stripped.
+    if (body.format !== undefined && body.releaseFormat === undefined) {
+      body.releaseFormat = body.format;
+    }
+    delete body.format;
+    const v = validateBody(body, createReleaseSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = { ...(v.data as Record<string, unknown>) };
+    stripServerManaged(data);
     const db = getApiDb();
     const [row] = await db
       .insert(releases)
       .values({
-        ...releaseFields(body, true),
+        ...releaseFields(data, true),
         createdBy: user.id,
       } as typeof releases.$inferInsert)
       .returning();
@@ -185,7 +257,8 @@ app.get("/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const [row] = await db
       .select()
@@ -203,10 +276,22 @@ app.patch("/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    // The dashboard sends `format`; the schema (and column) is
+    // `releaseFormat` — alias before validation so it is not stripped.
+    if (body.format !== undefined && body.releaseFormat === undefined) {
+      body.releaseFormat = body.format;
+    }
+    delete body.format;
+    const v = validateBody(body, updateReleaseSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = { ...(v.data as Record<string, unknown>) };
+    stripServerManaged(data);
     const db = getApiDb();
-    const values = releaseFields(body, false);
+    const values = releaseFields(data, false);
     if (Object.keys(values).length === 0) {
       // No updatable fields — the repository returns the existing row.
       const [existing] = await db
@@ -238,7 +323,8 @@ app.delete("/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     // No FKs point from the child tables to releases, so delete the
     // children first — otherwise a deleted release leaves orphaned rows.
@@ -272,7 +358,8 @@ app.get("/:id/lyrics", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const [row] = await db
       .select()
@@ -290,8 +377,10 @@ app.put("/:id/lyrics", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
     // The dashboard form sends `language`; the repository expects
     // `lyricsLanguage`.
     if (body.language !== undefined && body.lyricsLanguage === undefined) {
@@ -307,18 +396,22 @@ app.put("/:id/lyrics", async (c) => {
       .limit(1);
 
     if (existing) {
+      const v = validateBody(body, updateLyricBodySchema);
+      if ("error" in v) return c.json({ error: v.error }, 400);
+      const data = { ...(v.data as Record<string, unknown>) };
+      stripServerManaged(data);
       const sets: Partial<typeof releaseLyrics.$inferInsert> = {};
-      if (body.lyricsText !== undefined) {
-        sets.lyricsText = body.lyricsText as string | null;
+      if (data.lyricsText !== undefined) {
+        sets.lyricsText = data.lyricsText as string | null;
       }
-      if (body.lyricsLanguage !== undefined) {
-        sets.lyricsLanguage = body.lyricsLanguage as string | null;
+      if (data.lyricsLanguage !== undefined) {
+        sets.lyricsLanguage = data.lyricsLanguage as string | null;
       }
-      if (body.translations !== undefined) {
-        sets.translations = body.translations as Record<string, unknown> | null;
+      if (data.translations !== undefined) {
+        sets.translations = data.translations as Record<string, unknown> | null;
       }
-      if (body.status !== undefined) {
-        sets.status = body.status as string | null;
+      if (data.status !== undefined) {
+        sets.status = data.status as string | null;
       }
       if (Object.keys(sets).length === 0) return c.json(existing);
       const [row] = await db
@@ -330,15 +423,19 @@ app.put("/:id/lyrics", async (c) => {
       return c.json(row);
     }
 
+    const v = validateBody(body, createLyricBodySchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = { ...(v.data as Record<string, unknown>) };
+    stripServerManaged(data);
     const [row] = await db
       .insert(releaseLyrics)
       .values({
         releaseId: id,
-        lyricsText: (body.lyricsText as string | undefined) ?? null,
-        lyricsLanguage: (body.lyricsLanguage as string | undefined) ?? null,
+        lyricsText: (data.lyricsText as string | undefined) ?? null,
+        lyricsLanguage: (data.lyricsLanguage as string | undefined) ?? null,
         translations:
-          (body.translations as Record<string, unknown> | undefined) ?? null,
-        status: (body.status as string | undefined) ?? "draft",
+          (data.translations as Record<string, unknown> | undefined) ?? null,
+        status: (data.status as string | undefined) ?? "draft",
       })
       .returning();
     if (!row) return c.json({ error: "Failed to save lyrics" }, 500);
@@ -354,7 +451,8 @@ app.get("/:id/platforms", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const rows = await db
       .select()
@@ -371,20 +469,29 @@ app.post("/:id/platforms", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
     // The dashboard form sends `url`; the repository column is platform_url.
-    const platformUrl =
-      (body.platformUrl as string | undefined) ??
-      (body.url as string | undefined) ??
-      null;
+    if (body.url !== undefined && body.platformUrl === undefined) {
+      body.platformUrl = body.url;
+    }
+    delete body.url;
+    // createReleasePlatformSchema requires releaseId — server-set from :id.
+    const v = validateBody(
+      { ...body, releaseId: id },
+      createReleasePlatformSchema,
+    );
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data;
     const db = getApiDb();
     const [row] = await db
       .insert(releasePlatforms)
       .values({
         releaseId: id,
-        platformName: (body.platformName as string | undefined) ?? null,
-        platformUrl,
+        platformName: data.platformName,
+        platformUrl: data.platformUrl ?? null,
       })
       .returning();
     if (!row) return c.json({ error: "Failed to create platform link" }, 500);
@@ -398,19 +505,27 @@ app.patch("/:id/platforms/:platformId", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const platformId = c.req.param("platformId");
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const platformId = uuidParam(c, "platformId");
+    if (!platformId) return invalidParam(c, "platformId");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
     // Accept the dashboard form's `url` as an alias for `platformUrl`.
     if (body.url !== undefined && body.platformUrl === undefined) {
       body.platformUrl = body.url;
     }
     delete body.url;
+    const v = validateBody(body, updateReleasePlatformSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = { ...(v.data as Record<string, unknown>) };
+    stripServerManaged(data);
     const sets: Partial<typeof releasePlatforms.$inferInsert> = {};
-    if (body.platformName !== undefined) {
-      sets.platformName = body.platformName as string | null;
+    if (data.platformName !== undefined) {
+      sets.platformName = data.platformName as string | null;
     }
-    if (body.platformUrl !== undefined) {
-      sets.platformUrl = body.platformUrl as string | null;
+    if (data.platformUrl !== undefined) {
+      sets.platformUrl = data.platformUrl as string | null;
     }
     // The repository returns null when nothing is set — the route 404s.
     if (Object.keys(sets).length === 0) {
@@ -433,7 +548,10 @@ app.delete("/:id/platforms/:platformId", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const platformId = c.req.param("platformId");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const platformId = uuidParam(c, "platformId");
+    if (!platformId) return invalidParam(c, "platformId");
     const db = getApiDb();
     const [deleted] = await db
       .delete(releasePlatforms)
@@ -452,7 +570,8 @@ app.get("/:id/videos", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const rows = await db
       .select()
@@ -471,22 +590,27 @@ app.post("/:id/videos", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
     // The dashboard form sends `url`; the repository expects `videoUrl`.
     if (body.url !== undefined && body.videoUrl === undefined) {
       body.videoUrl = body.url;
     }
     delete body.url;
+    const v = validateBody(body, createReleaseVideoSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data;
     const db = getApiDb();
     const [row] = await db
       .insert(releaseVideos)
       .values({
         releaseId: id,
-        platformName: (body.platformName as string | undefined) ?? null,
-        videoUrl: (body.videoUrl as string | undefined) ?? null,
-        title: (body.title as string | undefined) ?? null,
-        sortOrder: (body.sortOrder as number | undefined) ?? null,
+        platformName: data.platformName ?? null,
+        videoUrl: data.videoUrl ?? null,
+        title: data.title ?? null,
+        sortOrder: data.sortOrder ?? null,
       })
       .returning();
     if (!row) return c.json({ error: "Failed to create video link" }, 500);
@@ -500,10 +624,15 @@ app.delete("/:id/videos", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     // The source deletes by ?videoId= on the collection route.
     const videoId = c.req.query("videoId");
     if (!videoId) {
       return c.json({ error: "videoId query param required" }, 400);
+    }
+    if (!uuidSchema.safeParse(videoId).success) {
+      return invalidParam(c, "videoId");
     }
     const db = getApiDb();
     const [deleted] = await db
@@ -523,7 +652,8 @@ app.get("/:id/timeline", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const rows = await db
       .select()
@@ -550,20 +680,25 @@ app.post("/:id/timeline", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, timelineBodySchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data;
     const db = getApiDb();
     const [row] = await db
       .insert(timelineEvents)
       .values({
         sourceType: "release",
         sourceId: id,
-        eventType: (body.eventType as string | undefined) ?? null,
-        title: (body.title as string | undefined) ?? null,
-        description: (body.description as string | undefined) ?? null,
-        eventDate: (body.eventDate as string | undefined) ?? null,
-        icon: (body.icon as string | undefined) ?? null,
-        url: (body.url as string | undefined) ?? null,
+        eventType: data.eventType,
+        title: data.title,
+        description: data.description ?? null,
+        eventDate: data.eventDate,
+        icon: data.icon ?? null,
+        url: data.url ?? null,
       })
       .returning();
     if (!row) return c.json({ error: "Failed to add timeline event" }, 500);
@@ -577,9 +712,14 @@ app.delete("/:id/timeline", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const body = (await c.req.json()) as { eventId?: unknown };
-    const eventId = body.eventId as string | undefined;
-    if (!eventId) return c.json({ error: "eventId required" }, 400);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    // A bodyless DELETE is a 400 here (not a 500 from bare .json()).
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, deleteTimelineSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const eventId = v.data.eventId;
     const db = getApiDb();
     const [deleted] = await db
       .delete(timelineEvents)

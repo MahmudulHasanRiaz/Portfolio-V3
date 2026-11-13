@@ -14,10 +14,16 @@
 // purgePublicCache(["home"]) after every create/update/delete
 // (best-effort, never fails the save).
 import { Hono } from "hono";
+import { z } from "zod";
+import {
+  createTechnologySchema,
+  updateTechnologySchema,
+} from "@repo/validation";
 import { asc, eq, ilike } from "drizzle-orm";
 import { clients, platforms, technologies } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth, unauthorized } from "../../lib/admin-auth";
+import { isRecord, readJsonBody, validateBody } from "../../lib/validate";
 import { purgePublicCache, waitUntilOf } from "../../lib/side-effects";
 
 const app = new Hono();
@@ -70,6 +76,41 @@ function assertUuid(id: string, label: string): void {
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
 }
+
+// ─── Validation ──────────────────────────────────────────────────────────────
+// Local schemas (finance.ts precedent): platforms and clients have no
+// shared @repo/validation schema. PUT is full-replace, so the update
+// schema is the same as the create schema — name/url/group (platforms)
+// and name (clients) stay required on PUT, exactly as platformValues /
+// clientValues enforced before.
+// sortOrder uses z.coerce so a numeric string ("3") still parses, as
+// asSortOrder accepted before.
+const createPlatformSchema = z.object({
+  name: z.string().min(1).max(255),
+  url: z.string().url().max(2048),
+  group: z.enum(["music", "social", "professional"]),
+  handle: z.string().optional(),
+  icon: z.string().optional(),
+  subtitle: z.string().optional(),
+  note: z.string().optional(),
+  nameBn: z.string().optional(),
+  subtitleBn: z.string().optional(),
+  isPrimary: z.boolean().optional(),
+  sortOrder: z.coerce.number().int().optional(),
+});
+const updatePlatformSchema = createPlatformSchema;
+
+const createClientSchema = z.object({
+  name: z.string().min(1).max(255),
+  logoUrl: z.string().url().optional(),
+  website: z.string().url().optional(),
+  nameBn: z.string().optional(),
+  sortOrder: z.coerce.number().int().optional(),
+});
+const updateClientSchema = createClientSchema;
+
+// List `search` is capped at 255 chars (400 when longer) — checked
+// inline in each list handler below.
 
 // ─── Platforms ───────────────────────────────────────────────────────────────
 
@@ -152,6 +193,9 @@ app.get("/platforms", async (c) => {
     if (!user) return c.json(unauthorized(), 401);
     const db = getApiDb();
     const search = (c.req.query("search") ?? "").trim();
+    if (search.length > 255) {
+      return c.json({ error: "search must be at most 255 characters" }, 400);
+    }
     const rows = await db
       .select()
       .from(platforms)
@@ -188,7 +232,11 @@ app.post("/platforms", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const data = (await c.req.json()) as PlatformInput;
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, createPlatformSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data;
     const db = getApiDb();
     const [row] = await db
       .insert(platforms)
@@ -209,7 +257,11 @@ app.put("/platforms/:id", async (c) => {
     if (!user) return c.json(unauthorized(), 401);
     const id = c.req.param("id");
     assertUuid(id, "platform");
-    const data = (await c.req.json()) as PlatformInput;
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, updatePlatformSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data;
     const db = getApiDb();
     const [row] = await db
       .update(platforms)
@@ -305,6 +357,9 @@ app.get("/technologies", async (c) => {
     if (!user) return c.json(unauthorized(), 401);
     const db = getApiDb();
     const search = (c.req.query("search") ?? "").trim();
+    if (search.length > 255) {
+      return c.json({ error: "search must be at most 255 characters" }, 400);
+    }
     const rows = await db
       .select()
       .from(technologies)
@@ -341,7 +396,11 @@ app.post("/technologies", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const data = (await c.req.json()) as TechnologyInput;
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, createTechnologySchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data;
     const db = getApiDb();
     const [row] = await db
       .insert(technologies)
@@ -362,7 +421,13 @@ app.put("/technologies/:id", async (c) => {
     if (!user) return c.json(unauthorized(), 401);
     const id = c.req.param("id");
     assertUuid(id, "technology");
-    const data = (await c.req.json()) as TechnologyInput;
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, updateTechnologySchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    // updateTechnologySchema is partial (name optional); technologyValues
+    // still enforces "Name is required" at runtime, as before.
+    const data = v.data as TechnologyInput;
     const db = getApiDb();
     // Note: the technologies table has no updated_at column (unlike
     // platforms/clients), so — like the source — no timestamp is set here.
@@ -443,6 +508,9 @@ app.get("/clients", async (c) => {
     if (!user) return c.json(unauthorized(), 401);
     const db = getApiDb();
     const search = (c.req.query("search") ?? "").trim();
+    if (search.length > 255) {
+      return c.json({ error: "search must be at most 255 characters" }, 400);
+    }
     const rows = await db
       .select()
       .from(clients)
@@ -479,7 +547,11 @@ app.post("/clients", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const data = (await c.req.json()) as ClientInput;
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, createClientSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data;
     const db = getApiDb();
     const [row] = await db
       .insert(clients)
@@ -500,7 +572,11 @@ app.put("/clients/:id", async (c) => {
     if (!user) return c.json(unauthorized(), 401);
     const id = c.req.param("id");
     assertUuid(id, "client");
-    const data = (await c.req.json()) as ClientInput;
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, updateClientSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data;
     const db = getApiDb();
     const [row] = await db
       .update(clients)

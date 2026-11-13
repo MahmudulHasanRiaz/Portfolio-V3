@@ -40,6 +40,8 @@
 //   effects are NOT wired here (cutover), matching the other routers.
 import { Hono } from "hono";
 import { and, asc, count, desc, eq, ilike, sql } from "drizzle-orm";
+import { z } from "zod";
+import { uuidSchema } from "@repo/validation";
 import {
   leadActivities,
   timelineEvents,
@@ -49,6 +51,14 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import {
+  invalidParam,
+  isRecord,
+  parsePagination,
+  readJsonBody,
+  uuidParam,
+  validateBody,
+} from "../../lib/validate";
 
 type Env = {
   Bindings: {
@@ -933,6 +943,80 @@ async function dispatchTrigger(
   return { triggered: workflowList.length, runIds };
 }
 
+// Local schemas — no workflow schemas exist in @repo/validation.
+// Trigger/action enums are the resolved lists from the DB schema and
+// the action registry below (AVAILABLE_TRIGGERS / actionRegistry).
+// Per-type action `config` shapes are NOT validated (plain record) —
+// that is a known limitation: a mistyped config only fails at run
+// execution, not at workflow creation.
+const workflowTriggerTypeSchema = z.enum([
+  "lead_created",
+  "lead_status_changed",
+  "form_submitted",
+  "content_published",
+  "venture_published",
+  "release_published",
+  "proposal_accepted",
+  "invoice_paid",
+  "payment_received",
+  "portal_message_received",
+]);
+const workflowActionTypeSchema = z.enum([
+  "create_task",
+  "create_timeline_event",
+  "create_crm_activity",
+  "send_notification",
+  "assign_user",
+  "update_status",
+  "create_follow_up",
+  "trigger_webhook",
+]);
+const workflowActionSchema = z.object({
+  type: workflowActionTypeSchema,
+  config: z.record(z.string(), z.unknown()),
+  order: z.number().int(),
+});
+const createWorkflowSchema = z.object({
+  name: z.string().min(1).max(255),
+  triggerType: workflowTriggerTypeSchema,
+  triggerConfig: z.record(z.string(), z.unknown()).optional(),
+  actions: z.array(workflowActionSchema).optional().default([]),
+  isActive: z.boolean().optional(),
+  maxRetries: z.number().int().min(0).max(10).optional(),
+});
+const updateWorkflowSchema = createWorkflowSchema.partial();
+const triggerTestSchema = z.object({
+  triggerType: workflowTriggerTypeSchema,
+  entityId: uuidSchema.optional(),
+  payload: z.record(z.string(), z.unknown()).optional(),
+});
+// Verified against the workflowRunStatus pgEnum
+// (packages/database/src/schema/enums.ts): pending|running|completed|
+// failed|partially_failed.
+const workflowRunStatusSchema = z.enum([
+  "pending",
+  "running",
+  "completed",
+  "failed",
+  "partially_failed",
+]);
+
+/** Validated data restricted to keys the client actually sent. Needed
+ *  for PATCH: updateWorkflowSchema is createWorkflowSchema.partial()
+ *  and `actions` carries a .default([]), which Zod fires even when
+ *  the client sent nothing — without this filter every PATCH would
+ *  silently wipe the workflow's actions. */
+function sentFields(
+  data: Record<string, unknown>,
+  body: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (key in body) out[key] = value;
+  }
+  return out;
+}
+
 const AVAILABLE_TRIGGERS = [
   "lead_created",
   "lead_status_changed",
@@ -958,8 +1042,23 @@ app.get("/", async (c) => {
     const triggerType = c.req.query("triggerType") || undefined;
     const isActiveParam = c.req.query("isActive");
     const search = c.req.query("search") || undefined;
-    const page = parseInt(c.req.query("page") ?? "1", 10);
-    const pageSize = parseInt(c.req.query("pageSize") ?? "20", 10);
+    if (
+      triggerType !== undefined &&
+      !workflowTriggerTypeSchema.safeParse(triggerType).success
+    ) {
+      return c.json({ error: "Invalid triggerType" }, 400);
+    }
+    if (
+      isActiveParam !== undefined &&
+      isActiveParam !== "true" &&
+      isActiveParam !== "false"
+    ) {
+      return c.json({ error: "Invalid isActive" }, 400);
+    }
+    if (search !== undefined && search.length > 255) {
+      return c.json({ error: "search must be at most 255 characters" }, 400);
+    }
+    const { page, pageSize } = parsePagination(c);
 
     const result = await listWorkflows(getApiDb(), {
       triggerType,
@@ -982,14 +1081,20 @@ app.post("/", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
+    const v = validateBody(body, createWorkflowSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data;
     const workflow = await createWorkflow(getApiDb(), {
-      name: body.name as string,
-      triggerType: body.triggerType as string,
-      triggerConfig: (body.triggerConfig as Record<string, unknown>) || {},
-      actions: (body.actions as ActionDefinition[]) || [],
-      isActive: body.isActive as boolean | undefined,
-      maxRetries: body.maxRetries as number | undefined,
+      name: data.name,
+      triggerType: data.triggerType,
+      triggerConfig: data.triggerConfig || {},
+      actions: (data.actions as ActionDefinition[]) || [],
+      isActive: data.isActive,
+      maxRetries: data.maxRetries,
       createdBy: user.id,
     });
     return c.json(workflow, 201);
@@ -1022,8 +1127,19 @@ app.get("/runs", async (c) => {
     if (!user) return c.json({ error: "Unauthorized" }, 401);
     const status = c.req.query("status") || undefined;
     const workflowId = c.req.query("workflowId") || undefined;
-    const page = parseInt(c.req.query("page") ?? "1", 10);
-    const pageSize = parseInt(c.req.query("pageSize") ?? "20", 10);
+    if (
+      status !== undefined &&
+      !workflowRunStatusSchema.safeParse(status).success
+    ) {
+      return c.json({ error: "Invalid status" }, 400);
+    }
+    if (
+      workflowId !== undefined &&
+      !uuidSchema.safeParse(workflowId).success
+    ) {
+      return c.json({ error: "Invalid uuid" }, 400);
+    }
+    const { page, pageSize } = parsePagination(c);
 
     const result = await listRuns(getApiDb(), {
       status,
@@ -1043,7 +1159,8 @@ app.get("/runs/:id", async (c) => {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
     const db = getApiDb();
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const run = await getRun(db, id);
 
     if (!run) return c.json({ error: "Run not found" }, 404);
@@ -1064,7 +1181,8 @@ app.post("/runs/:id/retry", async (c) => {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
     const db = getApiDb();
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const run = await getRun(db, id);
 
     if (!run) return c.json({ error: "Run not found" }, 404);
@@ -1096,20 +1214,17 @@ app.post("/trigger-test", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json()) as {
-      triggerType?: string;
-      entityId?: string;
-      payload?: Record<string, unknown>;
-    };
-
-    if (!body.triggerType) {
-      return c.json({ error: "triggerType is required" }, 400);
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
     }
+    const v = validateBody(body, triggerTestSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
 
     const result = await dispatchTrigger(getApiDb(), {
-      triggerType: body.triggerType,
-      entityId: body.entityId || undefined,
-      payload: body.payload || {},
+      triggerType: v.data.triggerType,
+      entityId: v.data.entityId || undefined,
+      payload: v.data.payload || {},
     });
 
     return c.json({
@@ -1127,7 +1242,9 @@ app.get("/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const workflow = await getWorkflow(getApiDb(), c.req.param("id"));
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const workflow = await getWorkflow(getApiDb(), id);
 
     if (!workflow) return c.json({ error: "Workflow not found" }, 404);
 
@@ -1142,30 +1259,22 @@ app.patch("/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
-    const data: {
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const v = validateBody(body, updateWorkflowSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = sentFields(v.data, body) as {
       name?: string;
       triggerType?: string;
       triggerConfig?: Record<string, unknown>;
       actions?: ActionDefinition[];
       isActive?: boolean;
       maxRetries?: number;
-    } = {};
-    if (body.name !== undefined) data.name = body.name as string;
-    if (body.triggerType !== undefined) {
-      data.triggerType = body.triggerType as string;
-    }
-    if (body.triggerConfig !== undefined) {
-      data.triggerConfig = body.triggerConfig as Record<string, unknown>;
-    }
-    if (body.actions !== undefined) {
-      data.actions = body.actions as ActionDefinition[];
-    }
-    if (body.isActive !== undefined) data.isActive = body.isActive as boolean;
-    if (body.maxRetries !== undefined) {
-      data.maxRetries = body.maxRetries as number;
-    }
+    };
 
     const updated = await updateWorkflow(getApiDb(), id, data);
 
@@ -1182,7 +1291,9 @@ app.delete("/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const deleted = await deleteWorkflow(getApiDb(), c.req.param("id"));
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const deleted = await deleteWorkflow(getApiDb(), id);
 
     if (!deleted) return c.json({ error: "Workflow not found" }, 404);
 

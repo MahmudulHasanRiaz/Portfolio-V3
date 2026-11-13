@@ -1,21 +1,45 @@
-import { auth } from "@repo/auth/server";
-import { headers } from "next/headers";
+import { honoFetch } from "@/lib/hono-client";
 
-// Server-side session check (Hono cutover: NO code change needed).
+// Server-side session check — validated through Hono, NOT the local
+// Better Auth instance.
 //
-// This validates the Better Auth session cookie against the shared
-// `ba_session` table in Neon — session tokens are random strings stored
-// in that table, so the lookup does not depend on which worker issued
-// the cookie. The Hono worker's Better Auth handler (/api/auth/*, now
-// reached via the next.config.mjs rewrite) reads and writes the SAME
-// table, so a session created by Hono validates here and vice versa.
-// Both workers must keep the same DATABASE_URL and BETTER_AUTH_SECRET;
-// do NOT regenerate the secret. See apps/api/src/auth.ts.
-export async function getServerSession() {
+// WHY: the admin's local Better Auth instance (@repo/auth) reads the
+// `ba_session` table through postgres.js (raw TCP), which CANNOT run
+// on the Cloudflare Workers edge runtime. So the old implementation
+// (`auth.api.getSession(...)`) always threw here, this function always
+// returned null, and every server action that gates on the session
+// (listContent, getContentById, …) threw "Authentication required" —
+// which surfaced in the browser as the blog/projects pages crashing
+// with "Minified React error #441" (a Server Components render
+// failure). Hono's /api/auth/get-session reads the SAME ba_session
+// table through the Neon HTTP driver (Workers-safe) and returns the
+// same shape ({ session, user } or null), so this is a drop-in
+// replacement. Hono's requireAuth on every admin endpoint still
+// enforces auth for the actual data calls; this check is only the
+// local gate the actions already had.
+export type ServerSession = {
+  session: {
+    id: string;
+    userId: string;
+    token: string;
+    expiresAt: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    emailVerified: boolean;
+    image: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+} | null;
+
+export async function getServerSession(): Promise<ServerSession> {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
+    const session = await honoFetch<ServerSession>("/api/auth/get-session");
     return session;
   } catch {
     return null;

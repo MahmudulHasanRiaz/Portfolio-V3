@@ -107,6 +107,31 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import { z } from "zod";
+import {
+  createMediaFolderSchema,
+  updateMediaAssetSchema,
+  updateMediaFolderSchema,
+  uuidSchema,
+} from "@repo/validation";
+import {
+  invalidParam,
+  isRecord,
+  parsePagination,
+  readJsonBody,
+  uuidParam,
+  validateBody,
+} from "../../lib/validate";
+
+// Local schema for the POST /upload multipart form fields. The file
+// itself keeps the existing validateFile MIME/extension/size checks
+// exactly as-is (no magic-byte verification — see the header TODO);
+// only the text fields are Zod-validated here.
+const uploadFormSchema = z.object({
+  folder: z.string().max(255).optional(),
+  folderId: uuidSchema.optional(),
+  altText: z.string().max(500).optional(),
+});
 
 type Env = {
   Bindings: {
@@ -790,45 +815,79 @@ app.get("/", async (c) => {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
     const db = getApiDb();
-    const q = c.req.query();
-    const page = Number(q.page) || 1;
-    const pageSize = Number(q.pageSize) || 50;
+    const { page, pageSize } = parsePagination(c, { defaultPageSize: 50 });
     const offset = (page - 1) * pageSize;
-    const sortDir = (q.sortDir as "asc" | "desc") || "desc";
+    const sortDirRaw = c.req.query("sortDir");
+    if (
+      sortDirRaw !== undefined &&
+      sortDirRaw !== "asc" &&
+      sortDirRaw !== "desc"
+    ) {
+      return c.json({ error: 'sortDir must be "asc" or "desc"' }, 400);
+    }
+    const sortDir = (sortDirRaw as "asc" | "desc") || "desc";
+    const folderIdRaw = c.req.query("folderId");
+    if (
+      folderIdRaw !== undefined &&
+      !uuidSchema.safeParse(folderIdRaw).success
+    ) {
+      return c.json({ error: "folderId must be a UUID" }, 400);
+    }
+    const uploadedByRaw = c.req.query("uploadedBy");
+    if (
+      uploadedByRaw !== undefined &&
+      !uuidSchema.safeParse(uploadedByRaw).success
+    ) {
+      return c.json({ error: "uploadedBy must be a UUID" }, 400);
+    }
+    const typeRaw = c.req.query("type");
+    if (typeRaw !== undefined && typeRaw.length > 50) {
+      return c.json({ error: "type must be at most 50 characters" }, 400);
+    }
+    const queryRaw = c.req.query("query");
+    if (queryRaw !== undefined && queryRaw.length > 255) {
+      return c.json({ error: "query must be at most 255 characters" }, 400);
+    }
+    for (const flag of ["includeDeleted", "attached", "includeUsage"] as const) {
+      const raw = c.req.query(flag);
+      if (raw !== undefined && raw !== "true" && raw !== "false") {
+        return c.json({ error: `${flag} must be "true" or "false"` }, 400);
+      }
+    }
     const attached =
-      q.attached === "true"
+      c.req.query("attached") === "true"
         ? true
-        : q.attached === "false"
+        : c.req.query("attached") === "false"
           ? false
           : undefined;
-    const includeUsage = q.includeUsage === "true";
+    const includeUsage = c.req.query("includeUsage") === "true";
 
     const conditions: any[] = [];
-    if (q.includeDeleted !== "true") {
+    if (c.req.query("includeDeleted") !== "true") {
       conditions.push(isNull(mediaAssets.deletedAt));
     }
-    if (q.folderId) {
-      conditions.push(eq(mediaAssets.folderId, q.folderId));
+    if (folderIdRaw) {
+      conditions.push(eq(mediaAssets.folderId, folderIdRaw));
     }
-    if (q.type) {
+    if (typeRaw) {
       // The UI sends a prefix ("image/", "video/") for categories — an
       // exact match on "image/" would never match "image/jpeg".
       conditions.push(
-        q.type.endsWith("/")
-          ? ilike(mediaAssets.type, `${q.type}%`)
-          : eq(mediaAssets.type, q.type),
+        typeRaw.endsWith("/")
+          ? ilike(mediaAssets.type, `${typeRaw}%`)
+          : eq(mediaAssets.type, typeRaw),
       );
     }
-    if (q.uploadedBy) {
-      conditions.push(eq(mediaAssets.uploadedBy, q.uploadedBy));
+    if (uploadedByRaw) {
+      conditions.push(eq(mediaAssets.uploadedBy, uploadedByRaw));
     }
-    if (q.query) {
+    if (queryRaw) {
       conditions.push(
         or(
-          ilike(mediaAssets.originalName, `%${q.query}%`),
-          ilike(mediaAssets.altText, `%${q.query}%`),
-          ilike(mediaAssets.filename, `%${q.query}%`),
-          ilike(mediaAssets.slug, `%${q.query}%`),
+          ilike(mediaAssets.originalName, `%${queryRaw}%`),
+          ilike(mediaAssets.altText, `%${queryRaw}%`),
+          ilike(mediaAssets.filename, `%${queryRaw}%`),
+          ilike(mediaAssets.slug, `%${queryRaw}%`),
         ),
       );
     }
@@ -845,7 +904,8 @@ app.get("/", async (c) => {
       size: mediaAssets.size,
       type: mediaAssets.type,
     };
-    const sortColumn = sortColumnMap[q.sortBy || ""] || mediaAssets.createdAt;
+    const sortColumn =
+      sortColumnMap[c.req.query("sortBy") || ""] || mediaAssets.createdAt;
     const orderBy = sortDir === "asc" ? asc(sortColumn) : desc(sortColumn);
 
     // Attachment filter / usage enrichment needs the real attachment
@@ -947,13 +1007,21 @@ app.post("/folders", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json()) as Record<string, unknown>;
-    if (!body.name || typeof body.name !== "string") {
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    // Reuse the shared folder schema for name + parentId; `path` is
+    // server-computed below, so it is picked out of the schema.
+    const v = validateBody(
+      body,
+      createMediaFolderSchema.pick({ name: true, parentId: true }),
+    );
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data;
+    if (!data.name) {
       return c.json({ error: "Folder name is required" }, 400);
     }
     const db = getApiDb();
-    const parentId =
-      typeof body.parentId === "string" ? body.parentId : undefined;
+    const parentId = data.parentId;
     let folderPath = R2_FOLDERS.base;
     if (parentId) {
       const [parent] = await db
@@ -962,15 +1030,15 @@ app.post("/folders", async (c) => {
         .where(eq(mediaFolders.id, parentId))
         .limit(1);
       if (parent) {
-        folderPath = `${parent.path}/${body.name}`;
+        folderPath = `${parent.path}/${data.name}`;
       }
     } else {
-      folderPath = `${R2_FOLDERS.base}/${body.name}`;
+      folderPath = `${R2_FOLDERS.base}/${data.name}`;
     }
     const [created] = await db
       .insert(mediaFolders)
       .values({
-        name: body.name,
+        name: data.name,
         parentId: parentId || null,
         path: folderPath,
       })
@@ -1004,13 +1072,15 @@ app.get("/folders/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const [folder] = await db
       .select()
       .from(mediaFolders)
-      .where(eq(mediaFolders.id, c.req.param("id")))
+      .where(eq(mediaFolders.id, id))
       .limit(1);
-    if (!folder) throw new NotFoundError("MediaFolder", c.req.param("id"));
+    if (!folder) throw new NotFoundError("MediaFolder", id);
     return c.json({ success: true, data: folder });
   } catch (err) {
     if (err instanceof NotFoundError) {
@@ -1027,9 +1097,16 @@ async function renameFolderHandler(c: Context<Env>) {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id") ?? "";
-    const body = (await c.req.json()) as Record<string, unknown>;
-    if (!body.name || typeof body.name !== "string") {
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, updateMediaFolderSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    // Server-managed fields in the partial schema (id, createdAt) are
+    // never read below, so they cannot be written.
+    const data = v.data;
+    if (!data.name) {
       return c.json({ error: "Folder name is required" }, 400);
     }
     const db = getApiDb();
@@ -1050,10 +1127,10 @@ async function renameFolderHandler(c: Context<Env>) {
         )[0]?.path
       : null;
     const basePath = parentPath || R2_FOLDERS.base;
-    const newPath = `${basePath}/${body.name}`;
+    const newPath = `${basePath}/${data.name}`;
     await db
       .update(mediaFolders)
-      .set({ name: body.name, path: newPath })
+      .set({ name: data.name, path: newPath })
       .where(eq(mediaFolders.id, id));
     return c.json({ success: true });
   } catch (err) {
@@ -1076,7 +1153,8 @@ app.delete("/folders/:id", async (c) => {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
     const db = getApiDb();
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const children = await db
       .select()
       .from(mediaFolders)
@@ -1141,6 +1219,22 @@ app.post("/upload", async (c) => {
     const folderId = (formData.get("folderId") as string | null) || undefined;
     const altText = (formData.get("altText") as string | null) || undefined;
 
+    // Zod-validate the text form fields only. The file itself keeps
+    // the existing validateFile MIME/extension/size checks exactly
+    // as-is (no magic-byte verification — see the header TODO).
+    const fields = validateBody(
+      {
+        ...(folder !== undefined ? { folder } : {}),
+        ...(folderId !== undefined ? { folderId } : {}),
+        ...(altText !== undefined ? { altText } : {}),
+      },
+      uploadFormSchema,
+    );
+    if ("error" in fields) return c.json({ error: fields.error }, 400);
+    const validatedFolder = fields.data.folder;
+    const validatedFolderId = fields.data.folderId;
+    const validatedAltText = fields.data.altText;
+
     const validation = validateFile(file.name, file.type, bytes.length);
     if (!validation.valid) {
       throw new ValidationError("File validation failed", {
@@ -1152,7 +1246,7 @@ app.post("/upload", async (c) => {
     // but is never called on the upload path — verify the stored MIME
     // against the file bytes before cutover if that hardening is wanted.
     const sanitized = sanitizeFilename(file.name);
-    const key = buildKey(folder || R2_FOLDERS.images, sanitized);
+    const key = buildKey(validatedFolder || R2_FOLDERS.images, sanitized);
     const s3 = ensureR2(c);
     try {
       await s3.send(
@@ -1186,9 +1280,9 @@ app.post("/upload", async (c) => {
         size: bytes.length,
         width: null,
         height: null,
-        altText: altText || null,
+        altText: validatedAltText || null,
         slug,
-        folderId: folderId || null,
+        folderId: validatedFolderId || null,
         variants: null,
         uploadedBy: internalUser.id,
       })
@@ -1246,8 +1340,10 @@ app.get("/usage/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
-    const usage = await findUsage(db, c, c.req.param("id"));
+    const usage = await findUsage(db, c, id);
     return c.json({ success: true, data: usage });
   } catch (err) {
     if (err instanceof NotFoundError) {
@@ -1274,8 +1370,10 @@ app.get("/:id/download", async (c) => {
       "admin",
       "super_admin",
     );
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
-    const asset = await getAssetById(db, c, c.req.param("id"));
+    const asset = await getAssetById(db, c, id);
     if (!asset.path) {
       return c.json({ error: "File not found" }, 404);
     }
@@ -1343,7 +1441,8 @@ app.post("/:id/restore", async (c) => {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
     const db = getApiDb();
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     await db
       .update(mediaAssets)
       .set({ deletedAt: null })
@@ -1365,8 +1464,10 @@ app.get("/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
-    const asset = await getAssetById(db, c, c.req.param("id"));
+    const asset = await getAssetById(db, c, id);
     return c.json({ success: true, data: asset });
   } catch (err) {
     if (err instanceof NotFoundError) {
@@ -1383,23 +1484,34 @@ async function updateAssetHandler(c: Context<Env>) {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id") ?? "";
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    // Reuse the shared update schema. Two extensions: folderId may be
+    // null (clear the folder — the base schema only allows a UUID) and
+    // `slug` is accepted (it is not in the shared schema, but
+    // updateMetadata validates its format + uniqueness itself).
+    // Server-managed fields in the partial schema (id, uploadedBy,
+    // createdAt, deletedAt) are never passed to updateMetadata below.
+    const v = validateBody(
+      body,
+      updateMediaAssetSchema.extend({
+        folderId: uuidSchema.nullable().optional(),
+        slug: z.string().optional(),
+      }),
+    );
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data;
     const db = getApiDb();
     await updateMetadata(db, c, id, {
-      altText:
-        typeof body.altText === "string" ? body.altText : undefined,
-      folderId:
-        typeof body.folderId === "string" || body.folderId === null
-          ? (body.folderId as string | null)
-          : undefined,
-      originalName:
-        typeof body.originalName === "string" ? body.originalName : undefined,
+      altText: data.altText,
+      folderId: data.folderId,
+      originalName: data.originalName,
       // `filename` is accepted as a display-name alias; the stored R2 key
       // never changes (content rows reference the public URL).
-      filename:
-        typeof body.filename === "string" ? body.filename : undefined,
-      slug: typeof body.slug === "string" ? body.slug : undefined,
+      filename: data.filename,
+      slug: data.slug,
     });
     const updated = await getAssetById(db, c, id);
     return c.json({ success: true, data: updated });
@@ -1426,7 +1538,9 @@ app.delete("/:id", async (c) => {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
     const db = getApiDb();
-    await deleteAsset(c, db, c.req.param("id"));
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    await deleteAsset(c, db, id);
     return c.json({ success: true });
   } catch (err) {
     if (err instanceof NotFoundError) {

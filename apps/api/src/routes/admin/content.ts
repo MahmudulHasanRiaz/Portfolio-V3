@@ -32,6 +32,25 @@
 // list/create/update/delete FAQ, and list/create/update/delete
 // TimelineEvent. Those belong in their own routers.
 import { Hono } from "hono";
+import { z } from "zod";
+import {
+  createCaseStudySchema,
+  createCategorySchema,
+  createPageSchema,
+  createPostSchema,
+  createProjectSchema,
+  createServiceSchema,
+  createTagSchema,
+  entityStatusSchema,
+  updateCaseStudySchema,
+  updateCategorySchema,
+  updatePageSchema,
+  updatePostSchema,
+  updateProjectSchema,
+  updateServiceSchema,
+  updateTagSchema,
+  uuidSchema,
+} from "@repo/validation";
 import { and, asc, count, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import {
   caseStudies,
@@ -47,6 +66,14 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import {
+  invalidParam,
+  isRecord,
+  parsePagination,
+  readJsonBody,
+  uuidParam,
+  validateBody,
+} from "../../lib/validate";
 import { cacheTagsForContentType, deleteSearchEntity, dispatchTrigger, indexSearchEntity, purgePublicCache, searchEntityTypeForContentType, waitUntilOf } from "../../lib/side-effects";
 
 type Env = {
@@ -272,6 +299,58 @@ function validateTransition(
   }
 }
 
+// ─── Validation ──────────────────────────────────────────────────────────────
+// Per-type create/update schemas from @repo/validation. The create schemas
+// leave `slug` optional, but the route requires it for pages/projects/
+// services — that check stays inline in POST (see below).
+const CREATE_SCHEMAS: Record<string, z.ZodType<any>> = {
+  pages: createPageSchema,
+  posts: createPostSchema,
+  services: createServiceSchema,
+  projects: createProjectSchema,
+  case_studies: createCaseStudySchema,
+};
+const UPDATE_SCHEMAS: Record<string, z.ZodType<any>> = {
+  pages: updatePageSchema,
+  posts: updatePostSchema,
+  services: updateServiceSchema,
+  projects: updateProjectSchema,
+  case_studies: updateCaseStudySchema,
+};
+
+// Local: transition actions (the workflow map above is the source of truth).
+const transitionSchema = z.object({
+  action: z.enum([
+    "publish",
+    "unpublish",
+    "draft",
+    "archive",
+    "restore",
+    "submit",
+    "approve",
+    "schedule",
+  ]),
+});
+
+// Posts use the 5-value workflow status; every other type uses the
+// 3-value entity status.
+const POST_STATUS_SCHEMA = z.enum([
+  "draft",
+  "review",
+  "scheduled",
+  "published",
+  "archived",
+]);
+
+/** Server-managed fields are never client-settable: drop them from
+ *  validated data before any DB write. */
+function stripServerManaged(data: Record<string, unknown>): void {
+  delete data.id;
+  delete data.createdBy;
+  delete data.createdAt;
+  delete data.updatedAt;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function errorMessage(err: unknown): string {
@@ -361,23 +440,28 @@ app.post("/categories", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json()) as Record<string, unknown>;
-    if (typeof body.name !== "string" || body.name.trim() === "") {
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, createCategorySchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data as Record<string, unknown>;
+    stripServerManaged(data);
+    if (typeof data.name !== "string" || data.name.trim() === "") {
       return c.json({ error: "name is required" }, 400);
     }
     const db = getApiDb();
     const slug =
-      typeof body.slug === "string" && body.slug !== ""
-        ? body.slug
-        : slugify(body.name);
+      typeof data.slug === "string" && data.slug !== ""
+        ? data.slug
+        : slugify(data.name);
     const [row] = await db
       .insert(categories)
       .values({
-        name: body.name,
+        name: data.name,
         slug,
         description:
-          typeof body.description === "string" ? body.description : null,
-        type: typeof body.type === "string" ? body.type : null,
+          typeof data.description === "string" ? data.description : null,
+        type: typeof data.type === "string" ? data.type : null,
       })
       .returning();
     return c.json(row, 201);
@@ -390,12 +474,19 @@ app.put("/categories/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, updateCategorySchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = { ...(v.data as Record<string, unknown>) };
+    stripServerManaged(data);
     const db = getApiDb();
     const [row] = await db
       .update(categories)
-      .set(pickFields(body, ["name", "slug", "description", "type"]))
-      .where(eq(categories.id, c.req.param("id")))
+      .set(pickFields(data, ["name", "slug", "description", "type"]))
+      .where(eq(categories.id, id))
       .returning();
     if (!row) throw new Error("Category not found");
     return c.json(row);
@@ -408,8 +499,10 @@ app.delete("/categories/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
-    await db.delete(categories).where(eq(categories.id, c.req.param("id")));
+    await db.delete(categories).where(eq(categories.id, id));
     return c.json({ ok: true });
   } catch (err) {
     return c.json({ error: errorMessage(err) }, 500);
@@ -434,18 +527,23 @@ app.post("/tags", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json()) as Record<string, unknown>;
-    if (typeof body.name !== "string" || body.name.trim() === "") {
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, createTagSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data as Record<string, unknown>;
+    stripServerManaged(data);
+    if (typeof data.name !== "string" || data.name.trim() === "") {
       return c.json({ error: "name is required" }, 400);
     }
     const db = getApiDb();
     const slug =
-      typeof body.slug === "string" && body.slug !== ""
-        ? body.slug
-        : slugify(body.name);
+      typeof data.slug === "string" && data.slug !== ""
+        ? data.slug
+        : slugify(data.name);
     const [row] = await db
       .insert(tags)
-      .values({ name: body.name, slug })
+      .values({ name: data.name, slug })
       .returning();
     return c.json(row, 201);
   } catch (err) {
@@ -457,12 +555,19 @@ app.put("/tags/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, updateTagSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = { ...(v.data as Record<string, unknown>) };
+    stripServerManaged(data);
     const db = getApiDb();
     const [row] = await db
       .update(tags)
-      .set(pickFields(body, ["name", "slug"]))
-      .where(eq(tags.id, c.req.param("id")))
+      .set(pickFields(data, ["name", "slug"]))
+      .where(eq(tags.id, id))
       .returning();
     if (!row) throw new Error("Tag not found");
     return c.json(row);
@@ -475,8 +580,10 @@ app.delete("/tags/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
-    await db.delete(tags).where(eq(tags.id, c.req.param("id")));
+    await db.delete(tags).where(eq(tags.id, id));
     return c.json({ ok: true });
   } catch (err) {
     return c.json({ error: errorMessage(err) }, 500);
@@ -496,51 +603,82 @@ app.get("/:type", async (c) => {
     const def = CONTENT_TYPES[type];
     if (!def) return c.json({ error: "Unknown content type" }, 404);
     const db = getApiDb();
-    const q = c.req.query();
-    const page = Number(q.page) || 1;
-    const pageSize = Number(q.pageSize) || 20;
+    const { page, pageSize } = parsePagination(c);
+    const status = c.req.query("status") ?? undefined;
+    const search = c.req.query("search") ?? undefined;
+    const authorId = c.req.query("authorId") ?? undefined;
+    const categoryId = c.req.query("categoryId") ?? undefined;
+    const tagId = c.req.query("tagId") ?? undefined;
+    const sortField = c.req.query("sortField") ?? undefined;
+    const sortDir = c.req.query("sortDir") ?? undefined;
+    if (status !== undefined) {
+      const statusSchema =
+        type === "posts" ? POST_STATUS_SCHEMA : entityStatusSchema;
+      if (!statusSchema.safeParse(status).success) {
+        return c.json({ error: "Invalid status" }, 400);
+      }
+    }
+    if (search !== undefined && search.length > 255) {
+      return c.json({ error: "search must be at most 255 characters" }, 400);
+    }
+    for (const [label, value] of [
+      ["authorId", authorId],
+      ["categoryId", categoryId],
+      ["tagId", tagId],
+    ] as const) {
+      if (value !== undefined && !uuidSchema.safeParse(value).success) {
+        return c.json({ error: `Invalid ${label}` }, 400);
+      }
+    }
+    if (
+      sortDir !== undefined &&
+      sortDir !== "asc" &&
+      sortDir !== "desc"
+    ) {
+      return c.json({ error: "Invalid sortDir" }, 400);
+    }
 
     const conditions: any[] = [];
 
-    if (q.status) {
-      conditions.push(eq(def.table.status, q.status));
+    if (status) {
+      conditions.push(eq(def.table.status, status));
     }
 
-    if (q.search && def.searchFields.length > 0) {
+    if (search && def.searchFields.length > 0) {
       conditions.push(
         or(
           ...def.searchFields.map((f) =>
-            ilike(def.table[f], `%${q.search}%`),
+            ilike(def.table[f], `%${search}%`),
           ),
         ),
       );
     }
 
-    if (q.authorId) {
-      conditions.push(eq(def.table.createdBy, q.authorId));
+    if (authorId) {
+      conditions.push(eq(def.table.createdBy, authorId));
     }
 
     // Only posts has category/tag junction tables.
-    if (q.categoryId && type === "posts") {
+    if (categoryId && type === "posts") {
       conditions.push(
         inArray(
           posts.id,
           db
             .select({ id: postCategories.postId })
             .from(postCategories)
-            .where(eq(postCategories.categoryId, q.categoryId)),
+            .where(eq(postCategories.categoryId, categoryId)),
         ),
       );
     }
 
-    if (q.tagId && type === "posts") {
+    if (tagId && type === "posts") {
       conditions.push(
         inArray(
           posts.id,
           db
             .select({ id: postTags.postId })
             .from(postTags)
-            .where(eq(postTags.tagId, q.tagId)),
+            .where(eq(postTags.tagId, tagId)),
         ),
       );
     }
@@ -553,8 +691,8 @@ app.get("/:type", async (c) => {
       .where(where);
     const total = Number(countResult?.count ?? 0);
 
-    const orderField = q.sortField || "createdAt";
-    const orderDir = q.sortDir || "desc";
+    const orderField = sortField || "createdAt";
+    const orderDir = sortDir || "desc";
     const orderCol = def.table[orderField];
     const orderBy = orderCol
       ? orderDir === "desc"
@@ -595,8 +733,10 @@ app.get("/:type/:id", async (c) => {
     if (!user) return c.json({ error: "Unauthorized" }, 401);
     const def = CONTENT_TYPES[c.req.param("type")];
     if (!def) return c.json({ error: "Unknown content type" }, 404);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
-    const row = await getContentRow(db, def, c.req.param("id"));
+    const row = await getContentRow(db, def, id);
     if (!row) return c.json({ error: "Not found" }, 404);
     return c.json(row);
   } catch (err) {
@@ -612,19 +752,26 @@ app.post("/:type", async (c) => {
     const type = c.req.param("type");
     const def = CONTENT_TYPES[type];
     if (!def) return c.json({ error: "Unknown content type" }, 404);
-    const body = (await c.req.json()) as Record<string, unknown>;
-    const data = pickFields(body, def.allowedFields);
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const createSchema = CREATE_SCHEMAS[type];
+    if (!createSchema) return c.json({ error: "Unknown content type" }, 404);
+    const v = validateBody(body, createSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = { ...(v.data as Record<string, unknown>) };
+    stripServerManaged(data);
+    const fields = pickFields(data, def.allowedFields);
     // slug is DB NOT NULL for pages/projects/services; the original
     // service let the DB throw here — fail fast with a clear 400 instead.
-    if (def.slugRequired && (typeof data.slug !== "string" || data.slug === "")) {
+    if (def.slugRequired && (typeof fields.slug !== "string" || fields.slug === "")) {
       return c.json({ error: "slug is required" }, 400);
     }
     const db = getApiDb();
     const [row] = (await db
       .insert(def.table)
       .values({
-        ...data,
-        status: data.status || "draft",
+        ...fields,
+        status: fields.status || "draft",
         createdBy: user.id,
       })
       .returning()) as unknown as Record<string, unknown>[];
@@ -645,6 +792,10 @@ app.post("/:type", async (c) => {
 });
 
 // PUT /:type/:id — update (ContentService.update)
+// NOTE (follow-up decision, left as-is): PUT still allows a direct
+// `status` change, bypassing the transition endpoint / workflow. The
+// update schemas validate `status` against the type's status enum, but
+// no workflow check is applied here.
 app.put("/:type/:id", async (c) => {
   try {
     const user = await requireAuth(c);
@@ -652,8 +803,16 @@ app.put("/:type/:id", async (c) => {
     const type = c.req.param("type");
     const def = CONTENT_TYPES[type];
     if (!def) return c.json({ error: "Unknown content type" }, 404);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const updateSchema = UPDATE_SCHEMAS[type];
+    if (!updateSchema) return c.json({ error: "Unknown content type" }, 404);
+    const v = validateBody(body, updateSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = { ...(v.data as Record<string, unknown>) };
+    stripServerManaged(data);
     const db = getApiDb();
     const existing = await getContentRow(db, def, id);
     if (existing) {
@@ -661,7 +820,7 @@ app.put("/:type/:id", async (c) => {
     }
     const [row] = await db
       .update(def.table)
-      .set({ ...pickFields(body, def.allowedFields), updatedAt: new Date() })
+      .set({ ...pickFields(data, def.allowedFields), updatedAt: new Date() })
       .where(eq(def.table.id, id))
       .returning();
     if (!row) throw new Error(`Content not found: ${id}`);
@@ -692,7 +851,8 @@ app.delete("/:type/:id", async (c) => {
     const type = c.req.param("type");
     const def = CONTENT_TYPES[type];
     if (!def) return c.json({ error: "Unknown content type" }, 404);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const existing = await getContentRow(db, def, id);
     if (!existing) throw new Error(`Content not found: ${id}`);
@@ -723,9 +883,13 @@ app.post("/:type/:id/transition", async (c) => {
     const type = c.req.param("type");
     const def = CONTENT_TYPES[type];
     if (!def) return c.json({ error: "Unknown content type" }, 404);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
-    const action = typeof body.action === "string" ? body.action : "";
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, transitionSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const action = v.data.action;
     const db = getApiDb();
     const existing = await getContentRow(db, def, id);
     if (!existing) throw new Error(`Content not found: ${id}`);

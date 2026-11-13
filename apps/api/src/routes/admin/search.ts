@@ -35,6 +35,11 @@
 //   populated (ba_user has no role column), so they always 403 today.
 import { Hono } from "hono";
 import { and, count, desc, eq, like, or, sql } from "drizzle-orm";
+import { z } from "zod";
+import {
+  createSearchSynonymSchema,
+  updateSearchSynonymSchema,
+} from "@repo/validation";
 import {
   searchAnalytics,
   searchIndex,
@@ -44,6 +49,15 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import {
+  firstIssue,
+  invalidParam,
+  isRecord,
+  parsePagination,
+  readJsonBody,
+  uuidParam,
+  validateBody,
+} from "../../lib/validate";
 
 type Env = {
   Bindings: {
@@ -55,6 +69,32 @@ type Env = {
 type Db = ReturnType<typeof getApiDb>;
 
 const app = new Hono<Env>();
+
+// GET /search query validation (local schema). An empty q is NOT an
+// error — it returns { results: [], total: 0 }, preserving the public
+// search contract; only a present q is length-checked (the old
+// "Query too long" message is kept for q > 200).
+const searchQuerySchema = z.object({
+  q: z.string().min(1).max(200),
+  type: z.string().max(50).optional(),
+  locale: z.string().max(10).optional(),
+});
+
+// POST /search/synonyms: the shared create schema, with synonyms
+// optional (default []) — the old code defaulted a missing synonyms
+// array to []. term is still required non-empty after trimming (the
+// old check), enforced below after validation so the stored term
+// keeps its original (untrimmed) value.
+const createSynonymLocalSchema = createSearchSynonymSchema.extend({
+  synonyms: z.array(z.string()).default([]),
+});
+
+// PATCH /search/synonyms/:id: the shared update schema (which has no
+// isEnabled field) extended locally with isEnabled, and with the
+// server-managed id omitted.
+const updateSynonymLocalSchema = updateSearchSynonymSchema
+  .omit({ id: true })
+  .extend({ isEnabled: z.boolean().optional() });
 
 // ─── Search FTS (packages/database/src/repository/search.ts) ────────────────
 // search_index has a `search_vector` tsvector column in the DB that is
@@ -412,11 +452,7 @@ app.get("/search", async (c) => {
     const query = c.req.query("q")?.trim() || "";
     const entityType = c.req.query("type") || undefined;
     const locale = c.req.query("locale") || undefined;
-    const page = Math.max(1, parseInt(c.req.query("page") || "1", 10));
-    const pageSize = Math.min(
-      100,
-      Math.max(1, parseInt(c.req.query("pageSize") || "20", 10)),
-    );
+    const { page, pageSize } = parsePagination(c);
 
     if (!query) {
       return c.json({ results: [], total: 0 });
@@ -427,6 +463,11 @@ app.get("/search", async (c) => {
         { error: "Query too long. Maximum 200 characters." },
         400,
       );
+    }
+
+    const qv = searchQuerySchema.safeParse({ q: query, type: entityType, locale });
+    if (!qv.success) {
+      return c.json({ error: firstIssue(qv.error) }, 400);
     }
 
     const db = getApiDb();
@@ -547,20 +588,19 @@ app.post("/search/synonyms", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json().catch(() => null)) as {
-      term?: unknown;
-      synonyms?: unknown;
-    } | null;
-    if (typeof body?.term !== "string" || body.term.trim() === "") {
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
+    const v = validateBody(body, createSynonymLocalSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    if (v.data.term.trim() === "") {
       return c.json({ error: "term is required" }, 400);
     }
-    const synonyms = Array.isArray(body.synonyms)
-      ? body.synonyms.filter((s): s is string => typeof s === "string")
-      : [];
     const db = getApiDb();
     const [row] = await db
       .insert(searchSynonyms)
-      .values({ term: body.term, synonyms })
+      .values({ term: v.data.term, synonyms: v.data.synonyms })
       .returning();
     if (!row) return c.json({ error: "Failed to create synonym" }, 500);
     return c.json(row, 201);
@@ -578,37 +618,28 @@ app.patch("/search/synonyms/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json().catch(() => null)) as {
-      term?: unknown;
-      synonyms?: unknown;
-      isEnabled?: unknown;
-    } | null;
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const v = validateBody(body, updateSynonymLocalSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
     const patch: Record<string, unknown> = {};
-    if (body?.term !== undefined) {
-      if (typeof body.term !== "string" || body.term.trim() === "") {
+    if (v.data.term !== undefined) {
+      if (v.data.term.trim() === "") {
         return c.json({ error: "term must be a non-empty string" }, 400);
       }
-      patch.term = body.term;
+      patch.term = v.data.term;
     }
-    if (body?.synonyms !== undefined) {
-      if (!Array.isArray(body.synonyms)) {
-        return c.json({ error: "synonyms must be an array" }, 400);
-      }
-      patch.synonyms = body.synonyms.filter(
-        (s): s is string => typeof s === "string",
-      );
-    }
-    if (body?.isEnabled !== undefined) {
-      if (typeof body.isEnabled !== "boolean") {
-        return c.json({ error: "isEnabled must be a boolean" }, 400);
-      }
-      patch.isEnabled = body.isEnabled;
-    }
+    if (v.data.synonyms !== undefined) patch.synonyms = v.data.synonyms;
+    if (v.data.isEnabled !== undefined) patch.isEnabled = v.data.isEnabled;
     const db = getApiDb();
     const [row] = await db
       .update(searchSynonyms)
       .set(patch)
-      .where(eq(searchSynonyms.id, c.req.param("id")))
+      .where(eq(searchSynonyms.id, id))
       .returning();
     if (!row) return c.json({ error: "Synonym not found" }, 404);
     return c.json(row);
@@ -626,10 +657,12 @@ app.delete("/search/synonyms/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     await db
       .delete(searchSynonyms)
-      .where(eq(searchSynonyms.id, c.req.param("id")));
+      .where(eq(searchSynonyms.id, id));
     return c.json({ ok: true });
   } catch (err) {
     console.error("[Search Synonyms API] Error:", err);

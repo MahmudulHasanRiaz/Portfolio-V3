@@ -23,6 +23,16 @@ import { eq, inArray } from "drizzle-orm";
 import { caseStudyTags, projectTags, tags } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import { z } from "zod";
+import { isRecord, readJsonBody, validateBody } from "../../lib/validate";
+
+// Local schema: the body is a comma-separated tag string. `tags` is
+// optional so a missing/empty value still clears all tags (existing
+// behaviour); a present non-string value, or one over 2000 chars,
+// now fails with 400 instead of being silently treated as "clear".
+const setEntityTagsSchema = z.object({
+  tags: z.string().max(2000).optional(),
+});
 
 type Env = {
   Bindings: {
@@ -115,10 +125,11 @@ app.post("/:entity/:id", async (c) => {
     if (!entity) return c.json({ error: "Unknown entity" }, 400);
     const id = c.req.param("id");
     if (!UUID_RE.test(id)) return c.json({ error: "Invalid id" }, 400);
-    const body = (await c.req.json().catch(() => null)) as {
-      tags?: unknown;
-    } | null;
-    const rawTags = typeof body?.tags === "string" ? body.tags : "";
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, setEntityTagsSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const rawTags = v.data.tags ?? "";
     const db = getApiDb();
     const clean = parseTagNames(rawTags);
     // Ensure the tag rows exist (slug is unique on `tags`).

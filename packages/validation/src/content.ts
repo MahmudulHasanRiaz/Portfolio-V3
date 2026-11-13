@@ -247,14 +247,20 @@ export const updateProjectSchema = projectSchema.partial();
 export const technologySchema = z.object({
   id: uuidSchema,
   name: z.string().max(100),
+  nameBn: z.string().optional(),
   category: z.string().max(50).optional(),
+  use: z.string().optional(),
+  useBn: z.string().optional(),
   icon: z.string().optional(),
   sortOrder: z.coerce.number().int().optional(),
 });
 
 export const createTechnologySchema = z.object({
   name: z.string().max(100),
+  nameBn: z.string().optional(),
   category: z.string().max(50).optional(),
+  use: z.string().optional(),
+  useBn: z.string().optional(),
   icon: z.string().optional(),
   sortOrder: z.coerce.number().int().optional(),
 });

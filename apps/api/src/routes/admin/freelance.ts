@@ -68,6 +68,15 @@ import {
   isNull,
   or,
 } from "drizzle-orm";
+import { z } from "zod";
+import {
+  createProjectDeliverableSchema,
+  createProjectMilestoneSchema,
+  createProjectsFreelanceSchema,
+  updateProjectDeliverableSchema,
+  updateProjectMilestoneSchema,
+  updateProjectsFreelanceSchema,
+} from "@repo/validation";
 import {
   deliverableStatus,
   freelanceProjectStatus,
@@ -81,52 +90,125 @@ import {
 } from "@repo/database/schema";
 import { getApiDb, type ApiDb } from "../../db";
 import { requireAuth, unauthorized } from "../../lib/admin-auth";
+import {
+  invalidParam,
+  isRecord,
+  parsePagination,
+  readJsonBody,
+  uuidParam,
+  validateBody,
+} from "../../lib/validate";
 
 const app = new Hono();
 
-const PROJECT_STATUSES = new Set([
-  "draft",
-  "in_progress",
-  "under_review",
-  "revision_requested",
-  "completed",
-  "archived",
-]);
+// Adapted shared schemas (@repo/validation/freelance.ts).
+// - Project create: title is required (the route requires it; the
+//   shared schema has it optional) and createdBy is omitted (stamped
+//   from the session). A blank "" amount arrives from the form as ""
+//   and must clear to null, not coerce to 0 (z.coerce.number turns
+//   "" into 0), hence the preprocess.
+// - Project update: server-managed fields omitted; a blank "" status
+//   clears to null (the old code did the same via bodyFields).
+// - Milestone/deliverable create: projectId comes from the path and
+//   status is forced (pending) by the route, so both are omitted;
+//   title is required (the route requires it). sortOrder "" clears
+//   to null (then defaults to 0 on create).
+// - Milestone/deliverable update: projectId is never updatable;
+//   blank "" status clears to null.
+// - Deliverable fileUrl is a plain string capped at 2048 chars. It is
+//   NOT .url()-validated: the audit could not confirm the route
+//   requires a URL (relative paths / storage keys may be valid).
+const createProjectLocalSchema = createProjectsFreelanceSchema
+  .omit({ createdBy: true })
+  .extend({
+    title: z.string().min(1).max(255),
+    totalAgreedAmount: z.preprocess(
+      (v) => (v === "" ? null : v),
+      z.coerce.number().nullable().optional(),
+    ),
+  });
+const updateProjectLocalSchema = updateProjectsFreelanceSchema
+  .omit({ id: true, createdBy: true, createdAt: true, updatedAt: true })
+  .extend({
+    status: z.preprocess(
+      (v) => (v === "" ? null : v),
+      z
+        .enum([
+          "draft",
+          "in_progress",
+          "under_review",
+          "revision_requested",
+          "completed",
+          "archived",
+        ])
+        .nullable()
+        .optional(),
+    ),
+    totalAgreedAmount: z.preprocess(
+      (v) => (v === "" ? null : v),
+      z.coerce.number().nullable().optional(),
+    ),
+  });
+const createMilestoneLocalSchema = createProjectMilestoneSchema
+  .omit({ projectId: true, status: true })
+  .extend({
+    title: z.string().min(1),
+    sortOrder: z.preprocess(
+      (v) => (v === "" ? null : v),
+      z.coerce.number().int().nullable().optional(),
+    ),
+  });
+const updateMilestoneLocalSchema = updateProjectMilestoneSchema
+  .omit({ id: true, projectId: true, createdAt: true })
+  .extend({
+    status: z.preprocess(
+      (v) => (v === "" ? null : v),
+      z
+        .enum(["pending", "in_progress", "completed", "approved"])
+        .nullable()
+        .optional(),
+    ),
+    sortOrder: z.preprocess(
+      (v) => (v === "" ? null : v),
+      z.coerce.number().int().nullable().optional(),
+    ),
+  });
+const createDeliverableLocalSchema = createProjectDeliverableSchema
+  .omit({ projectId: true, status: true })
+  .extend({
+    title: z.string().min(1),
+    fileUrl: z.string().max(2048).optional(),
+  });
+// NOTE: the shared deliverable schema has no createdAt column, so it
+// is not omitted here (omitting a non-existent key is a type error).
+const updateDeliverableLocalSchema = updateProjectDeliverableSchema
+  .omit({ id: true, projectId: true })
+  .extend({
+    status: z.preprocess(
+      (v) => (v === "" ? null : v),
+      z
+        .enum(["pending", "submitted", "approved", "revision_requested"])
+        .nullable()
+        .optional(),
+    ),
+    fileUrl: z.string().max(2048).optional(),
+  });
 
-const MILESTONE_STATUSES = new Set([
-  "pending",
-  "in_progress",
-  "completed",
-  "approved",
-]);
-
-const DELIVERABLE_STATUSES = new Set([
-  "pending",
-  "submitted",
-  "approved",
-  "revision_requested",
-]);
+/** Validated data restricted to keys the client actually sent, so an
+ *  update never writes a field the client omitted. */
+function sentFields(
+  data: Record<string, unknown>,
+  body: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (key in body) out[key] = value;
+  }
+  return out;
+}
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
-}
-
-/** V2 list pagination: page >= 1 else 1; pageSize 1..100 else 20. */
-function parsePage(query: (name: string) => string | undefined): {
-  page: number;
-  pageSize: number;
-} {
-  const parsedPage = parseInt(query("page") ?? "1", 10);
-  const parsedPageSize = parseInt(query("pageSize") ?? "20", 10);
-  return {
-    page: Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1,
-    pageSize:
-      Number.isFinite(parsedPageSize) &&
-      parsedPageSize > 0 &&
-      parsedPageSize <= 100
-        ? parsedPageSize
-        : 20,
-  };
 }
 
 /**
@@ -217,7 +299,20 @@ app.get("/projects", async (c) => {
     if (!user) return c.json(unauthorized(), 401);
     const search = c.req.query("search") ?? undefined;
     const status = c.req.query("status") ?? undefined;
-    const { page, pageSize } = parsePage((name) => c.req.query(name));
+    if (
+      status !== undefined &&
+      ![
+        "draft",
+        "in_progress",
+        "under_review",
+        "revision_requested",
+        "completed",
+        "archived",
+      ].includes(status)
+    ) {
+      return c.json({ error: "Invalid status" }, 400);
+    }
+    const { page, pageSize } = parsePagination(c, { maxPageSize: 100 });
     const offset = (page - 1) * pageSize;
 
     const db = getApiDb();
@@ -277,21 +372,18 @@ app.post("/projects", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const body = (await c.req.json()) as Record<string, unknown>;
-
-    // Title is required; blank dates/amounts arrive as "" from the form and
-    // must not reach date/numeric columns (Postgres rejects "" with a 500).
-    // Skipped keys fall back to the column default / NULL.
-    if (typeof body.title !== "string" || body.title.trim() === "") {
-      return c.json({ error: "Project title is required" }, 400);
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
     }
-    if (
-      body.status !== undefined &&
-      body.status !== null &&
-      body.status !== "" &&
-      !PROJECT_STATUSES.has(body.status as string)
-    ) {
-      return c.json({ error: "Invalid status" }, 400);
+    const v = validateBody(body, createProjectLocalSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    // Title is required (non-blank after trimming); blank dates/amounts
+    // arrive as "" from the form and must not reach date/numeric
+    // columns (Postgres rejects "" with a 500). Skipped keys fall back
+    // to the column default / NULL.
+    if (v.data.title.trim() === "") {
+      return c.json({ error: "Project title is required" }, 400);
     }
 
     const db = getApiDb();
@@ -300,7 +392,7 @@ app.post("/projects", async (c) => {
     const [row] = await db
       .insert(projectsFreelance)
       .values({
-        ...bodyFields(projectsFreelance, body, "create"),
+        ...bodyFields(projectsFreelance, v.data, "create"),
         id,
         createdBy: user.id,
         createdAt: now,
@@ -313,7 +405,7 @@ app.post("/projects", async (c) => {
       projectId: id,
       actorId: user.id,
       action: "project_created",
-      metadata: { title: body.title },
+      metadata: { title: v.data.title },
     });
 
     return c.json(row, 201);
@@ -329,7 +421,8 @@ app.get("/projects/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const [r] = await db
       .select()
@@ -368,26 +461,24 @@ app.put("/projects/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
-
-    if (
-      body.status !== undefined &&
-      body.status !== null &&
-      body.status !== "" &&
-      !PROJECT_STATUSES.has(body.status as string)
-    ) {
-      return c.json({ error: "Invalid status" }, 400);
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
     }
-    if (
-      body.title !== undefined &&
-      (typeof body.title !== "string" || body.title.trim() === "")
-    ) {
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const v = validateBody(body, updateProjectLocalSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    if (v.data.title !== undefined && v.data.title.trim() === "") {
       return c.json({ error: "Project title cannot be empty" }, 400);
     }
 
     const db = getApiDb();
-    const values = bodyFields(projectsFreelance, body, "update");
+    const values = bodyFields(
+      projectsFreelance,
+      sentFields(v.data, body),
+      "update",
+    );
     if (Object.keys(values).length === 0) {
       return c.json({ error: "No fields to update" }, 400);
     }
@@ -405,12 +496,12 @@ app.put("/projects/:id", async (c) => {
       projectId: id,
       actorId: user.id,
       action:
-        typeof body.status === "string" && body.status !== ""
+        typeof v.data.status === "string"
           ? "status_changed"
           : "project_updated",
       metadata:
-        typeof body.status === "string" && body.status !== ""
-          ? { status: body.status }
+        typeof v.data.status === "string"
+          ? { status: v.data.status }
           : { fields: Object.keys(body) },
     });
 
@@ -427,7 +518,8 @@ app.delete("/projects/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
 
     const [existing] = await db
@@ -478,7 +570,8 @@ app.get("/projects/:id/milestones", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const projectId = c.req.param("id");
+    const projectId = uuidParam(c, "id");
+    if (!projectId) return invalidParam(c, "id");
     const db = getApiDb();
     const rows = await db
       .select()
@@ -512,10 +605,15 @@ app.post("/projects/:id/milestones", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const projectId = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
-
-    if (typeof body.title !== "string" || body.title.trim() === "") {
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
+    const projectId = uuidParam(c, "id");
+    if (!projectId) return invalidParam(c, "id");
+    const v = validateBody(body, createMilestoneLocalSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    if (v.data.title.trim() === "") {
       return c.json({ error: "Milestone title is required" }, 400);
     }
 
@@ -526,11 +624,11 @@ app.post("/projects/:id/milestones", async (c) => {
       .values({
         id,
         projectId,
-        title: body.title,
-        description: (body.description as string | undefined) || null,
-        dueDate: (body.dueDate as string | undefined) || null,
+        title: v.data.title,
+        description: v.data.description || null,
+        dueDate: v.data.dueDate || null,
         status: "pending" as (typeof milestoneStatus.enumValues)[number],
-        sortOrder: (body.sortOrder as number | undefined) || 0,
+        sortOrder: v.data.sortOrder ?? 0,
         createdAt: new Date(),
       })
       .returning();
@@ -540,7 +638,7 @@ app.post("/projects/:id/milestones", async (c) => {
       projectId,
       actorId: user.id,
       action: "milestone_created",
-      metadata: { milestoneId: id, title: body.title },
+      metadata: { milestoneId: id, title: v.data.title },
     });
 
     return c.json(row, 201);
@@ -556,21 +654,22 @@ app.put("/projects/:id/milestones/:mid", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const projectId = c.req.param("id");
-    const mid = c.req.param("mid");
-    const body = (await c.req.json()) as Record<string, unknown>;
-
-    if (
-      body.status !== undefined &&
-      body.status !== null &&
-      body.status !== "" &&
-      !MILESTONE_STATUSES.has(body.status as string)
-    ) {
-      return c.json({ error: "Invalid milestone status" }, 400);
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
     }
+    const projectId = uuidParam(c, "id");
+    if (!projectId) return invalidParam(c, "id");
+    const mid = uuidParam(c, "mid");
+    if (!mid) return invalidParam(c, "mid");
+    const v = validateBody(body, updateMilestoneLocalSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
 
     const db = getApiDb();
-    const values = childUpdateFields(projectMilestones, body);
+    const values = childUpdateFields(
+      projectMilestones,
+      sentFields(v.data, body),
+    );
     if (Object.keys(values).length === 0) {
       return c.json({ error: "No fields" }, 400);
     }
@@ -606,8 +705,10 @@ app.delete("/projects/:id/milestones/:mid", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const projectId = c.req.param("id");
-    const mid = c.req.param("mid");
+    const projectId = uuidParam(c, "id");
+    if (!projectId) return invalidParam(c, "id");
+    const mid = uuidParam(c, "mid");
+    if (!mid) return invalidParam(c, "mid");
     const db = getApiDb();
     const [deleted] = await db
       .delete(projectMilestones)
@@ -639,7 +740,8 @@ app.get("/projects/:id/deliverables", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const projectId = c.req.param("id");
+    const projectId = uuidParam(c, "id");
+    if (!projectId) return invalidParam(c, "id");
     const db = getApiDb();
     // No ORDER BY: the V2 source ordered by created_at, but the
     // project_deliverables table has no created_at column (see the header
@@ -676,10 +778,15 @@ app.post("/projects/:id/deliverables", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const projectId = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
-
-    if (typeof body.title !== "string" || body.title.trim() === "") {
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
+    const projectId = uuidParam(c, "id");
+    if (!projectId) return invalidParam(c, "id");
+    const v = validateBody(body, createDeliverableLocalSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    if (v.data.title.trim() === "") {
       return c.json({ error: "Deliverable title is required" }, 400);
     }
 
@@ -690,15 +797,15 @@ app.post("/projects/:id/deliverables", async (c) => {
       .values({
         id,
         projectId,
-        milestoneId: body.milestoneId ? (body.milestoneId as string) : null,
-        title: body.title,
+        milestoneId: v.data.milestoneId ?? null,
+        title: v.data.title,
         fileUrl:
-          typeof body.fileUrl === "string" && body.fileUrl.trim() !== ""
-            ? body.fileUrl.trim()
+          typeof v.data.fileUrl === "string" && v.data.fileUrl.trim() !== ""
+            ? v.data.fileUrl.trim()
             : null,
         notes:
-          typeof body.notes === "string" && body.notes.trim() !== ""
-            ? body.notes.trim()
+          typeof v.data.notes === "string" && v.data.notes.trim() !== ""
+            ? v.data.notes.trim()
             : null,
         status: "pending" as (typeof deliverableStatus.enumValues)[number],
       })
@@ -709,7 +816,7 @@ app.post("/projects/:id/deliverables", async (c) => {
       projectId,
       actorId: user.id,
       action: "deliverable_created",
-      metadata: { deliverableId: id, title: body.title },
+      metadata: { deliverableId: id, title: v.data.title },
     });
 
     return c.json(row, 201);
@@ -725,21 +832,22 @@ app.put("/projects/:id/deliverables/:did", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const projectId = c.req.param("id");
-    const did = c.req.param("did");
-    const body = (await c.req.json()) as Record<string, unknown>;
-
-    if (
-      body.status !== undefined &&
-      body.status !== null &&
-      body.status !== "" &&
-      !DELIVERABLE_STATUSES.has(body.status as string)
-    ) {
-      return c.json({ error: "Invalid deliverable status" }, 400);
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
     }
+    const projectId = uuidParam(c, "id");
+    if (!projectId) return invalidParam(c, "id");
+    const did = uuidParam(c, "did");
+    if (!did) return invalidParam(c, "did");
+    const v = validateBody(body, updateDeliverableLocalSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
 
     const db = getApiDb();
-    const values = childUpdateFields(projectDeliverables, body);
+    const values = childUpdateFields(
+      projectDeliverables,
+      sentFields(v.data, body),
+    );
     if (Object.keys(values).length === 0) {
       return c.json({ error: "No fields" }, 400);
     }
@@ -775,8 +883,10 @@ app.delete("/projects/:id/deliverables/:did", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const projectId = c.req.param("id");
-    const did = c.req.param("did");
+    const projectId = uuidParam(c, "id");
+    if (!projectId) return invalidParam(c, "id");
+    const did = uuidParam(c, "did");
+    if (!did) return invalidParam(c, "did");
     const db = getApiDb();
     const [deleted] = await db
       .delete(projectDeliverables)
@@ -808,7 +918,8 @@ app.get("/projects/:id/activities", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const projectId = c.req.param("id");
+    const projectId = uuidParam(c, "id");
+    if (!projectId) return invalidParam(c, "id");
     const db = getApiDb();
     const rows = await db
       .select()
@@ -841,7 +952,8 @@ app.post("/projects/:id/portal", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const projectId = c.req.param("id");
+    const projectId = uuidParam(c, "id");
+    if (!projectId) return invalidParam(c, "id");
     const db = getApiDb();
 
     const [project] = await db

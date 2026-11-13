@@ -26,6 +26,19 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import { z } from "zod";
+import { uuidSchema } from "@repo/validation";
+import { isRecord, readJsonBody, validateBody } from "../../lib/validate";
+
+// Local schemas: replace the post's category / tag links with the
+// given ids (at most 100). cleanIds is kept as-is (dedupe).
+const setContentCategoriesSchema = z.object({
+  categoryIds: z.array(uuidSchema).max(100),
+});
+
+const setContentTagsSchema = z.object({
+  tagIds: z.array(uuidSchema).max(100),
+});
 
 type Env = {
   Bindings: {
@@ -91,10 +104,11 @@ app.post("/:type/:id/categories", async (c) => {
     if (c.req.param("type") !== "posts") return c.json({ ok: true });
     const id = c.req.param("id");
     if (!UUID_RE.test(id)) return c.json({ error: "Invalid id" }, 400);
-    const body = (await c.req.json().catch(() => null)) as {
-      categoryIds?: unknown;
-    } | null;
-    const categoryIds = cleanIds(body?.categoryIds);
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, setContentCategoriesSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const categoryIds = cleanIds(v.data.categoryIds);
     const db = getApiDb();
     await db.delete(postCategories).where(eq(postCategories.postId, id));
     if (categoryIds.length > 0) {
@@ -145,10 +159,11 @@ app.post("/:type/:id/tags", async (c) => {
     if (c.req.param("type") !== "posts") return c.json({ ok: true });
     const id = c.req.param("id");
     if (!UUID_RE.test(id)) return c.json({ error: "Invalid id" }, 400);
-    const body = (await c.req.json().catch(() => null)) as {
-      tagIds?: unknown;
-    } | null;
-    const tagIds = cleanIds(body?.tagIds);
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, setContentTagsSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const tagIds = cleanIds(v.data.tagIds);
     const db = getApiDb();
     await db.delete(postTags).where(eq(postTags.postId, id));
     if (tagIds.length > 0) {

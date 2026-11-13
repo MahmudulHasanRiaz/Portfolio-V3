@@ -69,6 +69,12 @@ import {
   type PDFFont,
   type RGB,
 } from "pdf-lib";
+import { z } from "zod";
+import {
+  createProposalTemplateSchema,
+  updateProposalTemplateSchema,
+  uuidSchema,
+} from "@repo/validation";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import {
   and,
@@ -92,6 +98,13 @@ import {
 } from "@repo/database/schema";
 import { getApiDb, type ApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import {
+  invalidParam,
+  parsePagination,
+  readJsonBody,
+  uuidParam,
+  validateBody,
+} from "../../lib/validate";
 
 type Env = {
   Bindings: {
@@ -111,22 +124,6 @@ const TEMPLATE_COLUMNS = getTableColumns(proposalTemplates);
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
-}
-
-function parsePage(query: (name: string) => string | undefined): {
-  page: number;
-  pageSize: number;
-} {
-  const page = Number(query("page")) || 1;
-  const pageSize = Number(query("pageSize")) || 20;
-  return { page, pageSize };
-}
-
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function isUuid(value: unknown): value is string {
-  return typeof value === "string" && UUID_PATTERN.test(value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -525,67 +522,65 @@ async function proposalPdf(
 
 // ─── Template validation (mirrors @repo/validation proposals.ts) ─────────────
 
-/**
- * Validates a template body against createProposalTemplateSchema
- * (full) or updateProposalTemplateSchema (partial). Returns the first
- * error message, zod-style, or null when valid. `createdBy` is the
- * session user id for create; for update it is only checked when the
- * body itself carries one.
- */
-function validateTemplate(
-  body: Record<string, unknown>,
-  partial: boolean,
-  createdBy?: string,
-): string | null {
-  const checkString = (
-    key: string,
-    required: boolean,
-  ): string | null => {
-    const v = body[key];
-    if (v === undefined) return required ? "Required" : null;
-    if (typeof v !== "string")
-      return `Expected string, received ${typeof v}`;
-    return null;
-  };
-  const checkUuid = (
-    key: string,
-    required: boolean,
-    value?: unknown,
-  ): string | null => {
-    const v = value !== undefined ? value : body[key];
-    if (v === undefined || v === null)
-      return required ? "Required" : null;
-    if (!isUuid(v)) return "Invalid uuid";
-    return null;
-  };
+// Template validation now uses the real shared schemas
+// (@repo/validation/proposals.ts), replacing the hand-rolled
+// validateTemplate(). Create omits createdBy (stamped from the session)
+// and accepts a null projectCategoryId (the old validator did; the
+// shared create schema is optional-only, so the null case is extended
+// locally). Update omits the server-managed fields.
+const createTemplateLocalSchema = createProposalTemplateSchema
+  .omit({ createdBy: true })
+  .extend({ projectCategoryId: uuidSchema.nullable().optional() });
+// NOTE: the shared template schema has no updatedAt column, so it is
+// not omitted here (omitting a non-existent key is a type error).
+const updateTemplateLocalSchema = updateProposalTemplateSchema.omit({
+  id: true,
+  createdBy: true,
+  createdAt: true,
+});
 
-  let err: string | null;
-  if ((err = checkString("name", !partial))) return err;
-  if ((err = checkUuid("projectCategoryId", false))) return err;
-  if ((err = checkString("clientType", false))) return err;
-  const type = body.type;
-  if (type === undefined) {
-    if (!partial) return "Required";
-  } else if (type !== "proposal" && type !== "contract") {
-    return `Invalid enum value. Expected 'proposal' | 'contract', received '${String(type)}'`;
+// POST /documents body: templateId is a uuid; variable VALUES must be
+// strings (this fixes the old `[object Object]` interpolation when a
+// variable value was an object/array).
+const createDocumentSchema = z.object({
+  templateId: uuidSchema,
+  projectId: uuidSchema.optional(),
+  clientId: uuidSchema.optional(),
+  variables: z.record(z.string(), z.string()).optional(),
+});
+
+// POST /documents/:id/version body.
+const createDocumentVersionSchema = z.object({
+  variables: z.record(z.string(), z.string()).optional(),
+  resolvedContent: z.string().max(100000).optional(),
+});
+
+// POST /documents/:id/reject body (trimmed, so a whitespace-only
+// reason still fails as before).
+const rejectDocumentSchema = z.object({
+  reason: z.string().trim().min(1).max(2000),
+});
+
+// GET /documents + GET /templates query enums.
+const proposalDocStatusSchema = z.enum([
+  "draft",
+  "sent",
+  "accepted",
+  "rejected",
+]);
+const proposalTypeSchema = z.enum(["proposal", "contract"]);
+
+/** Validated data restricted to keys the client actually sent, so a
+ *  PUT never writes a field the client omitted. */
+function sentFields(
+  data: Record<string, unknown>,
+  body: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (key in body) out[key] = value;
   }
-  if ((err = checkString("content", !partial))) return err;
-  const variables = body.variables;
-  if (variables !== undefined && !isRecord(variables)) {
-    return "Expected object, received array";
-  }
-  const isActive = body.isActive;
-  if (isActive === undefined) {
-    if (!partial) return "Required";
-  } else if (typeof isActive !== "boolean") {
-    return `Expected boolean, received ${typeof isActive}`;
-  }
-  if (createdBy !== undefined) {
-    if ((err = checkUuid("createdBy", true, createdBy))) return err;
-  } else if ((err = checkUuid("createdBy", false))) {
-    return err;
-  }
-  return null;
+  return out;
 }
 
 /** Pick allowlisted template fields from a body (create skips nulls
@@ -612,13 +607,33 @@ app.get("/documents", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const q = c.req.query;
+    const q = c.req.query.bind(c.req); // NB: query() reads this.url, so it must stay bound to c.req.
     const clientId = q("clientId");
     const projectId = q("projectId");
     const templateId = q("templateId");
     const statusParam = q("status");
     const latestOnly = q("latestOnly") === "true";
-    const { page, pageSize } = parsePage(q);
+    for (const [name, value] of [
+      ["clientId", clientId],
+      ["projectId", projectId],
+      ["templateId", templateId],
+    ] as const) {
+      if (value !== undefined && !uuidSchema.safeParse(value).success) {
+        return c.json({ error: `Invalid ${name}` }, 400);
+      }
+    }
+    if (statusParam !== undefined) {
+      const statuses = statusParam
+        .split(",")
+        .map((st) => st.trim())
+        .filter(Boolean);
+      for (const st of statuses) {
+        if (!proposalDocStatusSchema.safeParse(st).success) {
+          return c.json({ error: "Invalid status" }, 400);
+        }
+      }
+    }
+    const { page, pageSize } = parsePagination(c);
 
     const conditions: any[] = [];
     if (clientId) {
@@ -684,23 +699,13 @@ app.post("/documents", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json()) as Record<string, unknown>;
-    const { templateId, projectId, clientId, variables } = body ?? {};
-
-    if (!templateId || typeof templateId !== "string") {
-      return c.json({ error: "templateId is required" }, 400);
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
     }
-    if (
-      variables !== undefined &&
-      (typeof variables !== "object" ||
-        variables === null ||
-        Array.isArray(variables))
-    ) {
-      return c.json(
-        { error: "variables must be an object of key/value pairs" },
-        400,
-      );
-    }
+    const v = validateBody(body, createDocumentSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const { templateId, projectId, clientId, variables } = v.data;
 
     const db = getApiDb();
     const template = await getTemplateById(db, templateId);
@@ -724,14 +729,14 @@ app.post("/documents", async (c) => {
 
     const resolvedContent = substituteVariables(
       template.content ?? "",
-      (variables as Record<string, string>) ?? {},
+      variables ?? {},
     );
     const [document] = await db
       .insert(proposalDocuments)
       .values({
         templateId,
-        projectId: (projectId as string | null) ?? null,
-        clientId: (clientId as string | null) ?? null,
+        projectId: projectId ?? null,
+        clientId: clientId ?? null,
         resolvedContent,
         status: "draft",
         version: 1,
@@ -753,18 +758,26 @@ app.post("/documents", async (c) => {
 
 // GET /documents/:id/pdf — PDF download; POST — source shape { pdfUrl }.
 // Registered BEFORE /documents/:id so the static "pdf" segment wins.
-app.get("/documents/:id/pdf", (c) => proposalPdf(c, true, c.req.param("id")));
-app.post("/documents/:id/pdf", (c) =>
-  proposalPdf(c, false, c.req.param("id")),
-);
+app.get("/documents/:id/pdf", async (c) => {
+  const id = uuidParam(c, "id");
+  if (!id) return invalidParam(c, "id");
+  return proposalPdf(c, true, id);
+});
+app.post("/documents/:id/pdf", async (c) => {
+  const id = uuidParam(c, "id");
+  if (!id) return invalidParam(c, "id");
+  return proposalPdf(c, false, id);
+});
 
 // GET /documents/:id — one document.
 app.get("/documents/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
-    const document = await getDocumentById(db, c.req.param("id"));
+    const document = await getDocumentById(db, id);
     if (!document) {
       return c.json({ error: "Proposal document not found" }, 404);
     }
@@ -782,10 +795,12 @@ app.delete("/documents/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const [deleted] = await db
       .delete(proposalDocuments)
-      .where(eq(proposalDocuments.id, c.req.param("id")))
+      .where(eq(proposalDocuments.id, id))
       .returning({ id: proposalDocuments.id });
     if (!deleted) {
       return c.json({ error: "Proposal document not found" }, 404);
@@ -806,7 +821,8 @@ app.post("/documents/:id/accept", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const existing = await getDocumentById(db, id);
     if (!existing) {
@@ -911,12 +927,15 @@ app.post("/documents/:id/reject", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
-    const reason = body?.reason;
-    if (!reason || typeof reason !== "string" || !reason.trim()) {
-      return c.json({ error: "A rejection reason is required" }, 400);
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
     }
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const v = validateBody(body, rejectDocumentSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const reason = v.data.reason;
     const db = getApiDb();
     const [document] = await db
       .update(proposalDocuments)
@@ -955,7 +974,8 @@ app.post("/documents/:id/send", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const [document] = await db
       .update(proposalDocuments)
@@ -993,27 +1013,15 @@ app.post("/documents/:id/version", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json().catch(() => ({}))) as Record<
-      string,
-      unknown
-    >;
-    const { variables, resolvedContent } = body ?? {};
-
-    if (
-      variables !== undefined &&
-      (typeof variables !== "object" ||
-        variables === null ||
-        Array.isArray(variables))
-    ) {
-      return c.json(
-        { error: "variables must be an object of key/value pairs" },
-        400,
-      );
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
     }
-    if (resolvedContent !== undefined && typeof resolvedContent !== "string") {
-      return c.json({ error: "resolvedContent must be a string" }, 400);
-    }
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const v = validateBody(body, createDocumentVersionSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const { variables, resolvedContent } = v.data;
 
     const db = getApiDb();
     const source = await getDocumentById(db, id);
@@ -1023,7 +1031,7 @@ app.post("/documents/:id/version", async (c) => {
 
     let nextResolvedContent: string | null;
     if (resolvedContent !== undefined) {
-      nextResolvedContent = resolvedContent as string;
+      nextResolvedContent = resolvedContent;
     } else if (variables) {
       if (source.templateId) {
         const template = await getTemplateById(db, source.templateId);
@@ -1035,7 +1043,7 @@ app.post("/documents/:id/version", async (c) => {
         }
         nextResolvedContent = substituteVariables(
           template.content ?? "",
-          variables as Record<string, string>,
+          variables,
         );
       } else {
         nextResolvedContent = source.resolvedContent;
@@ -1084,7 +1092,8 @@ app.get("/documents/:id/versions", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const existing = await getDocumentById(db, id);
     if (!existing) {
@@ -1141,11 +1150,14 @@ app.get("/templates", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const q = c.req.query;
+    const q = c.req.query.bind(c.req); // NB: query() reads this.url, so it must stay bound to c.req.
     const type = q("type");
     const clientType = q("clientType");
     const isActiveParam = q("isActive");
-    const { page, pageSize } = parsePage(q);
+    if (type !== undefined && !proposalTypeSchema.safeParse(type).success) {
+      return c.json({ error: "Invalid type" }, 400);
+    }
+    const { page, pageSize } = parsePagination(c);
 
     const conditions: any[] = [];
     if (type) {
@@ -1198,16 +1210,17 @@ app.post("/templates", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json()) as Record<string, unknown>;
-    const validationError = validateTemplate(body, false, user.id);
-    if (validationError) {
-      return c.json({ error: validationError }, 400);
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
     }
+    const v = validateBody(body, createTemplateLocalSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
     const db = getApiDb();
     const [template] = await db
       .insert(proposalTemplates)
       .values({
-        ...templateFields(body, true),
+        ...templateFields(v.data, true),
         createdBy: user.id,
       } as typeof proposalTemplates.$inferInsert)
       .returning();
@@ -1228,8 +1241,10 @@ app.get("/templates/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
-    const template = await getTemplateById(db, c.req.param("id"));
+    const template = await getTemplateById(db, id);
     if (!template) {
       return c.json({ error: "Proposal template not found" }, 404);
     }
@@ -1247,14 +1262,16 @@ app.put("/templates/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
-    const validationError = validateTemplate(body, true);
-    if (validationError) {
-      return c.json({ error: validationError }, 400);
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
     }
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const v = validateBody(body, updateTemplateLocalSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
     const db = getApiDb();
-    const values = templateFields(body, false);
+    const values = templateFields(sentFields(v.data, body), false);
     let template;
     if (Object.keys(values).length === 0) {
       // No updatable fields — the repository returns the existing row.
@@ -1283,10 +1300,12 @@ app.delete("/templates/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const [deleted] = await db
       .delete(proposalTemplates)
-      .where(eq(proposalTemplates.id, c.req.param("id")))
+      .where(eq(proposalTemplates.id, id))
       .returning({ id: proposalTemplates.id });
     if (!deleted) {
       return c.json({ error: "Proposal template not found" }, 404);

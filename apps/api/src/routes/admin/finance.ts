@@ -105,6 +105,13 @@ import {
 } from "@repo/database/schema";
 import { getApiDb, type ApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import {
+  invalidParam,
+  isRecord,
+  parsePagination,
+  readJsonBody,
+  uuidParam,
+} from "../../lib/validate";
 
 type Env = {
   Bindings: {
@@ -154,19 +161,15 @@ function errorResponse(
   return c.json({ error: errorMessage(err, fallback) }, 500);
 }
 
-function parsePage(query: (name: string) => string | undefined): {
-  page: number;
-  pageSize: number;
-} {
-  const page = parseInt(query("page") ?? "1", 10);
-  const pageSize = parseInt(query("pageSize") ?? "20", 10);
-  return {
-    page: Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1,
-    pageSize:
-      Number.isFinite(pageSize) && pageSize >= 1
-        ? Math.floor(pageSize)
-        : 20,
-  };
+/** True when the value parses as a date (query date validation). */
+function isValidDateString(value: string): boolean {
+  return !Number.isNaN(Date.parse(value));
+}
+
+/** True when the value is a finite number (query amount validation). */
+function isFiniteNumberString(value: string): boolean {
+  const n = Number(value);
+  return value.trim() !== "" && Number.isFinite(n);
 }
 
 /**
@@ -861,7 +864,9 @@ const createExpenseCategorySchema = z.object({
   icon: z.string().optional(),
   isActive: z.boolean().optional(),
 });
-const updateExpenseCategorySchema = expenseCategorySchema.partial();
+const updateExpenseCategorySchema = expenseCategorySchema
+  .omit({ id: true, createdAt: true })
+  .partial();
 
 const paymentMethodSchema = z.object({
   id: uuidSchema,
@@ -875,7 +880,9 @@ const createPaymentMethodSchema = z.object({
   type: paymentMethodTypeSchema,
   isActive: z.boolean(),
 });
-const updatePaymentMethodSchema = paymentMethodSchema.partial();
+const updatePaymentMethodSchema = paymentMethodSchema
+  .omit({ id: true, createdAt: true })
+  .partial();
 
 const financePaymentSchema = z.object({
   id: uuidSchema,
@@ -909,7 +916,13 @@ const createFinancePaymentSchema = z.object({
   notes: z.string().optional(),
   invoiceId: uuidSchema.optional(),
 });
-const updateFinancePaymentSchema = financePaymentSchema.partial();
+const updateFinancePaymentSchema = financePaymentSchema
+  // amountBdt is server-computed, never client-supplied (see the create
+  // schema comment). Omit it (and identity fields) so a PUT that changes
+  // only description/notes cannot smuggle a client-supplied amountBdt
+  // past the recompute — the old .partial() accepted and wrote it verbatim.
+  .omit({ id: true, amountBdt: true, createdBy: true, createdAt: true })
+  .partial();
 
 const financeExpenseSchema = z.object({
   id: uuidSchema,
@@ -943,7 +956,13 @@ const createFinanceExpenseSchema = z.object({
   expenseDate: z.string(),
   receiptUrl: z.string().optional(),
 });
-const updateFinanceExpenseSchema = financeExpenseSchema.partial();
+const updateFinanceExpenseSchema = financeExpenseSchema
+  // amountBdt is server-computed, never client-supplied (see the create
+  // schema comment). Omit it (and identity fields) so a PUT that changes
+  // only description/notes cannot smuggle a client-supplied amountBdt
+  // past the recompute — the old .partial() accepted and wrote it verbatim.
+  .omit({ id: true, amountBdt: true, createdBy: true, createdAt: true })
+  .partial();
 
 const invoiceLineItemSchema = z.object({
   description: z.string(),
@@ -997,7 +1016,21 @@ const createFinanceInvoiceSchema = z.object({
   notes: z.string().optional(),
   pdfUrl: z.string().optional(),
 });
-const updateFinanceInvoiceSchema = financeInvoiceSchema.partial();
+const updateFinanceInvoiceSchema = financeInvoiceSchema
+  // subtotal/total/totalBdt are server-computed, never client-supplied
+  // (see the create schema comment). Omit them (and identity fields) so
+  // a PUT that changes only notes/dates cannot smuggle client-supplied
+  // totals past the recompute — the old .partial() accepted and wrote
+  // them verbatim when lineItems/discount did not change.
+  .omit({
+    id: true,
+    subtotal: true,
+    total: true,
+    totalBdt: true,
+    createdBy: true,
+    createdAt: true,
+  })
+  .partial();
 
 /** First Zod issue message, exactly as the Next.js routes return it. */
 function invalidBody(parsed: { error: z.ZodError }): string {
@@ -1014,7 +1047,7 @@ app.get("/expense-categories", async (c) => {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
     const onlyActive = c.req.query("onlyActive") === "true";
-    const { page, pageSize } = parsePage((name) => c.req.query(name));
+    const { page, pageSize } = parsePagination(c);
     const db = getApiDb();
     const where = onlyActive
       ? eq(expenseCategories.isActive, true)
@@ -1047,7 +1080,10 @@ app.post("/expense-categories", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
     const parsed = createExpenseCategorySchema.safeParse(body);
     if (!parsed.success) {
       return c.json({ error: invalidBody(parsed) }, 400);
@@ -1077,11 +1113,13 @@ app.get("/expense-categories/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const [row] = await db
       .select()
       .from(expenseCategories)
-      .where(eq(expenseCategories.id, c.req.param("id")))
+      .where(eq(expenseCategories.id, id))
       .limit(1);
     if (!row) {
       return c.json({ error: "Expense category not found" }, 404);
@@ -1096,8 +1134,12 @@ app.put("/expense-categories/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
     const parsed = updateExpenseCategorySchema.safeParse(body);
     if (!parsed.success) {
       return c.json({ error: invalidBody(parsed) }, 400);
@@ -1136,10 +1178,12 @@ app.delete("/expense-categories/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const deleted = await db
       .delete(expenseCategories)
-      .where(eq(expenseCategories.id, c.req.param("id")))
+      .where(eq(expenseCategories.id, id))
       .returning({ id: expenseCategories.id });
     if (deleted.length === 0) {
       return c.json({ error: "Expense category not found" }, 404);
@@ -1156,13 +1200,33 @@ app.get("/expenses", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const q = c.req.query;
+    const q = c.req.query.bind(c.req); // NB: query() reads this.url, so it must stay bound to c.req.
     const sourceType = q("sourceType") ?? undefined;
     const sourceId = q("sourceId") ?? undefined;
     const categoryId = q("categoryId") ?? undefined;
     const dateFrom = q("dateFrom") ?? undefined;
     const dateTo = q("dateTo") ?? undefined;
-    const { page, pageSize } = parsePage((name) => c.req.query(name));
+    if (
+      sourceType !== undefined &&
+      !expenseSourceTypeSchema.safeParse(sourceType).success
+    ) {
+      return c.json({ error: "Invalid sourceType" }, 400);
+    }
+    for (const [name, value] of [
+      ["sourceId", sourceId],
+      ["categoryId", categoryId],
+    ] as const) {
+      if (value !== undefined && !uuidSchema.safeParse(value).success) {
+        return c.json({ error: `Invalid ${name}` }, 400);
+      }
+    }
+    if (dateFrom !== undefined && !isValidDateString(dateFrom)) {
+      return c.json({ error: "Invalid dateFrom" }, 400);
+    }
+    if (dateTo !== undefined && !isValidDateString(dateTo)) {
+      return c.json({ error: "Invalid dateTo" }, 400);
+    }
+    const { page, pageSize } = parsePagination(c);
     const db = getApiDb();
     const where = and(
       sourceType
@@ -1207,7 +1271,10 @@ app.post("/expenses", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
     const parsed = createFinanceExpenseSchema.safeParse(body);
     if (!parsed.success) {
       return c.json({ error: invalidBody(parsed) }, 400);
@@ -1246,11 +1313,13 @@ app.get("/expenses/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const [row] = await db
       .select()
       .from(financeExpenses)
-      .where(eq(financeExpenses.id, c.req.param("id")))
+      .where(eq(financeExpenses.id, id))
       .limit(1);
     if (!row) return c.json({ error: "Expense not found" }, 404);
     return c.json(row);
@@ -1263,8 +1332,12 @@ app.put("/expenses/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
     const parsed = updateFinanceExpenseSchema.safeParse(body);
     if (!parsed.success) {
       return c.json({ error: invalidBody(parsed) }, 400);
@@ -1318,10 +1391,12 @@ app.delete("/expenses/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const deleted = await db
       .delete(financeExpenses)
-      .where(eq(financeExpenses.id, c.req.param("id")))
+      .where(eq(financeExpenses.id, id))
       .returning({ id: financeExpenses.id });
     if (deleted.length === 0) {
       return c.json({ error: "Expense not found" }, 404);
@@ -1338,7 +1413,7 @@ app.get("/invoices", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const q = c.req.query;
+    const q = c.req.query.bind(c.req); // NB: query() reads this.url, so it must stay bound to c.req.
     const statusParam = q("status") ?? undefined;
     const statuses = statusParam
       ? statusParam
@@ -1349,7 +1424,28 @@ app.get("/invoices", async (c) => {
     const sourceType = q("sourceType") ?? undefined;
     const sourceId = q("sourceId") ?? undefined;
     const clientId = q("clientId") ?? undefined;
-    const { page, pageSize } = parsePage((name) => c.req.query(name));
+    if (statuses !== undefined) {
+      for (const st of statuses) {
+        if (!invoiceStatusSchema.safeParse(st).success) {
+          return c.json({ error: "Invalid status" }, 400);
+        }
+      }
+    }
+    if (
+      sourceType !== undefined &&
+      !paymentSourceTypeSchema.safeParse(sourceType).success
+    ) {
+      return c.json({ error: "Invalid sourceType" }, 400);
+    }
+    for (const [name, value] of [
+      ["sourceId", sourceId],
+      ["clientId", clientId],
+    ] as const) {
+      if (value !== undefined && !uuidSchema.safeParse(value).success) {
+        return c.json({ error: `Invalid ${name}` }, 400);
+      }
+    }
+    const { page, pageSize } = parsePagination(c);
     const db = getApiDb();
     const where = and(
       statuses && statuses.length > 0
@@ -1398,7 +1494,10 @@ app.post("/invoices", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
     const parsed = createFinanceInvoiceSchema.safeParse(body);
     if (!parsed.success) {
       return c.json({ error: invalidBody(parsed) }, 400);
@@ -1448,20 +1547,28 @@ app.post("/invoices", async (c) => {
 
 // GET /invoices/:id/pdf — PDF download; POST — source shape { pdfUrl }.
 // Registered BEFORE /invoices/:id so the static "pdf" segment wins.
-app.get("/invoices/:id/pdf", (c) => invoicePdf(c, true, c.req.param("id")));
-app.post("/invoices/:id/pdf", (c) =>
-  invoicePdf(c, false, c.req.param("id")),
-);
+app.get("/invoices/:id/pdf", async (c) => {
+  const id = uuidParam(c, "id");
+  if (!id) return invalidParam(c, "id");
+  return invoicePdf(c, true, id);
+});
+app.post("/invoices/:id/pdf", async (c) => {
+  const id = uuidParam(c, "id");
+  if (!id) return invalidParam(c, "id");
+  return invoicePdf(c, false, id);
+});
 
 app.get("/invoices/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const [row] = await db
       .select()
       .from(financeInvoices)
-      .where(eq(financeInvoices.id, c.req.param("id")))
+      .where(eq(financeInvoices.id, id))
       .limit(1);
     if (!row) return c.json({ error: "Invoice not found" }, 404);
     return c.json(withParsedLineItems(row));
@@ -1474,8 +1581,12 @@ app.put("/invoices/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
     const parsed = updateFinanceInvoiceSchema.safeParse(body);
     if (!parsed.success) {
       return c.json({ error: invalidBody(parsed) }, 400);
@@ -1548,10 +1659,12 @@ app.delete("/invoices/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const deleted = await db
       .delete(financeInvoices)
-      .where(eq(financeInvoices.id, c.req.param("id")))
+      .where(eq(financeInvoices.id, id))
       .returning({ id: financeInvoices.id });
     if (deleted.length === 0) {
       return c.json({ error: "Invoice not found" }, 404);
@@ -1567,8 +1680,12 @@ app.post("/invoices/:id/status", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
     const parsed = invoiceStatusSchema.safeParse(body?.status);
     if (!parsed.success) {
       return c.json({ error: invalidBody(parsed) }, 400);
@@ -1609,7 +1726,7 @@ app.get("/payment-methods", async (c) => {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
     const onlyActive = c.req.query("onlyActive") === "true";
-    const { page, pageSize } = parsePage((name) => c.req.query(name));
+    const { page, pageSize } = parsePagination(c);
     const db = getApiDb();
     const where = onlyActive ? eq(paymentMethods.isActive, true) : undefined;
     const [countRow] = await db
@@ -1640,7 +1757,10 @@ app.post("/payment-methods", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
     const parsed = createPaymentMethodSchema.safeParse(body);
     if (!parsed.success) {
       return c.json({ error: invalidBody(parsed) }, 400);
@@ -1662,11 +1782,13 @@ app.get("/payment-methods/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const [row] = await db
       .select()
       .from(paymentMethods)
-      .where(eq(paymentMethods.id, c.req.param("id")))
+      .where(eq(paymentMethods.id, id))
       .limit(1);
     if (!row) {
       return c.json({ error: "Payment method not found" }, 404);
@@ -1681,8 +1803,12 @@ app.put("/payment-methods/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
     const parsed = updatePaymentMethodSchema.safeParse(body);
     if (!parsed.success) {
       return c.json({ error: invalidBody(parsed) }, 400);
@@ -1716,10 +1842,12 @@ app.delete("/payment-methods/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const deleted = await db
       .delete(paymentMethods)
-      .where(eq(paymentMethods.id, c.req.param("id")))
+      .where(eq(paymentMethods.id, id))
       .returning({ id: paymentMethods.id });
     if (deleted.length === 0) {
       return c.json({ error: "Payment method not found" }, 404);
@@ -1736,7 +1864,7 @@ app.get("/payments", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const q = c.req.query;
+    const q = c.req.query.bind(c.req); // NB: query() reads this.url, so it must stay bound to c.req.
     const sourceType = q("sourceType") ?? undefined;
     const sourceId = q("sourceId") ?? undefined;
     const clientId = q("clientId") ?? undefined;
@@ -1744,7 +1872,29 @@ app.get("/payments", async (c) => {
     const paymentMethodId = q("paymentMethodId") ?? undefined;
     const dateFrom = q("dateFrom") ?? undefined;
     const dateTo = q("dateTo") ?? undefined;
-    const { page, pageSize } = parsePage((name) => c.req.query(name));
+    if (
+      sourceType !== undefined &&
+      !paymentSourceTypeSchema.safeParse(sourceType).success
+    ) {
+      return c.json({ error: "Invalid sourceType" }, 400);
+    }
+    for (const [name, value] of [
+      ["sourceId", sourceId],
+      ["clientId", clientId],
+      ["invoiceId", invoiceId],
+      ["paymentMethodId", paymentMethodId],
+    ] as const) {
+      if (value !== undefined && !uuidSchema.safeParse(value).success) {
+        return c.json({ error: `Invalid ${name}` }, 400);
+      }
+    }
+    if (dateFrom !== undefined && !isValidDateString(dateFrom)) {
+      return c.json({ error: "Invalid dateFrom" }, 400);
+    }
+    if (dateTo !== undefined && !isValidDateString(dateTo)) {
+      return c.json({ error: "Invalid dateTo" }, 400);
+    }
+    const { page, pageSize } = parsePagination(c);
     const db = getApiDb();
     const where = and(
       sourceType
@@ -1793,7 +1943,10 @@ app.post("/payments", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
     const parsed = createFinancePaymentSchema.safeParse(body);
     if (!parsed.success) {
       return c.json({ error: invalidBody(parsed) }, 400);
@@ -1839,11 +1992,13 @@ app.get("/payments/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const [row] = await db
       .select()
       .from(financePayments)
-      .where(eq(financePayments.id, c.req.param("id")))
+      .where(eq(financePayments.id, id))
       .limit(1);
     if (!row) return c.json({ error: "Payment not found" }, 404);
     return c.json(row);
@@ -1856,8 +2011,12 @@ app.put("/payments/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
     const parsed = updateFinancePaymentSchema.safeParse(body);
     if (!parsed.success) {
       return c.json({ error: invalidBody(parsed) }, 400);
@@ -1902,10 +2061,12 @@ app.delete("/payments/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const deleted = await db
       .delete(financePayments)
-      .where(eq(financePayments.id, c.req.param("id")))
+      .where(eq(financePayments.id, id))
       .returning({ id: financePayments.id });
     if (deleted.length === 0) {
       return c.json({ error: "Payment not found" }, 404);
@@ -1925,6 +2086,25 @@ app.get("/summary", async (c) => {
     const sourceType = c.req.query("sourceType") ?? undefined;
     const sourceId = c.req.query("sourceId") ?? undefined;
     const agreedAmountBdt = c.req.query("agreedAmountBdt") ?? undefined;
+    // sourceType is used against both the payments enum
+    // (freelance_project|artist_event) and the expenses enum (which
+    // adds general), so either enum accepts it.
+    if (
+      sourceType !== undefined &&
+      !paymentSourceTypeSchema.safeParse(sourceType).success &&
+      !expenseSourceTypeSchema.safeParse(sourceType).success
+    ) {
+      return c.json({ error: "Invalid sourceType" }, 400);
+    }
+    if (sourceId !== undefined && !uuidSchema.safeParse(sourceId).success) {
+      return c.json({ error: "Invalid sourceId" }, 400);
+    }
+    if (
+      agreedAmountBdt !== undefined &&
+      !isFiniteNumberString(agreedAmountBdt)
+    ) {
+      return c.json({ error: "Invalid agreedAmountBdt" }, 400);
+    }
     const db = getApiDb();
 
     // Per-source summary (FinanceSummaryRepository.getSourceSummary).

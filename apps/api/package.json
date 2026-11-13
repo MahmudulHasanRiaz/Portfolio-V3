@@ -15,6 +15,7 @@
     "@aws-sdk/client-s3": "^3.1167.0",
     "@neondatabase/serverless": "^1.2.0",
     "@repo/database": "*",
+    "@repo/validation": "*",
     "better-auth": "^1.7.22",
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.18",

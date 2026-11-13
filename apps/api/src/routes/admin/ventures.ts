@@ -43,6 +43,16 @@
 // (b) dispatched the "venture_published" workflow trigger on create, and
 // (c) purged the public site cache via purgePublicCache(["ventures", "home"]).
 import { Hono } from "hono";
+import { z } from "zod";
+import {
+  createMediaMentionSchema,
+  createTimelineEventSchema,
+  createVentureSchema,
+  slugSchema,
+  updateMediaMentionSchema,
+  updateVentureSchema,
+  uuidSchema,
+} from "@repo/validation";
 import {
   and,
   asc,
@@ -66,9 +76,49 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth, unauthorized } from "../../lib/admin-auth";
+import {
+  invalidParam,
+  isRecord,
+  parsePagination,
+  readJsonBody,
+  uuidParam,
+  validateBody,
+} from "../../lib/validate";
 import { deleteSearchEntity, dispatchTrigger, indexSearchEntity, purgePublicCache, waitUntilOf } from "../../lib/side-effects";
 
 const app = new Hono();
+
+// ─── Validation ──────────────────────────────────────────────────────────────
+// Local schemas (finance.ts precedent): venture categories have no shared
+// @repo/validation schema. Create requires `name`; update is its partial
+// (PATCH sets only the fields sent, as before). Timeline: `sourceType` /
+// `sourceId` are server-set ("venture" / :id).
+const createVentureCategorySchema = z.object({
+  name: z.string().min(1).max(255),
+  slug: slugSchema.optional(),
+  description: z.string().optional(),
+});
+const updateVentureCategorySchema = createVentureCategorySchema.partial();
+const setVentureCategoriesSchema = z.object({
+  categoryIds: z.array(uuidSchema).min(0).max(100),
+});
+const timelineBodySchema = createTimelineEventSchema.omit({
+  sourceType: true,
+  sourceId: true,
+});
+const deleteTimelineSchema = z.object({ eventId: uuidSchema });
+// - List-query enums (same values as the shared venture schemas).
+const ventureStatusSchema = z.enum(["active", "paused", "acquired", "closed"]);
+const ventureContentStatusSchema = z.enum(["draft", "published", "archived"]);
+
+/** Server-managed fields are never client-settable: drop them from
+ *  validated data before any DB write. */
+function stripServerManaged(data: Record<string, unknown>): void {
+  delete data.id;
+  delete data.createdBy;
+  delete data.createdAt;
+  delete data.updatedAt;
+}
 
 // Columns of the ventures table, keyed by their camelCase property name —
 // used as the allowlist for create/update bodies.
@@ -76,15 +126,6 @@ const VENTURE_COLUMNS = getTableColumns(ventures);
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
-}
-
-function parsePage(query: (name: string) => string | undefined): {
-  page: number;
-  pageSize: number;
-} {
-  const page = parseInt(query("page") ?? "1", 10);
-  const pageSize = parseInt(query("pageSize") ?? "20", 10);
-  return { page, pageSize };
 }
 
 /**
@@ -130,7 +171,25 @@ app.get("/", async (c) => {
     const contentStatusParam = c.req.query("contentStatus") ?? undefined;
     const categoryId = c.req.query("categoryId") ?? undefined;
     const industry = c.req.query("industry") ?? undefined;
-    const { page, pageSize } = parsePage((name) => c.req.query(name));
+    if (search !== undefined && search.length > 255) {
+      return c.json({ error: "search must be at most 255 characters" }, 400);
+    }
+    if (status !== undefined && !ventureStatusSchema.safeParse(status).success) {
+      return c.json({ error: "Invalid status" }, 400);
+    }
+    if (
+      contentStatusParam !== undefined &&
+      !ventureContentStatusSchema.safeParse(contentStatusParam).success
+    ) {
+      return c.json({ error: "Invalid contentStatus" }, 400);
+    }
+    if (categoryId !== undefined && !uuidSchema.safeParse(categoryId).success) {
+      return c.json({ error: "Invalid categoryId" }, 400);
+    }
+    if (industry !== undefined && industry.length > 100) {
+      return c.json({ error: "industry must be at most 100 characters" }, 400);
+    }
+    const { page, pageSize } = parsePagination(c);
     const offset = (page - 1) * pageSize;
 
     const db = getApiDb();
@@ -215,12 +274,17 @@ app.post("/", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, createVentureSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = { ...(v.data as Record<string, unknown>) };
+    stripServerManaged(data);
     const db = getApiDb();
     const [row] = await db
       .insert(ventures)
       .values({
-        ...ventureFields(body, true),
+        ...ventureFields(data, true),
         createdBy: user.id,
       } as typeof ventures.$inferInsert)
       .returning();
@@ -257,11 +321,13 @@ app.post("/categories", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const body = (await c.req.json()) as Record<string, unknown>;
-    const name = body.name as string | undefined;
-    const slug =
-      (body.slug as string | undefined)?.trim() ||
-      (name ? slugify(name) : "");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, createVentureCategorySchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data;
+    const name = data.name;
+    const slug = data.slug?.trim() || slugify(name);
     if (!name?.trim() || !slug) {
       return c.json({ error: "Category name is required" }, 400);
     }
@@ -271,7 +337,7 @@ app.post("/categories", async (c) => {
       .values({
         name,
         slug,
-        description: (body.description as string | undefined) ?? null,
+        description: data.description ?? null,
       })
       .returning();
     if (!row) return c.json({ error: "Failed to create category" }, 500);
@@ -285,14 +351,20 @@ app.patch("/categories/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, updateVentureCategorySchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = { ...(v.data as Record<string, unknown>) };
+    stripServerManaged(data);
     const db = getApiDb();
     const sets: Partial<typeof ventureCategories.$inferInsert> = {};
-    if (body.name !== undefined) sets.name = body.name as string | null;
-    if (body.slug !== undefined) sets.slug = body.slug as string;
-    if (body.description !== undefined) {
-      sets.description = body.description as string | null;
+    if (data.name !== undefined) sets.name = data.name as string | null;
+    if (data.slug !== undefined) sets.slug = data.slug as string;
+    if (data.description !== undefined) {
+      sets.description = data.description as string | null;
     }
     if (Object.keys(sets).length === 0) {
       // The repository returns the existing row when nothing is set.
@@ -320,7 +392,8 @@ app.delete("/categories/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const [deleted] = await db
       .delete(ventureCategories)
@@ -339,7 +412,8 @@ app.get("/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const [row] = await db
       .select()
@@ -357,10 +431,16 @@ app.patch("/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, updateVentureSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = { ...(v.data as Record<string, unknown>) };
+    stripServerManaged(data);
     const db = getApiDb();
-    const values = ventureFields(body, false);
+    const values = ventureFields(data, false);
     if (Object.keys(values).length === 0) {
       // No updatable fields — the repository returns the existing row.
       const [existing] = await db
@@ -392,7 +472,8 @@ app.delete("/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     // No FKs point from products / timeline_events to ventures, so delete
     // the children first — otherwise a deleted venture leaves orphaned
@@ -442,7 +523,8 @@ app.get("/:id/categories", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const categories = await getVentureCategories(db, id);
     return c.json(categories);
@@ -455,12 +537,13 @@ app.post("/:id/categories", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
-    const categoryIds = body.categoryIds as string[] | undefined;
-    if (!Array.isArray(categoryIds)) {
-      return c.json({ error: "categoryIds must be an array" }, 400);
-    }
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, setVentureCategoriesSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const categoryIds = v.data.categoryIds;
     const db = getApiDb();
     // NOTE: the source ran this in one postgres.js transaction. The
     // neon-http driver has no transaction support (db.transaction()
@@ -489,8 +572,9 @@ app.get("/:id/media", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
-    const { page, pageSize } = parsePage((name) => c.req.query(name));
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const { page, pageSize } = parsePagination(c);
     const offset = (page - 1) * pageSize;
     const db = getApiDb();
     const [countRow] = await db
@@ -523,29 +607,35 @@ app.post("/:id/media", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
-    const title = body.title as string | undefined;
-    const sourceName = body.sourceName as string | undefined;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, createMediaMentionSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = { ...(v.data as Record<string, unknown>) };
+    stripServerManaged(data);
+    const title = data.title as string | undefined;
+    const sourceName = data.sourceName as string | undefined;
     if (!title?.trim() && !sourceName?.trim()) {
       return c.json({ error: "Title or source name is required" }, 400);
     }
     const slugBase =
       slugify(
-        (body.slug as string | undefined) || title || "mention",
+        (data.slug as string | undefined) || title || "mention",
       ) || "mention";
-    const publishedDate = (body.publishedDate as string | undefined) || null;
+    const publishedDate = (data.publishedDate as string | undefined) || null;
     const db = getApiDb();
     const values = {
       ventureId: id,
       title: title ?? null,
       slug: slugBase,
       sourceName: sourceName ?? null,
-      sourceUrl: (body.sourceUrl as string | undefined) ?? null,
+      sourceUrl: (data.sourceUrl as string | undefined) ?? null,
       publishedDate,
-      summary: (body.summary as string | undefined) ?? null,
-      isFeatured: (body.isFeatured as boolean | undefined) ?? false,
-      status: ((body.status as string | undefined) ?? "draft") as (
+      summary: (data.summary as string | undefined) ?? null,
+      isFeatured: (data.isFeatured as boolean | undefined) ?? false,
+      status: ((data.status as string | undefined) ?? "draft") as (
         typeof contentStatus.enumValues
       )[number],
     };
@@ -574,29 +664,47 @@ app.patch("/:id/media", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const body = (await c.req.json()) as Record<string, unknown>;
-    const mentionId = (body.mentionId as string | undefined) ??
+    // NOTE (out of scope, left as-is): the mention is looked up by
+    // mentionId alone, ignoring the :id venture — a mention from another
+    // venture can be updated/deleted through this route. That is an
+    // authorization fix, not a validation fix.
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    // mentionId is the lookup key, not a media-mention field, so it is
+    // extracted (and UUID-checked) before schema validation strips it.
+    const mentionIdRaw =
+      (body.mentionId as string | undefined) ??
       (body.id as string | undefined);
-    if (!mentionId) return c.json({ error: "mentionId required" }, 400);
+    if (!mentionIdRaw) return c.json({ error: "mentionId required" }, 400);
+    if (!uuidSchema.safeParse(mentionIdRaw).success) {
+      return invalidParam(c, "mentionId");
+    }
+    const mentionId = mentionIdRaw;
+    const v = validateBody(body, updateMediaMentionSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = { ...(v.data as Record<string, unknown>) };
+    stripServerManaged(data);
     const db = getApiDb();
     const sets: Partial<typeof mediaMentions.$inferInsert> = {};
-    if (body.title !== undefined) sets.title = body.title as string | null;
-    if (body.slug !== undefined) sets.slug = body.slug as string;
-    if (body.sourceName !== undefined) {
-      sets.sourceName = body.sourceName as string | null;
+    if (data.title !== undefined) sets.title = data.title as string | null;
+    if (data.slug !== undefined) sets.slug = data.slug as string;
+    if (data.sourceName !== undefined) {
+      sets.sourceName = data.sourceName as string | null;
     }
-    if (body.sourceUrl !== undefined) {
-      sets.sourceUrl = body.sourceUrl as string | null;
+    if (data.sourceUrl !== undefined) {
+      sets.sourceUrl = data.sourceUrl as string | null;
     }
-    if (body.publishedDate !== undefined) {
-      sets.publishedDate = (body.publishedDate as string | undefined) || null;
+    if (data.publishedDate !== undefined) {
+      sets.publishedDate = (data.publishedDate as string | undefined) || null;
     }
-    if (body.summary !== undefined) sets.summary = body.summary as string | null;
-    if (body.isFeatured !== undefined) {
-      sets.isFeatured = body.isFeatured as boolean | null;
+    if (data.summary !== undefined) sets.summary = data.summary as string | null;
+    if (data.isFeatured !== undefined) {
+      sets.isFeatured = data.isFeatured as boolean | null;
     }
-    if (body.status !== undefined) {
-      sets.status = body.status as (typeof contentStatus.enumValues)[number];
+    if (data.status !== undefined) {
+      sets.status = data.status as (typeof contentStatus.enumValues)[number];
     }
     if (Object.keys(sets).length === 0) {
       const [existing] = await db
@@ -623,17 +731,24 @@ app.delete("/:id/media", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
+    // NOTE (out of scope, left as-is): the mention is looked up by
+    // mentionId alone, ignoring the :id venture — see PATCH above.
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     // The source takes the id from the body, falling back to ?mentionId=.
-    const body = (await c.req.json().catch(() => ({}))) as Record<
-      string,
-      unknown
-    >;
+    // A bodyless/malformed body is treated as {} (as the source's
+    // .json().catch(() => ({})) did), so ?mentionId= still works.
+    const rawBody = await readJsonBody(c);
+    const body: Record<string, unknown> = isRecord(rawBody) ? rawBody : {};
     const mentionId =
       (body.mentionId as string | undefined) ??
       (body.id as string | undefined) ??
       c.req.query("mentionId") ??
       undefined;
     if (!mentionId) return c.json({ error: "mentionId required" }, 400);
+    if (!uuidSchema.safeParse(mentionId).success) {
+      return invalidParam(c, "mentionId");
+    }
     const db = getApiDb();
     const [deleted] = await db
       .delete(mediaMentions)
@@ -652,9 +767,9 @@ app.get("/:id/products", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
-    const page = parseInt(c.req.query("page") ?? "1", 10);
-    const pageSize = parseInt(c.req.query("pageSize") ?? "50", 10);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const { page, pageSize } = parsePagination(c, { defaultPageSize: 50 });
     const offset = (page - 1) * pageSize;
     const db = getApiDb();
     const where = eq(products.ventureId, id);
@@ -688,7 +803,8 @@ app.get("/:id/timeline", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const rows = await db
       .select()
@@ -715,20 +831,25 @@ app.post("/:id/timeline", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const id = c.req.param("id");
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, timelineBodySchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data;
     const db = getApiDb();
     const [row] = await db
       .insert(timelineEvents)
       .values({
         sourceType: "venture",
         sourceId: id,
-        eventType: (body.eventType as string | undefined) ?? null,
-        title: (body.title as string | undefined) ?? null,
-        description: (body.description as string | undefined) ?? null,
-        eventDate: (body.eventDate as string | undefined) ?? null,
-        icon: (body.icon as string | undefined) ?? null,
-        url: (body.url as string | undefined) ?? null,
+        eventType: data.eventType,
+        title: data.title,
+        description: data.description ?? null,
+        eventDate: data.eventDate,
+        icon: data.icon ?? null,
+        url: data.url ?? null,
       })
       .returning();
     if (!row) return c.json({ error: "Failed to add timeline event" }, 500);
@@ -742,9 +863,14 @@ app.delete("/:id/timeline", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const body = (await c.req.json()) as { eventId?: unknown };
-    const eventId = body.eventId as string | undefined;
-    if (!eventId) return c.json({ error: "eventId required" }, 400);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
+    const body = await readJsonBody(c);
+    // A bodyless DELETE is a 400 here (not a 500 from bare .json()).
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, deleteTimelineSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const eventId = v.data.eventId;
     const db = getApiDb();
     const [deleted] = await db
       .delete(timelineEvents)

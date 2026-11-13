@@ -21,9 +21,18 @@
 //   in these sources.
 import { Hono } from "hono";
 import { desc, eq } from "drizzle-orm";
+import { z } from "zod";
+import { createAbandonedLeadSchema } from "@repo/validation";
 import { abandonedLeads } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import {
+  invalidParam,
+  isRecord,
+  readJsonBody,
+  uuidParam,
+  validateBody,
+} from "../../lib/validate";
 
 type Env = {
   Bindings: {
@@ -37,6 +46,26 @@ const app = new Hono<Env>();
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
 }
+
+// POST / capture validation: the shared create schema, but email is
+// optional here (the route also accepts phone-only captures) with a
+// refinement requiring at least one contact field — the old code
+// inserted an all-null row when neither was given. sourcePage is capped
+// at 255 chars and metadata at 50 keys. Nullable spellings are accepted
+// (the old code coerced non-strings to null) and stored as null.
+const createAbandonedLeadLocalSchema = createAbandonedLeadSchema
+  .extend({
+    email: z.string().max(255).email().nullable().optional(),
+    phone: z.string().max(50).nullable().optional(),
+    sourcePage: z.string().max(255).nullable().optional(),
+    metadata: z.record(z.string(), z.unknown()).nullable().optional(),
+  })
+  .refine((d) => !!d.email || !!d.phone, {
+    message: "email or phone is required",
+  })
+  .refine((d) => !d.metadata || Object.keys(d.metadata).length <= 50, {
+    message: "metadata must have at most 50 keys",
+  });
 
 // GET / — list abandoned leads, newest first
 // (AbandonedRepository.list). Requires auth.
@@ -63,19 +92,21 @@ app.get("/", async (c) => {
 // require a session here.
 app.post("/", async (c) => {
   try {
-    const body = (await c.req.json()) as Record<string, unknown>;
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
+    const v = validateBody(body, createAbandonedLeadLocalSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data;
     const db = getApiDb();
     const [row] = await db
       .insert(abandonedLeads)
       .values({
-        email: typeof body.email === "string" ? body.email : null,
-        phone: typeof body.phone === "string" ? body.phone : null,
-        sourcePage:
-          typeof body.sourcePage === "string" ? body.sourcePage : null,
-        metadata:
-          body.metadata !== undefined && body.metadata !== null
-            ? (body.metadata as Record<string, unknown>)
-            : null,
+        email: data.email ?? null,
+        phone: data.phone ?? null,
+        sourcePage: data.sourcePage ?? null,
+        metadata: data.metadata ?? null,
       })
       .returning();
     if (!row) {
@@ -95,10 +126,12 @@ app.delete("/:id", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const [deleted] = await db
       .delete(abandonedLeads)
-      .where(eq(abandonedLeads.id, c.req.param("id")))
+      .where(eq(abandonedLeads.id, id))
       .returning({ id: abandonedLeads.id });
     if (!deleted) {
       return c.json({ error: "Abandoned lead not found" }, 404);

@@ -46,6 +46,7 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import { parsePagination, uuidParam, invalidParam } from "../../lib/validate";
 import { cacheTagsForContentType, deleteSearchEntity, indexSearchEntity, purgePublicCache, searchEntityTypeForContentType, waitUntilOf } from "../../lib/side-effects";
 
 type Env = {
@@ -251,14 +252,7 @@ app.get("/revisions", async (c) => {
     if (entityType && !ENTITY_TYPES.includes(entityType)) {
       return c.json({ error: "Invalid entityType" }, 400);
     }
-    const page = Math.max(
-      1,
-      parseInt(c.req.query("page") ?? "1", 10) || 1,
-    );
-    const pageSize = Math.min(
-      50,
-      Math.max(1, parseInt(c.req.query("pageSize") ?? "20", 10) || 20),
-    );
+    const { page, pageSize } = parsePagination(c, { maxPageSize: 50 });
     const db = getApiDb();
     const where = entityType
       ? eq(contentRevisions.entityType, entityType)
@@ -302,7 +296,8 @@ app.post("/revisions/:id/restore", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user?.email) return c.json({ error: "Unauthorized" }, 401);
-    const id = c.req.param("id");
+    const id = uuidParam(c, "id");
+    if (!id) return invalidParam(c, "id");
     const db = getApiDb();
     const [revision] = await db
       .select()
@@ -331,6 +326,15 @@ app.post("/revisions/:id/restore", async (c) => {
     if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
       throw new Error("Revision snapshot is empty");
     }
+    // FOLLOW-UP (not wired): re-validate the picked snapshot fields
+    // against the per-type update*Schema before applying them. A
+    // naive safeParse would 400 legitimate restores: snapshots store
+    // real DB nulls (authorId / translationGroup / projectId /
+    // publishAt / unpublishAt / metrics) for columns the schemas
+    // model as optional-but-not-nullable, and the schemas also accept
+    // the createdBy the allowlist already includes — so the wiring
+    // needs null-tolerant schema variants (or snapshot sanitisation),
+    // not a bare safeParse. The :id UUID check above is in place.
     const entityId = revision.entityId ?? "";
     const [existing] = await db
       .select()
