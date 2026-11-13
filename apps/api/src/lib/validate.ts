@@ -91,6 +91,19 @@ export function uuidParam(c: Context, name: string): string | null {
   return parsed.success ? parsed.data : null;
 }
 
+/**
+ * Read an optional query-string filter, treating a missing value OR an
+ * empty string as "not provided". The admin UI sends `""` for an unset
+ * filter (e.g. the blog page calls listContent with `status: ""`), and
+ * `new URLSearchParams` keeps that empty value — so a handler that
+ * validates `status !== undefined` would 400 a perfectly normal list
+ * request. Callers validate the returned value only when it is defined.
+ */
+export function queryParam(c: Context, name: string): string | undefined {
+  const value = c.req.query(name);
+  return value === undefined || value === "" ? undefined : value;
+}
+
 /** The 400 response for a malformed path param. */
 export function invalidParam(c: Context, name: string) {
   return c.json({ error: `Invalid ${name}` }, 400);

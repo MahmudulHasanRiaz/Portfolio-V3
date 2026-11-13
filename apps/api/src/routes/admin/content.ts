@@ -70,6 +70,7 @@ import {
   invalidParam,
   isRecord,
   parsePagination,
+  queryParam,
   readJsonBody,
   uuidParam,
   validateBody,
@@ -604,13 +605,13 @@ app.get("/:type", async (c) => {
     if (!def) return c.json({ error: "Unknown content type" }, 404);
     const db = getApiDb();
     const { page, pageSize } = parsePagination(c);
-    const status = c.req.query("status") ?? undefined;
-    const search = c.req.query("search") ?? undefined;
-    const authorId = c.req.query("authorId") ?? undefined;
-    const categoryId = c.req.query("categoryId") ?? undefined;
-    const tagId = c.req.query("tagId") ?? undefined;
-    const sortField = c.req.query("sortField") ?? undefined;
-    const sortDir = c.req.query("sortDir") ?? undefined;
+    const status = queryParam(c, "status");
+    const search = queryParam(c, "search");
+    const authorId = queryParam(c, "authorId");
+    const categoryId = queryParam(c, "categoryId");
+    const tagId = queryParam(c, "tagId");
+    const sortField = queryParam(c, "sortField");
+    const sortDir = queryParam(c, "sortDir");
     if (status !== undefined) {
       const statusSchema =
         type === "posts" ? POST_STATUS_SCHEMA : entityStatusSchema;

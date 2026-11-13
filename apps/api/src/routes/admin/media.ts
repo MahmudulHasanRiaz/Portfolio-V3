@@ -118,6 +118,7 @@ import {
   invalidParam,
   isRecord,
   parsePagination,
+  queryParam,
   readJsonBody,
   uuidParam,
   validateBody,
@@ -817,7 +818,7 @@ app.get("/", async (c) => {
     const db = getApiDb();
     const { page, pageSize } = parsePagination(c, { defaultPageSize: 50 });
     const offset = (page - 1) * pageSize;
-    const sortDirRaw = c.req.query("sortDir");
+    const sortDirRaw = queryParam(c, "sortDir");
     if (
       sortDirRaw !== undefined &&
       sortDirRaw !== "asc" &&
@@ -826,44 +827,44 @@ app.get("/", async (c) => {
       return c.json({ error: 'sortDir must be "asc" or "desc"' }, 400);
     }
     const sortDir = (sortDirRaw as "asc" | "desc") || "desc";
-    const folderIdRaw = c.req.query("folderId");
+    const folderIdRaw = queryParam(c, "folderId");
     if (
       folderIdRaw !== undefined &&
       !uuidSchema.safeParse(folderIdRaw).success
     ) {
       return c.json({ error: "folderId must be a UUID" }, 400);
     }
-    const uploadedByRaw = c.req.query("uploadedBy");
+    const uploadedByRaw = queryParam(c, "uploadedBy");
     if (
       uploadedByRaw !== undefined &&
       !uuidSchema.safeParse(uploadedByRaw).success
     ) {
       return c.json({ error: "uploadedBy must be a UUID" }, 400);
     }
-    const typeRaw = c.req.query("type");
+    const typeRaw = queryParam(c, "type");
     if (typeRaw !== undefined && typeRaw.length > 50) {
       return c.json({ error: "type must be at most 50 characters" }, 400);
     }
-    const queryRaw = c.req.query("query");
+    const queryRaw = queryParam(c, "query");
     if (queryRaw !== undefined && queryRaw.length > 255) {
       return c.json({ error: "query must be at most 255 characters" }, 400);
     }
     for (const flag of ["includeDeleted", "attached", "includeUsage"] as const) {
-      const raw = c.req.query(flag);
+      const raw = queryParam(c, flag);
       if (raw !== undefined && raw !== "true" && raw !== "false") {
         return c.json({ error: `${flag} must be "true" or "false"` }, 400);
       }
     }
     const attached =
-      c.req.query("attached") === "true"
+      queryParam(c, "attached") === "true"
         ? true
-        : c.req.query("attached") === "false"
+        : queryParam(c, "attached") === "false"
           ? false
           : undefined;
-    const includeUsage = c.req.query("includeUsage") === "true";
+    const includeUsage = queryParam(c, "includeUsage") === "true";
 
     const conditions: any[] = [];
-    if (c.req.query("includeDeleted") !== "true") {
+    if (queryParam(c, "includeDeleted") !== "true") {
       conditions.push(isNull(mediaAssets.deletedAt));
     }
     if (folderIdRaw) {
