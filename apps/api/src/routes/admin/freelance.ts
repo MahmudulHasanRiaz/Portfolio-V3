@@ -94,6 +94,7 @@ import {
   invalidParam,
   isRecord,
   parsePagination,
+  queryParam,
   readJsonBody,
   uuidParam,
   validateBody,
@@ -297,8 +298,8 @@ app.get("/projects", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
-    const search = c.req.query("search") ?? undefined;
-    const status = c.req.query("status") ?? undefined;
+    const search = queryParam(c, "search");
+    const status = queryParam(c, "status");
     if (
       status !== undefined &&
       ![

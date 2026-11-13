@@ -109,6 +109,7 @@ import {
   invalidParam,
   isRecord,
   parsePagination,
+  queryParam,
   readJsonBody,
   uuidParam,
 } from "../../lib/validate";
@@ -2083,9 +2084,9 @@ app.get("/summary", async (c) => {
   try {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const sourceType = c.req.query("sourceType") ?? undefined;
-    const sourceId = c.req.query("sourceId") ?? undefined;
-    const agreedAmountBdt = c.req.query("agreedAmountBdt") ?? undefined;
+    const sourceType = queryParam(c, "sourceType");
+    const sourceId = queryParam(c, "sourceId");
+    const agreedAmountBdt = queryParam(c, "agreedAmountBdt");
     // sourceType is used against both the payments enum
     // (freelance_project|artist_event) and the expenses enum (which
     // adds general), so either enum accepts it.
