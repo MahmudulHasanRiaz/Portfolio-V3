@@ -35,14 +35,12 @@
 //   static segments win over the :id param.
 // - These sources have no purgePublicCache / search-indexer calls.
 //
-// TODO (cutover wiring, deliberately NOT done here): the original
+// Side effects (wired at cutover via lib/side-effects): the original
 // routes also (a) dispatchTrigger(..., "lead_created", ...) after a
 // lead is created, (b) dispatchTrigger(..., "lead_status_changed", ...)
 // after a status change, and (c) link page views to the new lead via
 // LeadAttributionService.linkPageViewsToLead(visitorId, lead.id) when
-// a visitorId is supplied. Those cross-cutting side effects will be
-// wired at cutover; the TODO markers below show where each call
-// belongs.
+// a visitorId is supplied.
 import { Hono } from "hono";
 import {
   and,
@@ -65,6 +63,7 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import { dispatchTrigger, linkPageViewsToLead, waitUntilOf } from "../../lib/side-effects";
 
 type Env = {
   Bindings: {
@@ -262,12 +261,10 @@ app.post("/", async (c) => {
       user.id,
       { source: leadData.leadSource },
     );
-    // TODO (cutover): dispatchTrigger(dbUrl, "lead_created", lead.id,
-    //   { ...lead, triggeredBy: user.id }).
-    // TODO (cutover): if visitorId is set, link page views to the new
-    //   lead via LeadAttributionService.linkPageViewsToLead(visitorId,
-    //   lead.id) — best-effort in the original (failure only logged).
-    void visitorId;
+    await dispatchTrigger(db, "lead_created", lead.id, { ...lead, triggeredBy: user.id });
+    if (typeof visitorId === "string" && visitorId !== "") {
+      void linkPageViewsToLead(db, visitorId, lead.id, waitUntilOf(c));
+    }
     return c.json(lead, 201);
   } catch (err) {
     return c.json({ error: errorMessage(err, "Failed to create lead") }, 500);
@@ -641,8 +638,7 @@ app.post("/:id/status", async (c) => {
       user.id,
       { newStatus },
     );
-    // TODO (cutover): dispatchTrigger(dbUrl, "lead_status_changed", id,
-    //   { lead, newStatus, triggeredBy: user.id }).
+    await dispatchTrigger(db, "lead_status_changed", id, { lead, newStatus, triggeredBy: user.id });
     return c.json(lead);
   } catch (err) {
     return c.json(

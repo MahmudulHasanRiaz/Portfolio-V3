@@ -21,13 +21,11 @@
 // - Update/delete snapshot the previous row into content_revisions
 //   (RevisionService.create), with revisionNumber = existing count + 1.
 //
-// TODO (cutover wiring, deliberately NOT done here): the original
+// Side effects (wired at cutover via lib/side-effects): the original
 // actions also (a) dispatchTrigger(..., "content_published", ...) when
 // a create/update/transition lands on status "published", (b) index /
 // de-index the entity via SearchIndexerService, and (c) purge the public
-// site cache via purgePublicCache. Those cross-cutting side effects
-// will be wired at cutover; the TODO markers below show where each
-// call belongs.
+// site cache via purgePublicCache.
 //
 // Out of scope for this router (they live in the same action file but
 // were not requested): set/getContentCategories, set/getContentTags,
@@ -49,11 +47,14 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import { cacheTagsForContentType, deleteSearchEntity, dispatchTrigger, indexSearchEntity, purgePublicCache, searchEntityTypeForContentType, waitUntilOf } from "../../lib/side-effects";
 
 type Env = {
   Bindings: {
     DATABASE_URL?: string;
     BETTER_AUTH_SECRET?: string;
+    PUBLIC_SITE_URL?: string;
+    CACHE_INVALIDATE_SECRET?: string;
   };
 };
 
@@ -627,8 +628,16 @@ app.post("/:type", async (c) => {
         createdBy: user.id,
       })
       .returning()) as unknown as Record<string, unknown>[];
-    // TODO (cutover): if row.status === "published" — dispatchTrigger
-    // "content_published", index the entity in search, purgePublicCache.
+    const entityType = searchEntityTypeForContentType(type);
+    if (row?.status === "published") {
+      await dispatchTrigger(db, "content_published", row.id as string, {
+        ...row,
+        contentType: type,
+        triggeredBy: user.id,
+      });
+      void indexSearchEntity(db, entityType, row.id as string, c.env, waitUntilOf(c));
+    }
+    void purgePublicCache(c.env, cacheTagsForContentType(type), waitUntilOf(c));
     return c.json(row, 201);
   } catch (err) {
     return c.json({ error: errorMessage(err) }, 500);
@@ -656,9 +665,19 @@ app.put("/:type/:id", async (c) => {
       .where(eq(def.table.id, id))
       .returning();
     if (!row) throw new Error(`Content not found: ${id}`);
-    // TODO (cutover): if row is published — dispatchTrigger
-    // "content_published" + index in search; if it WAS published and no
-    // longer is — de-index; purgePublicCache in all cases.
+    const entityType = searchEntityTypeForContentType(type);
+    const wasPublished = existing?.status === "published";
+    if (row.status === "published") {
+      await dispatchTrigger(db, "content_published", row.id, {
+        ...row,
+        contentType: type,
+        triggeredBy: user.id,
+      });
+      void indexSearchEntity(db, entityType, row.id, c.env, waitUntilOf(c));
+    } else if (wasPublished) {
+      void deleteSearchEntity(db, entityType, row.id, waitUntilOf(c));
+    }
+    void purgePublicCache(c.env, cacheTagsForContentType(type), waitUntilOf(c));
     return c.json(row);
   } catch (err) {
     return c.json({ error: errorMessage(err) }, 500);
@@ -686,8 +705,10 @@ app.delete("/:type/:id", async (c) => {
       .update(def.table)
       .set({ status: "archived", updatedAt: new Date() })
       .where(eq(def.table.id, id));
-    // TODO (cutover): if it was published — de-index from search;
-    // purgePublicCache.
+    if (currentStatus === "published") {
+      void deleteSearchEntity(db, searchEntityTypeForContentType(type), id, waitUntilOf(c));
+    }
+    void purgePublicCache(c.env, cacheTagsForContentType(type), waitUntilOf(c));
     return c.json({ ok: true });
   } catch (err) {
     return c.json({ error: errorMessage(err) }, 500);
@@ -717,9 +738,19 @@ app.post("/:type/:id/transition", async (c) => {
       .where(eq(def.table.id, id))
       .returning();
     if (!row) throw new Error(`Content not found: ${id}`);
-    // TODO (cutover): if target is published — dispatchTrigger
-    // "content_published" + index in search; if it WAS published —
-    // de-index; purgePublicCache.
+    const entityType = searchEntityTypeForContentType(type);
+    if (targetStatus === "published") {
+      await dispatchTrigger(db, "content_published", row.id, {
+        ...row,
+        contentType: type,
+        action,
+        triggeredBy: user.id,
+      });
+      void indexSearchEntity(db, entityType, row.id, c.env, waitUntilOf(c));
+    } else if (currentStatus === "published") {
+      void deleteSearchEntity(db, entityType, row.id, waitUntilOf(c));
+    }
+    void purgePublicCache(c.env, cacheTagsForContentType(type), waitUntilOf(c));
     return c.json(row);
   } catch (err) {
     return c.json({ error: errorMessage(err) }, 500);

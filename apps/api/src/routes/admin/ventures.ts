@@ -38,12 +38,10 @@
 //   (list / add / delete by eventId in the body), same as the source.
 //   Products is list-only, exactly as the source route (GET only).
 //
-// TODO(cutover): the sources also (a) indexed / de-indexed the entity via
-// SearchIndexerService, (b) dispatched the "venture_published" workflow
-// trigger on create, and (c) purged the public site cache via
-// purgePublicCache(["ventures", "home"]). Those cross-cutting side effects
-// are NOT ported here — the cutover wires them centrally. The TODO markers
-// below show where each call belongs.
+// Side effects (wired at cutover via lib/side-effects): the sources also
+// (a) indexed / de-indexed the entity via SearchIndexerService,
+// (b) dispatched the "venture_published" workflow trigger on create, and
+// (c) purged the public site cache via purgePublicCache(["ventures", "home"]).
 import { Hono } from "hono";
 import {
   and,
@@ -68,6 +66,7 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth, unauthorized } from "../../lib/admin-auth";
+import { deleteSearchEntity, dispatchTrigger, indexSearchEntity, purgePublicCache, waitUntilOf } from "../../lib/side-effects";
 
 const app = new Hono();
 
@@ -226,9 +225,9 @@ app.post("/", async (c) => {
       } as typeof ventures.$inferInsert)
       .returning();
     if (!row) return c.json({ error: "Failed to create venture" }, 500);
-    // TODO(cutover): searchIndexer.indexEntity("venture", row.id);
-    // TODO(cutover): dispatchTrigger(dbUrl, "venture_published", row.id, { ...row, triggeredBy: user.id });
-    // TODO(cutover): purgePublicCache(["ventures", "home"]).
+    void indexSearchEntity(db, "venture", row.id, c.env, waitUntilOf(c));
+    await dispatchTrigger(db, "venture_published", row.id, { ...row, triggeredBy: user.id });
+    void purgePublicCache(c.env, ["ventures", "home"], waitUntilOf(c));
     return c.json(row, 201);
   } catch (err) {
     return c.json({ error: errorMessage(err, "Failed to create venture") }, 500);
@@ -381,8 +380,8 @@ app.patch("/:id", async (c) => {
       .where(eq(ventures.id, id))
       .returning();
     if (!row) return c.json({ error: "Venture not found" }, 404);
-    // TODO(cutover): searchIndexer.indexEntity("venture", row.id);
-    // TODO(cutover): purgePublicCache(["ventures", "home"]).
+    void indexSearchEntity(db, "venture", row.id, c.env, waitUntilOf(c));
+    void purgePublicCache(c.env, ["ventures", "home"], waitUntilOf(c));
     return c.json(row);
   } catch (err) {
     return c.json({ error: errorMessage(err, "Failed to update venture") }, 500);
@@ -413,8 +412,8 @@ app.delete("/:id", async (c) => {
       .where(eq(ventures.id, id))
       .returning({ id: ventures.id });
     if (!deleted) return c.json({ error: "Venture not found" }, 404);
-    // TODO(cutover): searchIndexer.deleteEntity("venture", id);
-    // TODO(cutover): purgePublicCache(["ventures", "home"]).
+    void deleteSearchEntity(db, "venture", id, waitUntilOf(c));
+    void purgePublicCache(c.env, ["ventures", "home"], waitUntilOf(c));
     return c.json({ success: true });
   } catch (err) {
     return c.json({ error: errorMessage(err, "Failed to delete venture") }, 500);

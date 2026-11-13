@@ -34,12 +34,11 @@
 //   for PATCH (same handler, same validation), so both the original
 //   PATCH contract and the PUT contract are served.
 //
-// TODO (cutover wiring, deliberately NOT done here): the originals
+// Cache purge (wired at cutover via lib/side-effects): the originals
 // call purgePublicCache(["home"]) after saving availability,
 // default-language, favicon, hero-portrait, primary-identity and
-// site-copy (best-effort, never fails the save). That side effect
-// will be wired at cutover; the TODO markers below show where each
-// call belongs. search-indexing has no purge call in the original.
+// site-copy (best-effort, never fails the save).
+// search-indexing has no purge call in the original.
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { desc, eq } from "drizzle-orm";
@@ -52,6 +51,7 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import { purgePublicCache, waitUntilOf } from "../../lib/side-effects";
 import {
   AVAILABILITY_DEFAULT,
   AVAILABILITY_KEY,
@@ -82,6 +82,8 @@ type Env = {
   Bindings: {
     DATABASE_URL?: string;
     BETTER_AUTH_SECRET?: string;
+    PUBLIC_SITE_URL?: string;
+    CACHE_INVALIDATE_SECRET?: string;
   };
 };
 
@@ -185,7 +187,7 @@ app.put("/availability", async (c) => {
       "brand",
       "Availability badge shown on the public site (available + badge text)",
     );
-    // TODO (cutover): purgePublicCache(["home"]) — best-effort, never fails the save.
+    void purgePublicCache(c.env, ["home"], waitUntilOf(c));
     return c.json(value);
   } catch (err) {
     return c.json({ error: errorMessage(err) }, 500);
@@ -230,7 +232,7 @@ app.put("/default-language", async (c) => {
       "brand",
       "Default language of the public site: en (English), bn (Bangla), or system (auto-detect from the visitor's device language). A visitor's manual switch always wins.",
     );
-    // TODO (cutover): purgePublicCache(["home"]) — best-effort, never fails the save.
+    void purgePublicCache(c.env, ["home"], waitUntilOf(c));
     return c.json({ defaultLanguage: value });
   } catch (err) {
     return c.json({ error: errorMessage(err) }, 500);
@@ -275,7 +277,7 @@ app.put("/favicon", async (c) => {
       "brand",
       'Favicon image URL, uploaded from the admin panel (public site renders it as <link rel="icon">)',
     );
-    // TODO (cutover): purgePublicCache(["home"]) — best-effort, never fails the save.
+    void purgePublicCache(c.env, ["home"], waitUntilOf(c));
     return c.json({ faviconUrl });
   } catch (err) {
     return c.json({ error: errorMessage(err) }, 500);
@@ -320,7 +322,7 @@ app.put("/hero-portrait", async (c) => {
       "brand",
       "Hero portrait image URL, uploaded from the admin panel (never a repo file)",
     );
-    // TODO (cutover): purgePublicCache(["home"]) — best-effort, never fails the save.
+    void purgePublicCache(c.env, ["home"], waitUntilOf(c));
     return c.json({ portraitUrl });
   } catch (err) {
     return c.json({ error: errorMessage(err) }, 500);
@@ -365,7 +367,7 @@ app.put("/primary-identity", async (c) => {
       "brand",
       "Focused public profile shown first on the homepage",
     );
-    // TODO (cutover): purgePublicCache(["home"]) — best-effort, never fails the save.
+    void purgePublicCache(c.env, ["home"], waitUntilOf(c));
     return c.json({ primaryIdentity: value });
   } catch (err) {
     return c.json({ error: errorMessage(err) }, 500);
@@ -560,8 +562,9 @@ app.put("/site-copy", async (c) => {
           .values({ key: rowKey, value: merged, group: "brand", description: desc });
       }
     }
-    // TODO (cutover): if Object.keys(saved).length > 0 —
-    // purgePublicCache(["home"]) — best-effort, never fails the save.
+    if (Object.keys(saved).length > 0) {
+      void purgePublicCache(c.env, ["home"], waitUntilOf(c));
+    }
     return c.json(saved);
   } catch (err) {
     return c.json({ error: errorMessage(err) }, 500);

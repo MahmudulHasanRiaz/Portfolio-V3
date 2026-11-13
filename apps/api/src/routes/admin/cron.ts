@@ -19,20 +19,29 @@
 // is re-implemented here with direct Drizzle over getApiDb() (Neon
 // HTTP) — the CMS service calls getDb() (postgres.js, TCP) and is not
 // Workers-safe. The status updates are the same (scheduled → published
-// for due publishAt, published → draft for due unpublishAt), but the
+// for due publishAt, published → draft for due unpublishAt), and the
 // ContentService.transition() side effects (search-index update and
-// purgePublicCache) are NOT wired — see the TODO (cutover) below.
+// purgePublicCache) are wired via lib/side-effects.
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { and, eq, isNotNull, lte } from "drizzle-orm";
 import { posts } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { processNextRun } from "./workflows";
+import {
+  cacheTagsForContentType,
+  deleteSearchEntity,
+  indexSearchEntity,
+  purgePublicCache,
+  waitUntilOf,
+} from "../../lib/side-effects";
 
 type Env = {
   Bindings: {
     DATABASE_URL?: string;
     BETTER_AUTH_SECRET?: string;
+    PUBLIC_SITE_URL?: string;
+    CACHE_INVALIDATE_SECRET?: string;
   };
 };
 
@@ -100,19 +109,20 @@ app.get("/publish", async (c) => {
         ),
       );
 
-    // TODO (cutover): the original routes each post through
-    // ContentService.transition(), which also fires the search-index
-    // update (index on publish / de-index on unpublish) and
-    // purgePublicCache. Those side effects are NOT wired here yet.
-    // The status flips below are the same transitions (scheduled →
-    // published and published → draft are both valid per the posts
-    // workflow), run as sequential statements — Neon HTTP has no
-    // transaction support.
+    // Side effects (wired at cutover via lib/side-effects): the original
+    // routes each post through ContentService.transition(), which also
+    // fires the search-index update (index on publish / de-index on
+    // unpublish) and purgePublicCache. The status flips below are the
+    // same transitions (scheduled → published and published → draft are
+    // both valid per the posts workflow), run as sequential statements —
+    // Neon HTTP has no transaction support. The per-post purge is
+    // coalesced into one purge when anything flipped (same tags).
     for (const post of toPublish) {
       await db
         .update(posts)
         .set({ status: "published", updatedAt: new Date() })
         .where(eq(posts.id, post.id));
+      void indexSearchEntity(db, "post", post.id, c.env, waitUntilOf(c));
     }
 
     for (const post of toUnpublish) {
@@ -120,6 +130,15 @@ app.get("/publish", async (c) => {
         .update(posts)
         .set({ status: "draft", updatedAt: new Date() })
         .where(eq(posts.id, post.id));
+      void deleteSearchEntity(db, "post", post.id, waitUntilOf(c));
+    }
+
+    if (toPublish.length > 0 || toUnpublish.length > 0) {
+      void purgePublicCache(
+        c.env,
+        cacheTagsForContentType("posts"),
+        waitUntilOf(c),
+      );
     }
 
     return c.json({

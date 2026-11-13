@@ -276,6 +276,40 @@ async function isLiveFetchAllowed(): Promise<boolean> {
 		liveFetchDecision = true;
 		return true;
 	}
+	// Worker runtime detection — FALLBACK (2026-11-13, Hono cutover).
+	// The userAgent check above is NOT reliable when nodejs_compat is
+	// on: workerd's Node.js compatibility layer provides Node's
+	// `navigator`, whose userAgent is "Node.js/..." — NOT
+	// "Cloudflare-Workers". The deployed public Worker (nodejs_compat
+	// enabled in wrangler.jsonc) therefore failed this check, the gate
+	// stayed closed, and every page fell back to the build-time static
+	// rows even though the Hono API was live and the token matched.
+	// This fallback opens the gate when the Worker runtime env carries
+	// BOTH the API URL and the read token. The token is a Worker
+	// secret, so it is present ONLY in a deployed Worker, never at
+	// build time — that is what makes this safe against the Run #19
+	// failure (the old `cloudflare:workers` check opened the gate at
+	// build time because the module resolves there too). The URL alone
+	// is not enough as a signal (wrangler.jsonc vars can reach the
+	// build), but a secret cannot. At build time the token is absent,
+	// so the gate stays closed and the build never pays live fetches.
+	try {
+		const { env } = await import("cloudflare:workers");
+		const rt = env as Record<string, unknown>;
+		const apiUrl = rt.PUBLIC_CONTENT_API_URL;
+		const token = rt.PUBLIC_CONTENT_API_TOKEN;
+		if (
+			typeof apiUrl === "string" &&
+			apiUrl &&
+			typeof token === "string" &&
+			token
+		) {
+			liveFetchDecision = true;
+			return true;
+		}
+	} catch {
+		// Not running in a Worker — fall through to SKIP.
+	}
 	liveFetchDecision = false;
 	return false;
 }
@@ -355,14 +389,78 @@ async function fetchJson(
 	return fetchJsonUncached(url, token);
 }
 
+/**
+ * Fetch through the HONO_API service binding when one is configured
+ * (2026-11-13, Hono cutover). Returns null when there is no binding
+ * (local dev / `astro build`, where the binding does not exist) or the
+ * binding call itself throws — the caller then falls back to a plain
+ * HTTP fetch. A Response (any status, including 401/404/500) is
+ * returned as-is: it is authoritative, never a reason to retry over
+ * HTTP.
+ *
+ * WHY a binding is needed at all: a Worker CANNOT fetch another
+ * Worker's `*.workers.dev` URL from inside the Worker — every such
+ * subrequest fails with Cloudflare "error code: 1042" (the
+ * `workers.dev` hostname does not resolve in the Worker's subrequest
+ * context; verified 2026-11-13 by probing Hono /health, Hono
+ * /api/public/content/projects and the admin /auth/login from the
+ * public Worker — all 1042 — while an external URL, example.com,
+ * returned 200). The public site therefore could never reach Hono
+ * over its `workers.dev` URL, and every page fell back to the static
+ * rows even though the token, the gate and the URL were all correct.
+ * A service binding calls the Hono Worker directly (no DNS, no
+ * `workers.dev` hostname), so it is the only free-tier path that
+ * works without a custom domain (which the user deferred). The
+ * binding is declared in wrangler.jsonc (`services: [{ binding:
+ * "HONO_API", service: "portfolio-v3-api" }]`); the Bearer token is
+ * still sent, because Hono still requires it. The Request URL uses a
+ * placeholder origin — a service binding routes by the bound service,
+ * not by hostname — and only the path + query + headers reach Hono.
+ * This helper is only ever called for Hono API URLs (every fetchJson
+ * caller in this file targets `{PUBLIC_CONTENT_API_URL}/api/public/…`),
+ * so using the binding whenever it exists is correct here.
+ */
+type HonoBinding = {
+	fetch: (req: Request) => Promise<Response>;
+};
+
+async function fetchViaHonoBinding(
+	url: string,
+	token: string | undefined,
+): Promise<Response | null> {
+	try {
+		const { env } = await import("cloudflare:workers");
+		const binding = (env as Record<string, unknown>).HONO_API as
+			| HonoBinding
+			| undefined;
+		if (!binding || typeof binding.fetch !== "function") return null;
+		const u = new URL(url);
+		const req = new Request(
+			`https://hono-api${u.pathname}${u.search}`,
+			{
+				headers: token
+					? { Authorization: `Bearer ${token}` }
+					: {},
+				signal: AbortSignal.timeout(8000),
+			},
+		);
+		return await binding.fetch(req);
+	} catch {
+		return null;
+	}
+}
+
 async function fetchJsonUncached(
 	url: string,
 	token: string | undefined,
 ): Promise<unknown> {
-	const res = await fetch(url, {
-		headers: token ? { Authorization: `Bearer ${token}` } : {},
-		signal: AbortSignal.timeout(8000),
-	});
+	const bound = await fetchViaHonoBinding(url, token);
+	const res =
+		bound ??
+		(await fetch(url, {
+			headers: token ? { Authorization: `Bearer ${token}` } : {},
+			signal: AbortSignal.timeout(8000),
+		}));
 	if (res.status === 404) return undefined;
 	if (!res.ok) {
 		throw new Error(`Public Content API ${res.status} for ${url}`);

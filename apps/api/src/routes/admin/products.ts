@@ -15,20 +15,22 @@
 //   known product columns are allowlisted (the admin UI sends only
 //   these), matching the other Hono routers' Zod-stripping precedent.
 //
-// TODO (cutover): the original also called SearchIndexerService
-// indexEntity("product", id) on create/update and deleteEntity on
-// delete. Those search-index side effects are not wired here; see
-// content.ts for the same TODO pattern.
+// Search-index side effects (wired at cutover via lib/side-effects):
+// the original also called SearchIndexerService indexEntity("product", id)
+// on create/update and deleteEntity on delete.
 import { Hono } from "hono";
 import { count, desc, eq } from "drizzle-orm";
 import { products } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import { deleteSearchEntity, indexSearchEntity, waitUntilOf } from "../../lib/side-effects";
 
 type Env = {
   Bindings: {
     DATABASE_URL?: string;
     BETTER_AUTH_SECRET?: string;
+    PUBLIC_SITE_URL?: string;
+    CACHE_INVALIDATE_SECRET?: string;
   };
 };
 
@@ -111,7 +113,9 @@ app.post("/", async (c) => {
         createdBy: user.id,
       } as typeof products.$inferInsert)
       .returning();
-    // TODO (cutover): searchIndexer.indexEntity("product", row.id).
+    if (row) {
+      void indexSearchEntity(db, "product", row.id, c.env, waitUntilOf(c));
+    }
     return c.json(row, 201);
   } catch (err) {
     return c.json({ error: errorMessage(err) }, 500);
@@ -149,7 +153,7 @@ app.patch("/:id", async (c) => {
       .where(eq(products.id, c.req.param("id")))
       .returning();
     if (!row) return c.json({ error: "Product not found" }, 404);
-    // TODO (cutover): searchIndexer.indexEntity("product", row.id).
+    void indexSearchEntity(db, "product", row.id, c.env, waitUntilOf(c));
     return c.json(row);
   } catch (err) {
     return c.json({ error: errorMessage(err) }, 500);
@@ -170,7 +174,7 @@ app.delete("/:id", async (c) => {
     if (deleted.length === 0) {
       return c.json({ error: "Product not found" }, 404);
     }
-    // TODO (cutover): searchIndexer.deleteEntity("product", id).
+    void deleteSearchEntity(db, "product", id, waitUntilOf(c));
     return c.json({ success: true });
   } catch (err) {
     return c.json({ error: errorMessage(err) }, 500);

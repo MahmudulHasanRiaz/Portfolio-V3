@@ -10,15 +10,15 @@
 // messages the actions threw. Drizzle rows are already camelCase, so no
 // toCamel conversion is applied.
 //
-// TODO(cutover): the source calls purgePublicCache(["home"]) after every
-// create/update/delete (best-effort, never fails the save). That
-// cross-cutting side effect is NOT ported here — the cutover wires cache
-// purging centrally.
+// Cache purge (wired at cutover via lib/side-effects): the source calls
+// purgePublicCache(["home"]) after every create/update/delete
+// (best-effort, never fails the save).
 import { Hono } from "hono";
 import { asc, eq, ilike } from "drizzle-orm";
 import { clients, platforms, technologies } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth, unauthorized } from "../../lib/admin-auth";
+import { purgePublicCache, waitUntilOf } from "../../lib/side-effects";
 
 const app = new Hono();
 
@@ -195,7 +195,7 @@ app.post("/platforms", async (c) => {
       .values(platformValues(data))
       .returning();
     if (!row) return c.json({ error: "Failed to create platform" }, 500);
-    // TODO(cutover): purgePublicCache(["home"]) — see file header.
+    void purgePublicCache(c.env, ["home"], waitUntilOf(c));
     return c.json(toPlatformRow(row), 201);
   } catch (err) {
     if (err instanceof ApiError) return c.json({ error: err.message }, err.status);
@@ -217,7 +217,7 @@ app.put("/platforms/:id", async (c) => {
       .where(eq(platforms.id, id))
       .returning();
     if (!row) throw new ApiError(404, "Platform not found");
-    // TODO(cutover): purgePublicCache(["home"]) — see file header.
+    void purgePublicCache(c.env, ["home"], waitUntilOf(c));
     return c.json(toPlatformRow(row));
   } catch (err) {
     if (err instanceof ApiError) return c.json({ error: err.message }, err.status);
@@ -232,7 +232,7 @@ app.delete("/platforms/:id", async (c) => {
     const id = c.req.param("id");
     assertUuid(id, "platform");
     await getApiDb().delete(platforms).where(eq(platforms.id, id));
-    // TODO(cutover): purgePublicCache(["home"]) — see file header.
+    void purgePublicCache(c.env, ["home"], waitUntilOf(c));
     return c.json({ success: true });
   } catch (err) {
     if (err instanceof ApiError) return c.json({ error: err.message }, err.status);
@@ -348,7 +348,7 @@ app.post("/technologies", async (c) => {
       .values(technologyValues(data))
       .returning();
     if (!row) return c.json({ error: "Failed to create technology" }, 500);
-    // TODO(cutover): purgePublicCache(["home"]) — see file header.
+    void purgePublicCache(c.env, ["home"], waitUntilOf(c));
     return c.json(toTechnologyRow(row), 201);
   } catch (err) {
     if (err instanceof ApiError) return c.json({ error: err.message }, err.status);
@@ -372,7 +372,7 @@ app.put("/technologies/:id", async (c) => {
       .where(eq(technologies.id, id))
       .returning();
     if (!row) throw new ApiError(404, "Technology not found");
-    // TODO(cutover): purgePublicCache(["home"]) — see file header.
+    void purgePublicCache(c.env, ["home"], waitUntilOf(c));
     return c.json(toTechnologyRow(row));
   } catch (err) {
     if (err instanceof ApiError) return c.json({ error: err.message }, err.status);
@@ -387,7 +387,7 @@ app.delete("/technologies/:id", async (c) => {
     const id = c.req.param("id");
     assertUuid(id, "technology");
     await getApiDb().delete(technologies).where(eq(technologies.id, id));
-    // TODO(cutover): purgePublicCache(["home"]) — see file header.
+    void purgePublicCache(c.env, ["home"], waitUntilOf(c));
     return c.json({ success: true });
   } catch (err) {
     if (err instanceof ApiError) return c.json({ error: err.message }, err.status);
@@ -486,7 +486,7 @@ app.post("/clients", async (c) => {
       .values(clientValues(data))
       .returning();
     if (!row) return c.json({ error: "Failed to create client" }, 500);
-    // TODO(cutover): purgePublicCache(["home"]) — see file header.
+    void purgePublicCache(c.env, ["home"], waitUntilOf(c));
     return c.json(toClientRow(row), 201);
   } catch (err) {
     if (err instanceof ApiError) return c.json({ error: err.message }, err.status);
@@ -508,7 +508,7 @@ app.put("/clients/:id", async (c) => {
       .where(eq(clients.id, id))
       .returning();
     if (!row) throw new ApiError(404, "Client not found");
-    // TODO(cutover): purgePublicCache(["home"]) — see file header.
+    void purgePublicCache(c.env, ["home"], waitUntilOf(c));
     return c.json(toClientRow(row));
   } catch (err) {
     if (err instanceof ApiError) return c.json({ error: err.message }, err.status);
@@ -523,7 +523,7 @@ app.delete("/clients/:id", async (c) => {
     const id = c.req.param("id");
     assertUuid(id, "client");
     await getApiDb().delete(clients).where(eq(clients.id, id));
-    // TODO(cutover): purgePublicCache(["home"]) — see file header.
+    void purgePublicCache(c.env, ["home"], waitUntilOf(c));
     return c.json({ success: true });
   } catch (err) {
     if (err instanceof ApiError) return c.json({ error: err.message }, err.status);

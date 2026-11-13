@@ -28,11 +28,9 @@
 //   homepage/seed route bulk-seeds dummy data (including a DevPulse BD
 //   venture the user said to drop) and is NOT ported.
 //
-// TODO (cutover wiring, deliberately NOT done here): HomepageService
+// Cache purge (wired at cutover via lib/side-effects): HomepageService
 // calls purgePublicCache(["home"]) after reorder, section update,
-// toggle, and version restore (when anything was restored). Those
-// cross-cutting side effects will be wired at cutover; the TODO markers
-// below show where each call belongs.
+// toggle, and version restore (when anything was restored).
 import { Hono } from "hono";
 import { asc, count, desc, eq } from "drizzle-orm";
 import {
@@ -42,11 +40,14 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import { purgePublicCache, waitUntilOf } from "../../lib/side-effects";
 
 type Env = {
   Bindings: {
     DATABASE_URL?: string;
     BETTER_AUTH_SECRET?: string;
+    PUBLIC_SITE_URL?: string;
+    CACHE_INVALIDATE_SECRET?: string;
   };
 };
 
@@ -128,7 +129,7 @@ app.post("/reorder", async (c) => {
         .set({ sortOrder: i, updatedAt: new Date() })
         .where(eq(homepageSections.id, ids[i] as string));
     }
-    // TODO (cutover): purgePublicCache(["home"]).
+    void purgePublicCache(c.env, ["home"], waitUntilOf(c));
     return c.json({ success: true });
   } catch (err) {
     return c.json(
@@ -173,7 +174,7 @@ app.patch("/sections/:id", async (c) => {
       .where(eq(homepageSections.id, id))
       .returning();
     if (!row) throw new Error("Section not found");
-    // TODO (cutover): purgePublicCache(["home"]).
+    void purgePublicCache(c.env, ["home"], waitUntilOf(c));
     return c.json({ success: true, section: row });
   } catch (err) {
     return c.json(
@@ -200,7 +201,7 @@ app.post("/sections/:id/toggle", async (c) => {
       .set({ isVisible: !section.isVisible, updatedAt: new Date() })
       .where(eq(homepageSections.id, id))
       .returning();
-    // TODO (cutover): purgePublicCache(["home"]).
+    void purgePublicCache(c.env, ["home"], waitUntilOf(c));
     return c.json({ success: true, section: row });
   } catch (err) {
     return c.json(
@@ -298,7 +299,9 @@ app.post("/versions/:id/restore", async (c) => {
         .where(eq(homepageSections.id, target.id));
       restored++;
     }
-    // TODO (cutover): if restored > 0 — purgePublicCache(["home"]).
+    if (restored > 0) {
+      void purgePublicCache(c.env, ["home"], waitUntilOf(c));
+    }
     return c.json({ success: true, restored });
   } catch (err) {
     if (err instanceof Error && err.message === "Version not found") {

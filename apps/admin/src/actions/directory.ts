@@ -1,16 +1,24 @@
 "use server";
 
-import { asc, eq, ilike } from "drizzle-orm";
-import { getDb, platforms, technologies, clients } from "@repo/database";
 import { purgePublicCache } from "@repo/shared";
 import { getServerSession } from "@/lib/get-server-session";
 import { TECHNOLOGY_CATEGORIES } from "@/lib/technology-categories";
+import { honoFetch } from "@/lib/hono-client";
 
 // Admin server actions for the public-site directory tables: platforms,
-// technologies, clients (migrations 0025–0027, D1a). Drizzle query
-// builder throughout, following the website-integrations lib pattern.
-// Technologies gained its *_bn columns in 0032, so it follows the
-// PR #76 EN + BN pattern like platforms and clients.
+// technologies, clients (migrations 0025–0027, D1a).
+//
+// Hono cutover: the data calls below go to the Hono worker
+// (GET/POST/PUT/DELETE /api/admin/directory/*) via the typed fetch
+// wrapper in @/lib/hono-client — Hono's directory router mirrors this
+// file's validation, row normalization and error messages, so the return
+// shapes and thrown errors are unchanged. What stays local:
+//  - input validation (platformValues / technologyValues / clientValues)
+//    still runs here first, so callers get the same errors without a
+//    network round-trip;
+//  - `purgePublicCache(["home"])` after every write — Hono does not wire
+//    that side effect yet (its TODO), so the admin keeps doing it
+//    best-effort, never failing the save.
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -34,10 +42,6 @@ function asSortOrder(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function escapeLike(value: string): string {
-  return value.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
-}
-
 // ─── Platforms ───────────────────────────────────────────────────────────────
 
 export type PlatformGroup = "music" | "social" | "professional";
@@ -59,52 +63,22 @@ export interface PlatformRow {
 
 const PLATFORM_GROUPS: PlatformGroup[] = ["music", "social", "professional"];
 
-function toPlatformRow(r: typeof platforms.$inferSelect): PlatformRow {
-  return {
-    id: r.id,
-    name: r.name ?? "",
-    url: r.url ?? "",
-    handle: r.handle,
-    group: PLATFORM_GROUPS.includes(r.group as PlatformGroup)
-      ? (r.group as PlatformGroup)
-      : "social",
-    icon: r.icon,
-    subtitle: r.subtitle,
-    note: r.note,
-    isPrimary: r.isPrimary ?? false,
-    sortOrder: r.sortOrder,
-    nameBn: r.nameBn,
-    subtitleBn: r.subtitleBn,
-  };
-}
-
 export async function listPlatforms(params?: {
   search?: string;
 }): Promise<PlatformRow[]> {
   const session = await getServerSession();
   requireUserId(session);
-  const db = getDb();
   const search = (params?.search ?? "").trim();
-  const rows = await db
-    .select()
-    .from(platforms)
-    .where(search ? ilike(platforms.name, `%${escapeLike(search)}%`) : undefined)
-    .orderBy(asc(platforms.sortOrder), asc(platforms.createdAt));
-  return rows.map(toPlatformRow);
+  return honoFetch<PlatformRow[]>("/api/admin/directory/platforms", {
+    query: search ? { search } : undefined,
+  });
 }
 
 export async function getPlatformById(id: string): Promise<PlatformRow> {
   const session = await getServerSession();
   requireUserId(session);
   if (!UUID_RE.test(id)) throw new Error("Invalid platform id");
-  const db = getDb();
-  const [row] = await db
-    .select()
-    .from(platforms)
-    .where(eq(platforms.id, id))
-    .limit(1);
-  if (!row) throw new Error("Platform not found");
-  return toPlatformRow(row);
+  return honoFetch<PlatformRow>(`/api/admin/directory/platforms/${id}`);
 }
 
 export interface PlatformInput {
@@ -147,15 +121,13 @@ export async function createPlatform(
 ): Promise<PlatformRow> {
   const session = await getServerSession();
   requireUserId(session);
-  const db = getDb();
-  const [row] = await db
-    .insert(platforms)
-    .values(platformValues(data))
-    .returning();
-  if (!row) throw new Error("Failed to create platform");
+  const row = await honoFetch<PlatformRow>("/api/admin/directory/platforms", {
+    method: "POST",
+    json: platformValues(data),
+  });
   // Instant public-site refresh (best-effort, never fails the save).
   void purgePublicCache(["home"]);
-  return toPlatformRow(row);
+  return row;
 }
 
 export async function updatePlatform(
@@ -165,23 +137,22 @@ export async function updatePlatform(
   const session = await getServerSession();
   requireUserId(session);
   if (!UUID_RE.test(id)) throw new Error("Invalid platform id");
-  const db = getDb();
-  const [row] = await db
-    .update(platforms)
-    .set({ ...platformValues(data), updatedAt: new Date() })
-    .where(eq(platforms.id, id))
-    .returning();
-  if (!row) throw new Error("Platform not found");
+  const row = await honoFetch<PlatformRow>(
+    `/api/admin/directory/platforms/${id}`,
+    { method: "PUT", json: platformValues(data) },
+  );
   // Instant public-site refresh (best-effort, never fails the save).
   void purgePublicCache(["home"]);
-  return toPlatformRow(row);
+  return row;
 }
 
 export async function deletePlatform(id: string): Promise<void> {
   const session = await getServerSession();
   requireUserId(session);
   if (!UUID_RE.test(id)) throw new Error("Invalid platform id");
-  await getDb().delete(platforms).where(eq(platforms.id, id));
+  await honoFetch<{ ok: boolean }>(`/api/admin/directory/platforms/${id}`, {
+    method: "DELETE",
+  });
   // Instant public-site refresh (best-effort, never fails the save).
   void purgePublicCache(["home"]);
 }
@@ -200,46 +171,24 @@ export interface TechnologyRow {
   sortOrder: number | null;
 }
 
-function toTechnologyRow(r: typeof technologies.$inferSelect): TechnologyRow {
-  return {
-    id: r.id,
-    name: r.name ?? "",
-    nameBn: r.nameBn,
-    category: r.category,
-    icon: r.icon,
-    use: r.use,
-    useBn: r.useBn,
-    sortOrder: r.sortOrder,
-  };
-}
-
 export async function listTechnologies(params?: {
   search?: string;
 }): Promise<TechnologyRow[]> {
   const session = await getServerSession();
   requireUserId(session);
-  const db = getDb();
   const search = (params?.search ?? "").trim();
-  const rows = await db
-    .select()
-    .from(technologies)
-    .where(search ? ilike(technologies.name, `%${escapeLike(search)}%`) : undefined)
-    .orderBy(asc(technologies.sortOrder), asc(technologies.name));
-  return rows.map(toTechnologyRow);
+  return honoFetch<TechnologyRow[]>("/api/admin/directory/technologies", {
+    query: search ? { search } : undefined,
+  });
 }
 
 export async function getTechnologyById(id: string): Promise<TechnologyRow> {
   const session = await getServerSession();
   requireUserId(session);
   if (!UUID_RE.test(id)) throw new Error("Invalid technology id");
-  const db = getDb();
-  const [row] = await db
-    .select()
-    .from(technologies)
-    .where(eq(technologies.id, id))
-    .limit(1);
-  if (!row) throw new Error("Technology not found");
-  return toTechnologyRow(row);
+  return honoFetch<TechnologyRow>(
+    `/api/admin/directory/technologies/${id}`,
+  );
 }
 
 export interface TechnologyInput {
@@ -279,15 +228,13 @@ export async function createTechnology(
 ): Promise<TechnologyRow> {
   const session = await getServerSession();
   requireUserId(session);
-  const db = getDb();
-  const [row] = await db
-    .insert(technologies)
-    .values(technologyValues(data))
-    .returning();
-  if (!row) throw new Error("Failed to create technology");
+  const row = await honoFetch<TechnologyRow>(
+    "/api/admin/directory/technologies",
+    { method: "POST", json: technologyValues(data) },
+  );
   // Instant public-site refresh (best-effort, never fails the save).
   void purgePublicCache(["home"]);
-  return toTechnologyRow(row);
+  return row;
 }
 
 export async function updateTechnology(
@@ -297,23 +244,23 @@ export async function updateTechnology(
   const session = await getServerSession();
   requireUserId(session);
   if (!UUID_RE.test(id)) throw new Error("Invalid technology id");
-  const db = getDb();
-  const [row] = await db
-    .update(technologies)
-    .set(technologyValues(data))
-    .where(eq(technologies.id, id))
-    .returning();
-  if (!row) throw new Error("Technology not found");
+  const row = await honoFetch<TechnologyRow>(
+    `/api/admin/directory/technologies/${id}`,
+    { method: "PUT", json: technologyValues(data) },
+  );
   // Instant public-site refresh (best-effort, never fails the save).
   void purgePublicCache(["home"]);
-  return toTechnologyRow(row);
+  return row;
 }
 
 export async function deleteTechnology(id: string): Promise<void> {
   const session = await getServerSession();
   requireUserId(session);
   if (!UUID_RE.test(id)) throw new Error("Invalid technology id");
-  await getDb().delete(technologies).where(eq(technologies.id, id));
+  await honoFetch<{ ok: boolean }>(
+    `/api/admin/directory/technologies/${id}`,
+    { method: "DELETE" },
+  );
   // Instant public-site refresh (best-effort, never fails the save).
   void purgePublicCache(["home"]);
 }
@@ -329,44 +276,22 @@ export interface ClientRow {
   nameBn: string | null;
 }
 
-function toClientRow(r: typeof clients.$inferSelect): ClientRow {
-  return {
-    id: r.id,
-    name: r.name ?? "",
-    logoUrl: r.logoUrl,
-    website: r.website,
-    sortOrder: r.sortOrder,
-    nameBn: r.nameBn,
-  };
-}
-
 export async function listClients(params?: {
   search?: string;
 }): Promise<ClientRow[]> {
   const session = await getServerSession();
   requireUserId(session);
-  const db = getDb();
   const search = (params?.search ?? "").trim();
-  const rows = await db
-    .select()
-    .from(clients)
-    .where(search ? ilike(clients.name, `%${escapeLike(search)}%`) : undefined)
-    .orderBy(asc(clients.sortOrder), asc(clients.createdAt));
-  return rows.map(toClientRow);
+  return honoFetch<ClientRow[]>("/api/admin/directory/clients", {
+    query: search ? { search } : undefined,
+  });
 }
 
 export async function getClientById(id: string): Promise<ClientRow> {
   const session = await getServerSession();
   requireUserId(session);
   if (!UUID_RE.test(id)) throw new Error("Invalid client id");
-  const db = getDb();
-  const [row] = await db
-    .select()
-    .from(clients)
-    .where(eq(clients.id, id))
-    .limit(1);
-  if (!row) throw new Error("Client not found");
-  return toClientRow(row);
+  return honoFetch<ClientRow>(`/api/admin/directory/clients/${id}`);
 }
 
 export interface ClientInput {
@@ -392,15 +317,13 @@ function clientValues(data: ClientInput) {
 export async function createClient(data: ClientInput): Promise<ClientRow> {
   const session = await getServerSession();
   requireUserId(session);
-  const db = getDb();
-  const [row] = await db
-    .insert(clients)
-    .values(clientValues(data))
-    .returning();
-  if (!row) throw new Error("Failed to create client");
+  const row = await honoFetch<ClientRow>("/api/admin/directory/clients", {
+    method: "POST",
+    json: clientValues(data),
+  });
   // Instant public-site refresh (best-effort, never fails the save).
   void purgePublicCache(["home"]);
-  return toClientRow(row);
+  return row;
 }
 
 export async function updateClient(
@@ -410,23 +333,22 @@ export async function updateClient(
   const session = await getServerSession();
   requireUserId(session);
   if (!UUID_RE.test(id)) throw new Error("Invalid client id");
-  const db = getDb();
-  const [row] = await db
-    .update(clients)
-    .set({ ...clientValues(data), updatedAt: new Date() })
-    .where(eq(clients.id, id))
-    .returning();
-  if (!row) throw new Error("Client not found");
+  const row = await honoFetch<ClientRow>(`/api/admin/directory/clients/${id}`, {
+    method: "PUT",
+    json: clientValues(data),
+  });
   // Instant public-site refresh (best-effort, never fails the save).
   void purgePublicCache(["home"]);
-  return toClientRow(row);
+  return row;
 }
 
 export async function deleteClient(id: string): Promise<void> {
   const session = await getServerSession();
   requireUserId(session);
   if (!UUID_RE.test(id)) throw new Error("Invalid client id");
-  await getDb().delete(clients).where(eq(clients.id, id));
+  await honoFetch<{ ok: boolean }>(`/api/admin/directory/clients/${id}`, {
+    method: "DELETE",
+  });
   // Instant public-site refresh (best-effort, never fails the save).
   void purgePublicCache(["home"]);
 }

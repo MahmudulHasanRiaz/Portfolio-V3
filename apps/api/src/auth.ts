@@ -35,6 +35,19 @@ function createAuth() {
     verification: { modelName: "ba_verification" },
     emailAndPassword: { enabled: true },
     secret: process.env.BETTER_AUTH_SECRET,
+    // Trusted origins for Better Auth's Origin check on non-GET
+    // /api/auth/* calls (2026-11-13, admin cutover). The browser signs
+    // in from the admin worker, so its Origin is the ADMIN origin —
+    // not Hono's own baseURL — and Better Auth rejects it with 403
+    // INVALID_ORIGIN unless it is listed here. The admin reaches Hono
+    // through the same-origin /api/* proxy (src/app/api/[...path]/),
+    // but the proxy forwards the browser's Origin header unchanged,
+    // so Hono still sees the admin origin. Without this, real
+    // browser sign-in 403s even though curl (no Origin header) works.
+    trustedOrigins: [
+      "https://portfolio-v3-admin.riaaz.workers.dev",
+      "https://portfolio-v3-public.riaaz.workers.dev",
+    ],
   });
 }
 

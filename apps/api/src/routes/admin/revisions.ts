@@ -29,12 +29,10 @@
 //   strips them in the original). A missing target row throws
 //   "Content not found: <id>" (500, as in the original).
 //
-// TODO (cutover wiring, deliberately NOT done here): ContentService.update
+// Side effects (wired at cutover via lib/side-effects): ContentService.update
 // also (a) indexes / de-indexes the entity in search depending on
 // whether it is/was published, (b) dispatches no workflow trigger for
 // restores, and (c) purges the public site cache via purgePublicCache.
-// Those cross-cutting side effects will be wired at cutover; the TODO
-// marker below shows where each call belongs.
 import { Hono } from "hono";
 import { and, count, desc, eq } from "drizzle-orm";
 import {
@@ -48,11 +46,14 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import { cacheTagsForContentType, deleteSearchEntity, indexSearchEntity, purgePublicCache, searchEntityTypeForContentType, waitUntilOf } from "../../lib/side-effects";
 
 type Env = {
   Bindings: {
     DATABASE_URL?: string;
     BETTER_AUTH_SECRET?: string;
+    PUBLIC_SITE_URL?: string;
+    CACHE_INVALIDATE_SECRET?: string;
   };
 };
 
@@ -354,8 +355,13 @@ app.post("/revisions/:id/restore", async (c) => {
       .where(eq(def.table.id, entityId))
       .returning();
     if (!restored) throw new Error(`Content not found: ${entityId}`);
-    // TODO (cutover): if restored is/was published — index / de-index
-    // in search; purgePublicCache.
+    const searchEntityType = searchEntityTypeForContentType(entityType);
+    if (restored.status === "published") {
+      void indexSearchEntity(db, searchEntityType, entityId, c.env, waitUntilOf(c));
+    } else if (existing?.status === "published") {
+      void deleteSearchEntity(db, searchEntityType, entityId, waitUntilOf(c));
+    }
+    void purgePublicCache(c.env, cacheTagsForContentType(entityType), waitUntilOf(c));
     return c.json({ success: true, content: restored });
   } catch (err) {
     return c.json(

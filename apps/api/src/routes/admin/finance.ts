@@ -41,20 +41,40 @@
 //   repositories. `id` / `createdAt` / `createdBy` are never taken from
 //   the body.
 //
-// NOT ported: POST /invoices/:id/pdf — it uses pdfkit (Node-only:
-// Buffer/streams) plus R2 storage via @/lib/pdf, which cannot run on
-// Cloudflare Workers. It needs a Workers-compatible PDF path or a
-// Node-runtime service; the route is intentionally absent here.
+// PDF: GET /invoices/:id/pdf (+ POST alias, see below) — pdf-lib port of
+// apps/dashboard/src/app/api/finance/invoices/[id]/pdf/route.ts via
+// apps/dashboard/src/lib/pdf.ts generateInvoicePdf + storePdf. pdfkit
+// (Node-only) is NOT used; pdf-lib is pure JS and Workers-safe. The
+// generated PDF is stored in R2 under documents/ (direct PutObject,
+// where the source uploaded via a presigned PUT URL — same object, same
+// public URL) and the row's pdfUrl is updated, exactly as the source.
+// GET returns the PDF bytes as an attachment (the Hono download form);
+// POST returns { pdfUrl }, the shape the admin UI expects (it POSTs and
+// window.open()s the returned URL).
 //
-// TODO (cutover wiring, deliberately NOT done here): the sources also
-// dispatched workflow triggers — dispatchTrigger(dbUrl, "invoice_paid",
-// ...) when an invoice status becomes "paid", and
-// dispatchTrigger(dbUrl, "payment_received", ...) after a payment is
-// created — isolated so a workflow failure never fails the API call.
-// Those will be wired at cutover; the TODO markers below show where each
-// call belongs. Finance routes never purge the public cache and never
-// touch the search index in the sources, so there is nothing else to wire.
+// Workflow triggers: POST /invoices/:id/status dispatches
+// "invoice_paid" when the status becomes "paid", and POST /payments
+// dispatches "payment_received" after a payment is created — both
+// isolated in try/catch so a workflow failure never fails the API call,
+// exactly as the sources. The dispatch itself only records pending
+// workflow_runs rows (the TriggerRegistry.dispatch equivalent,
+// re-implemented here with direct Drizzle because
+// routes/admin/workflows.ts does not export its dispatchTrigger and
+// @repo/workflows is postgres.js-bound); execution happens via
+// /workflows/process or the cron tick. Finance routes never purge the
+// public cache and never touch the search index in the sources, so there
+// is nothing else to wire.
 import { Hono, type Context } from "hono";
+import {
+  PDFDocument,
+  PageSizes,
+  StandardFonts,
+  rgb,
+  type PDFPage,
+  type PDFFont,
+  type RGB,
+} from "pdf-lib";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import {
   and,
   asc,
@@ -80,11 +100,25 @@ import {
   invoiceStatus,
   paymentMethods,
   paymentSourceType,
+  workflowRuns,
+  workflows,
 } from "@repo/database/schema";
 import { getApiDb, type ApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
 
-const app = new Hono();
+type Env = {
+  Bindings: {
+    DATABASE_URL?: string;
+    BETTER_AUTH_SECRET?: string;
+    R2_ENDPOINT?: string;
+    R2_ACCESS_KEY_ID?: string;
+    R2_SECRET_ACCESS_KEY?: string;
+    R2_BUCKET?: string;
+    R2_PUBLIC_URL?: string;
+  };
+};
+
+const app = new Hono<Env>();
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -102,7 +136,7 @@ function fail(status: 400 | 404, message: string): Error {
 }
 
 function errorResponse(
-  c: Context,
+  c: Context<Env>,
   err: unknown,
   fallback: string,
   duplicateMessage?: string,
@@ -284,6 +318,483 @@ async function generateInvoiceNumber(
     .where(like(financeInvoices.invoiceNumber, `${prefix}%`));
   const serial = Number(row?.total ?? 0) + 1;
   return `${prefix}${String(serial).padStart(4, "0")}`;
+}
+
+// ─── Workflow dispatch (TriggerRegistry.dispatch port) ───────────────────────
+// @repo/workflows dispatchTrigger is NOT Workers-safe (postgres.js pool)
+// and routes/admin/workflows.ts does not export its Drizzle port of the
+// same function, so the two queries are repeated here: find the active
+// workflows listening for the trigger, then record one pending
+// workflow_runs row per match. Dispatch only records runs — execution
+// happens via POST /workflows/process or the cron tick. Callers wrap
+// this in try/catch so a workflow failure never fails the API call.
+// The payload is JSON round-tripped first so Drizzle row values that
+// are not plain JSON (Date objects, numeric strings stay strings) are
+// stored exactly as the jsonb column would hold them.
+async function dispatchWorkflowTrigger(
+  db: ApiDb,
+  triggerType: string,
+  entityId: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const matched = await db
+    .select()
+    .from(workflows)
+    .where(
+      and(
+        eq(workflows.triggerType, triggerType),
+        eq(workflows.isActive, true),
+      ),
+    )
+    .orderBy(asc(workflows.createdAt));
+  const cleanPayload = JSON.parse(JSON.stringify(payload)) as Record<
+    string,
+    unknown
+  >;
+  for (const workflow of matched) {
+    await db.insert(workflowRuns).values({
+      workflowId: workflow.id,
+      workflowVersion: workflow.version,
+      triggerType,
+      triggerEntityId: entityId,
+      triggerPayload: cleanPayload,
+      status: "pending",
+    });
+  }
+}
+
+// ─── R2 (S3 SDK directly; mirrors routes/admin/media.ts) ────────────────────
+// Env is read from c.env first, then process.env (the same fallback
+// db.ts uses for DATABASE_URL). The client is a lazy module-level
+// singleton, mirroring packages/media/src/r2.ts.
+
+let r2Client: S3Client | null = null;
+let r2Bucket = "";
+
+function r2Env(c: Context<Env>): Env["Bindings"] {
+  return c.env ?? ({} as Env["Bindings"]);
+}
+
+function ensureR2(c: Context<Env>): S3Client {
+  if (r2Client) return r2Client;
+  const env = r2Env(c);
+  const endpoint = env.R2_ENDPOINT ?? process.env.R2_ENDPOINT ?? "";
+  const accessKeyId =
+    env.R2_ACCESS_KEY_ID ?? process.env.R2_ACCESS_KEY_ID ?? "";
+  const secretAccessKey =
+    env.R2_SECRET_ACCESS_KEY ?? process.env.R2_SECRET_ACCESS_KEY ?? "";
+  const bucket = env.R2_BUCKET ?? process.env.R2_BUCKET ?? "";
+  if (!endpoint || !accessKeyId || !secretAccessKey || !bucket) {
+    throw new Error(
+      "R2 storage is not configured: R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET must be set to store PDFs.",
+    );
+  }
+  r2Client = new S3Client({
+    region: "auto",
+    endpoint,
+    credentials: { accessKeyId, secretAccessKey },
+    forcePathStyle: true,
+    requestChecksumCalculation: "WHEN_REQUIRED",
+  });
+  r2Bucket = bucket;
+  return r2Client;
+}
+
+function getR2PublicUrl(c: Context<Env>, key: string): string {
+  const env = r2Env(c);
+  const publicUrl = env.R2_PUBLIC_URL ?? process.env.R2_PUBLIC_URL ?? "";
+  if (publicUrl) {
+    return `${publicUrl.replace(/\/+$/, "")}/${key}`;
+  }
+  return `${r2Bucket}/${key}`;
+}
+
+/**
+ * Best-effort R2 store for a generated PDF (source: storePdf in
+ * apps/dashboard/src/lib/pdf.ts — key documents/<filename>, public URL
+ * returned). The source uploaded through a presigned PUT URL because
+ * @repo/media exposed no raw upload primitive; here the S3 client puts
+ * the object directly — same key, same public URL, one less hop.
+ * Returns the public URL, or null (with a warning logged) when storage
+ * is unconfigured or the upload fails. Never throws: the GET download
+ * still returns the PDF bytes, and the POST route turns a null into the
+ * 500 the source would have returned.
+ */
+async function storePdfBestEffort(
+  c: Context<Env>,
+  bytes: Uint8Array,
+  filename: string,
+): Promise<string | null> {
+  try {
+    const s3 = ensureR2(c);
+    const key = `documents/${filename}`;
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: r2Bucket,
+        Key: key,
+        Body: bytes,
+        ContentType: "application/pdf",
+      }),
+    );
+    return getR2PublicUrl(c, key);
+  } catch (err) {
+    console.warn(
+      "[PDF] Failed to store PDF in R2:",
+      err instanceof Error ? err.message : String(err),
+    );
+    return null;
+  }
+}
+
+/** ASCII-safe fallback filename for the Content-Disposition header. */
+function safeFilename(name: string): string {
+  const base = name
+    .replace(/[^a-zA-Z0-9._-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return base || "file.pdf";
+}
+
+function pdfDownloadResponse(
+  bytes: Uint8Array,
+  filename: string,
+): Response {
+  const safe = safeFilename(filename);
+  const headers = new Headers();
+  headers.set("Content-Type", "application/pdf");
+  headers.set(
+    "Content-Disposition",
+    `attachment; filename="${safe}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+  );
+  headers.set("Content-Length", String(bytes.length));
+  return new Response(bytes as unknown as BodyInit, {
+    status: 200,
+    headers,
+  });
+}
+
+// ─── PDF rendering (pdf-lib port of apps/dashboard/src/lib/pdf.ts) ───────────
+// pdfkit is Node-only (Buffer/streams); pdf-lib is pure JS and runs on
+// Workers. Same content, same values, same order as generateInvoicePdf:
+// "INVOICE" title, invoice number / billed-to / issued / due / status,
+// the line-items table (Description / Qty / Unit Price / Total),
+// subtotal / discount (only when non-zero) / total, the non-BDT
+// "Total in BDT" line with exchange rate, notes, and the "Generated by
+// Portfolio V2" footer. Layout differences from pdfkit (unavoidable —
+// pdf-lib has no flow layout, so y positions are tracked by hand):
+//   - Letter page, 50 pt margins (same as the source).
+//   - Line breaks are computed from Helvetica metrics, so wrapping
+//     points can differ by a word from pdfkit's.
+//   - A table row grows past 16 pt when its description wraps (the
+//     source fixed every row at 16 pt, so a long description could
+//     overlap the next row there).
+//   - The totals value column is left-aligned at x=400, as in the
+//     source (pdfkit drew it there with an explicit x).
+//   - Standard Helvetica only covers WinAnsi: characters outside it
+//     (notably Bangla script) are replaced with "?" — see
+//     sanitizePdfText. pdfkit's built-in Helvetica had the same
+//     limitation, so no content that rendered before is lost.
+const [PDF_PAGE_WIDTH, PDF_PAGE_HEIGHT] = PageSizes.Letter;
+const PDF_MARGIN = 50;
+
+/**
+ * Characters the embedded Standard Helvetica (WinAnsi) cannot encode
+ * become "?" instead of throwing inside pdf-lib's encoder and failing
+ * the whole request. Kept: printable ASCII, Latin-1, and the WinAnsi
+ * punctuation (en/em dash, curly quotes, bullet, ellipsis, euro,
+ * trademark, …). Everything else — including Bangla — is replaced.
+ * GAP: a Bangla invoice (notes / descriptions in Bangla) renders its
+ * Bangla runs as "?" — a Bangla-capable embedded font would be needed
+ * to render them, and the source had no such font either.
+ */
+function sanitizePdfText(text: string): string {
+  return text.replace(
+    /[^\x20-\x7E\xA0-\xFF\u2013\u2014\u2018\u2019\u201A\u201C\u201D\u201E\u2020\u2021\u2022\u2026\u2030\u2039\u203A\u2044\u20AC\u2122\u0192\u02C6\u02DC\u0160\u0161\u017D\u017E\u0152\u0153\u0178]|[\x81\x8D\x8F\x90\x9D\xAD]/g,
+    "?",
+  );
+}
+
+/** Minimal top-down cursor over pdf-lib pages (y = distance from the
+ *  top edge, in points). Adds pages as content overflows. */
+class PdfWriter {
+  private page: PDFPage;
+  private y: number;
+
+  constructor(
+    private readonly doc: PDFDocument,
+    private readonly font: PDFFont,
+    private readonly bold: PDFFont,
+  ) {
+    this.page = doc.addPage(PageSizes.Letter);
+    this.y = PDF_MARGIN;
+  }
+
+  private lineHeight(size: number, lineGap = 0): number {
+    return size * 1.15 + lineGap;
+  }
+
+  private ensureSpace(height: number): void {
+    if (this.y + height > PDF_PAGE_HEIGHT - PDF_MARGIN) {
+      this.page = this.doc.addPage(PageSizes.Letter);
+      this.y = PDF_MARGIN;
+    }
+  }
+
+  /** Word-wrap sanitized text to the given width, Helvetica metrics. */
+  linesFor(
+    text: string,
+    size: number,
+    maxWidth: number,
+    bold = false,
+  ): string[] {
+    const f = bold ? this.bold : this.font;
+    const words = sanitizePdfText(text)
+      .split(/\s+/)
+      .filter(Boolean);
+    const lines: string[] = [];
+    let current = "";
+    for (const word of words) {
+      const candidate = current ? `${current} ${word}` : word;
+      if (f.widthOfTextAtSize(candidate, size) <= maxWidth || !current) {
+        current = candidate;
+      } else {
+        lines.push(current);
+        current = word;
+      }
+    }
+    if (current) lines.push(current);
+    return lines.length > 0 ? lines : [""];
+  }
+
+  /** Wrapped paragraph at x (default margin), advancing one line per
+   *  wrapped line, with a page break when the next line would overflow. */
+  para(
+    text: string,
+    size: number,
+    opts?: {
+      bold?: boolean;
+      color?: RGB;
+      x?: number;
+      maxWidth?: number;
+      lineGap?: number;
+    },
+  ): void {
+    const f = opts?.bold ? this.bold : this.font;
+    const x = opts?.x ?? PDF_MARGIN;
+    const maxWidth = opts?.maxWidth ?? PDF_PAGE_WIDTH - x - PDF_MARGIN;
+    const lh = this.lineHeight(size, opts?.lineGap ?? 0);
+    for (const line of this.linesFor(text, size, maxWidth, opts?.bold)) {
+      this.ensureSpace(lh);
+      this.page.drawText(line, {
+        x,
+        y: PDF_PAGE_HEIGHT - this.y - size,
+        size,
+        font: f,
+        color: opts?.color,
+      });
+      this.y += lh;
+    }
+  }
+
+  /** One unwrapped line at an absolute x on the current row (no y
+   *  advance — the caller advances). `dy` offsets down within the row. */
+  drawAt(
+    text: string,
+    x: number,
+    size: number,
+    opts?: { bold?: boolean; color?: RGB; dy?: number },
+  ): void {
+    const f = opts?.bold ? this.bold : this.font;
+    this.page.drawText(sanitizePdfText(text), {
+      x,
+      y: PDF_PAGE_HEIGHT - this.y - (opts?.dy ?? 0) - size,
+      size,
+      font: f,
+      color: opts?.color,
+    });
+  }
+
+  /** Horizontal rule across the current row (no y advance). */
+  rule(x1: number, x2: number): void {
+    this.page.drawLine({
+      start: { x: x1, y: PDF_PAGE_HEIGHT - this.y },
+      end: { x: x2, y: PDF_PAGE_HEIGHT - this.y },
+      thickness: 0.5,
+      color: rgb(0, 0, 0),
+    });
+  }
+
+  advance(points: number): void {
+    this.y += points;
+  }
+
+  moveDown(size: number, n = 1): void {
+    this.y += n * this.lineHeight(size);
+  }
+
+  newLine(size: number, lineGap = 0): void {
+    this.y += this.lineHeight(size, lineGap);
+  }
+
+  ensureSpaceFor(height: number): void {
+    this.ensureSpace(height);
+  }
+
+  save(): Promise<Uint8Array> {
+    return this.doc.save();
+  }
+}
+
+function money(value: string | number | null | undefined): string {
+  const num = Number(value ?? 0);
+  return Number.isNaN(num) ? "0.00" : num.toFixed(2);
+}
+
+async function generateInvoicePdf(
+  invoice: InvoiceRow,
+  clientName?: string,
+): Promise<Uint8Array> {
+  const currency = invoice.currency ?? "BDT";
+  const items = parseLineItems(invoice.lineItems);
+
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const w = new PdfWriter(doc, font, bold);
+  const gray = rgb(0.4, 0.4, 0.4);
+
+  w.para("INVOICE", 24, { bold: true });
+  w.moveDown(24, 0.5);
+  w.para(`Invoice Number: ${invoice.invoiceNumber ?? invoice.id}`, 11);
+  if (clientName) w.para(`Billed To: ${clientName}`, 11);
+  else if (invoice.clientId) w.para(`Client ID: ${invoice.clientId}`, 11);
+  if (invoice.issuedDate) w.para(`Issued: ${invoice.issuedDate}`, 11);
+  if (invoice.dueDate) w.para(`Due: ${invoice.dueDate}`, 11);
+  w.para(`Status: ${invoice.status ?? "draft"}`, 11);
+  w.moveDown(11, 1);
+
+  // Line items table (source x positions, row width 50–562).
+  const startX = 50;
+  const qtyX = 340;
+  const priceX = 400;
+  const totalX = 480;
+  const rowEndX = 562;
+  w.drawAt("Description", startX, 10, { bold: true });
+  w.drawAt("Qty", qtyX, 10, { bold: true });
+  w.drawAt("Unit Price", priceX, 10, { bold: true });
+  w.drawAt("Total", totalX, 10, { bold: true });
+  w.advance(16);
+  w.rule(startX, rowEndX);
+  w.advance(6);
+
+  for (const item of items) {
+    const descLines = w.linesFor(
+      item.description || "-",
+      10,
+      qtyX - startX - 10,
+    );
+    const rowHeight = Math.max(16, descLines.length * 12);
+    w.ensureSpaceFor(rowHeight);
+    descLines.forEach((line, i) =>
+      w.drawAt(line, startX, 10, { dy: i * 12 }),
+    );
+    w.drawAt(String(item.quantity), qtyX, 10);
+    w.drawAt(money(item.unitPrice), priceX, 10);
+    w.drawAt(money(item.total), totalX, 10);
+    w.advance(rowHeight);
+  }
+
+  w.advance(4);
+  w.rule(startX, rowEndX);
+  w.moveDown(11, 1);
+
+  const labelX = 380;
+  w.drawAt("Subtotal:", labelX, 11);
+  w.drawAt(`${money(invoice.subtotal)} ${currency}`, totalX - 80, 11);
+  w.newLine(11);
+  if (Number(invoice.discount ?? 0) !== 0) {
+    w.drawAt("Discount:", labelX, 11);
+    w.drawAt(`${money(invoice.discount)} ${currency}`, totalX - 80, 11);
+    w.newLine(11);
+  }
+  w.drawAt("Total:", labelX, 11, { bold: true });
+  w.drawAt(`${money(invoice.total)} ${currency}`, totalX - 80, 11, {
+    bold: true,
+  });
+  w.newLine(11);
+
+  if (currency !== "BDT" && invoice.totalBdt) {
+    w.moveDown(11, 0.5);
+    w.para(
+      `Total in BDT: ${money(invoice.totalBdt)} BDT` +
+        (invoice.exchangeRate
+          ? ` (exchange rate: ${invoice.exchangeRate})`
+          : ""),
+      11,
+      { x: labelX },
+    );
+  }
+
+  if (invoice.notes) {
+    w.moveDown(10, 1.5);
+    w.para(`Notes: ${invoice.notes}`, 10);
+  }
+
+  w.moveDown(9, 2);
+  w.para("Generated by Portfolio V2 — Personal Brand Platform.", 9, {
+    color: gray,
+  });
+
+  return w.save();
+}
+
+// ─── Invoice PDF endpoint ────────────────────────────────────────────────────
+// GET returns the PDF bytes as an attachment (the Hono download form
+// the task specifies); POST returns { pdfUrl }, the source's shape,
+// which the admin UI expects. Both store the PDF in R2 and update the
+// row's pdfUrl, exactly as the source route did. The source called
+// generateInvoicePdf(invoice) with no client name, so the "Billed To"
+// line is the client id, as in the source.
+async function invoicePdf(
+  c: Context<Env>,
+  download: boolean,
+  id: string,
+): Promise<Response> {
+  try {
+    const user = await requireAuth(c);
+    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const db = getApiDb();
+    const [row] = await db
+      .select()
+      .from(financeInvoices)
+      .where(eq(financeInvoices.id, id))
+      .limit(1);
+    if (!row) return c.json({ error: "Invoice not found" }, 404);
+    const invoice = withParsedLineItems(row);
+    const bytes = await generateInvoicePdf(invoice);
+    const filename = `invoice-${invoice.invoiceNumber ?? invoice.id}.pdf`;
+    const pdfUrl = await storePdfBestEffort(c, bytes, filename);
+    if (pdfUrl) {
+      try {
+        await db
+          .update(financeInvoices)
+          .set({ pdfUrl })
+          .where(eq(financeInvoices.id, invoice.id));
+      } catch (err) {
+        console.warn(
+          "[PDF] Failed to save invoice pdfUrl:",
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    }
+    if (download) return pdfDownloadResponse(bytes, filename);
+    if (!pdfUrl) {
+      return c.json({ error: "Failed to store invoice PDF" }, 500);
+    }
+    return c.json({ pdfUrl });
+  } catch (err) {
+    return errorResponse(c, err, "Failed to generate invoice PDF");
+  }
 }
 
 // ─── Expenses: category snapshot ─────────────────────────────────────────────
@@ -935,6 +1446,13 @@ app.post("/invoices", async (c) => {
   }
 });
 
+// GET /invoices/:id/pdf — PDF download; POST — source shape { pdfUrl }.
+// Registered BEFORE /invoices/:id so the static "pdf" segment wins.
+app.get("/invoices/:id/pdf", (c) => invoicePdf(c, true, c.req.param("id")));
+app.post("/invoices/:id/pdf", (c) =>
+  invoicePdf(c, false, c.req.param("id")),
+);
+
 app.get("/invoices/:id", async (c) => {
   try {
     const user = await requireAuth(c);
@@ -1063,9 +1581,21 @@ app.post("/invoices/:id/status", async (c) => {
       .returning();
     if (!row) return c.json({ error: "Invoice not found" }, 404);
     const invoice = withParsedLineItems(row);
-    // TODO (cutover): if (parsed.data === "paid") dispatchTrigger(dbUrl,
-    // "invoice_paid", invoice.id, { ...invoice, triggeredBy: user.id }) —
-    // isolated so a workflow failure never fails the status change itself.
+    if (parsed.data === "paid") {
+      // Workflow dispatch is isolated: a workflow failure must never fail
+      // the status change itself.
+      try {
+        await dispatchWorkflowTrigger(db, "invoice_paid", invoice.id, {
+          ...invoice,
+          triggeredBy: user.id,
+        });
+      } catch (err) {
+        console.error(
+          "[Invoices API] Failed to dispatch invoice_paid:",
+          err,
+        );
+      }
+    }
     return c.json(invoice);
   } catch (err) {
     return errorResponse(c, err, "Failed to update invoice status");
@@ -1286,9 +1816,19 @@ app.post("/payments", async (c) => {
       } as typeof financePayments.$inferInsert)
       .returning();
     if (!row) return c.json({ error: "Failed to create" }, 500);
-    // TODO (cutover): dispatchTrigger(dbUrl, "payment_received", row.id,
-    // { ...row, triggeredBy: user.id }) — isolated so a workflow failure
-    // never fails the payment creation itself.
+    // Workflow dispatch is isolated: a workflow failure must never fail
+    // the payment creation itself.
+    try {
+      await dispatchWorkflowTrigger(db, "payment_received", row.id, {
+        ...row,
+        triggeredBy: user.id,
+      });
+    } catch (err) {
+      console.error(
+        "[Payments API] Failed to dispatch payment_received:",
+        err,
+      );
+    }
     return c.json(row, 201);
   } catch (err) {
     return errorResponse(c, err, "Failed to create");
