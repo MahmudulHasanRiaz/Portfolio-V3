@@ -1,0 +1,102 @@
+---
+// Twin SSR fallback — catch-all on-demand detail route.
+//
+// The live half of the hybrid plan (ASTRO_HYBRID_PLAN.md §2), kept
+// after the 2026-11-12 switch to output "server": the 10 detail routes
+// are live too now, so this route no longer rescues new slugs — it is
+// the catch-all for paths no other route matches. It renders the slug
+// LIVE from the Public Content API with the SAME detail templates +
+// SEO the detail pages use (see src/lib/twin-detail.ts and
+// src/components/details/).
+//   - A path with no match anywhere else falls through to this route.
+//   - A slug the API does not know returns a proper 404 (the type's
+//     not-found section, never an empty detail page), and a path that
+//     is not a detail URL at all returns a generic 404.
+//
+// On-demand by design: `export const prerender = false` — this route
+// runs in the deployed Cloudflare Worker, where isLiveFetchAllowed()
+// lets the live loader fetch. Edge caching comes from src/middleware.ts
+// (detail-shaped paths get 300/60) + the cache tags set on the live
+// entry below, so publish events purge it by tag.
+import Layout from "../layouts/Layout.astro";
+import CaseStudyDetail from "../components/details/CaseStudyDetail.astro";
+import PostDetail from "../components/details/PostDetail.astro";
+import ProjectDetail from "../components/details/ProjectDetail.astro";
+import ReleaseDetail from "../components/details/ReleaseDetail.astro";
+import VentureDetail from "../components/details/VentureDetail.astro";
+import { applySiteCopy, getDict, langFromPath, langUrl } from "../lib/i18n";
+import { resolveCanonicalBase } from "../lib/detail";
+import { getSiteSettings } from "../lib/settings";
+import {
+	fetchLiveDetail,
+	prepareDetail,
+	resolveTwinRoute,
+	type PreparedDetail,
+} from "../lib/twin-detail";
+
+export const prerender = false;
+
+const route = resolveTwinRoute(Astro.url.pathname);
+const lang = route?.lang ?? langFromPath(Astro.url.pathname);
+const settings = await getSiteSettings();
+const t = applySiteCopy(getDict(lang), lang, settings);
+
+let view: PreparedDetail | null = null;
+if (route) {
+	const liveEntry = await fetchLiveDetail(route.type, route.slug);
+	if (liveEntry) Astro.cache.set(liveEntry);
+	const liveData = liveEntry?.data as unknown as
+		| Record<string, unknown>
+		| undefined;
+	view = await prepareDetail(
+		route.type,
+		liveData,
+		route.lang,
+		route.slug,
+		Astro.url.searchParams.get("from"),
+		t,
+		// Same settings fetch as above (memoised) — no second fetch.
+		resolveCanonicalBase(settings.siteUrl, Astro.url),
+	);
+	if (!view.found) Astro.response.status = 404;
+} else {
+	Astro.response.status = 404;
+}
+---
+
+{view ? (
+	<Layout
+		title={view.layoutTitle}
+		description={view.description}
+		ogType={view.ogType}
+		ogImage={view.ogImage}
+		canonical={view.canonical}
+		lang={view.lang}
+	>
+		{view.type === "projects" ? (
+			<ProjectDetail view={view} lang={view.lang} t={t} />
+		) : view.type === "case-studies" ? (
+			<CaseStudyDetail view={view} lang={view.lang} t={t} />
+		) : view.type === "ventures" ? (
+			<VentureDetail view={view} lang={view.lang} t={t} />
+		) : view.type === "releases" ? (
+			<ReleaseDetail view={view} lang={view.lang} t={t} />
+		) : (
+			<PostDetail view={view} lang={view.lang} t={t} />
+		)}
+	</Layout>
+) : (
+	<Layout
+		title={`${t.pageNotFound} — Mahmudul Hasan Riaz`}
+		ogImage={null}
+		lang={lang}
+	>
+		<section class="glass">
+			<a class="back-link" href={langUrl("/", lang)}>
+				{t.backHome}
+			</a>
+			<h1 class="detail-title">{t.pageNotFound}</h1>
+			<p class="empty-state">{t.pageNotFoundText}</p>
+		</section>
+	</Layout>
+)}

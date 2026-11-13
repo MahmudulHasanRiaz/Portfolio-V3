@@ -1,0 +1,28 @@
+---
+// Know Me — the whole person (all identities, one detailed page).
+// Body lives in components/KnowMeSections.astro (shared with the
+// homepage when the admin primary identity is "know-me"); this page
+// stays the permanent canonical URL for that content. Fixed strings
+// from the dictionary (same keys as the /bn/ page), with the admin
+// site-copy overlay applied — same as every other page.
+// MARKETPLACE COPY: services are NOT fetched here — they were only
+// for Layout's contact modal select, which does not exist on this
+// copy. The Services section rows are fetched inside
+// KnowMeSections.
+import Layout from "../layouts/Layout.astro";
+import KnowMeSections from "../components/KnowMeSections.astro";
+import { applySiteCopy, getDict } from "../lib/i18n";
+import { getSiteSettings } from "../lib/settings";
+
+const lang = "en" as const;
+const t = applySiteCopy(getDict(lang), lang, await getSiteSettings());
+---
+
+<Layout
+	title={t.knowMeTitle}
+	description={t.knowMeDescription}
+	profile="knowme"
+	lang={lang}
+>
+	<KnowMeSections lang={lang} />
+</Layout>

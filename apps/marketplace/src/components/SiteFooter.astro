@@ -1,0 +1,45 @@
+---
+// Site footer — MARKETPLACE COPY (see docs/MARKETPLACE.md).
+//
+// Same identity + copyright as the public site, but with NO contact
+// information of any kind: no social-media icons/links, no "Contact
+// me" button, no "All platforms" link. The footer primaries (platform
+// links) and the contact modal do not exist on this copy. Identity
+// line + copyright only.
+import { PROFILE } from "../data/site";
+import { displayName, type Dict, type Lang } from "../lib/i18n";
+
+interface Props {
+	profile?: "se" | "knowme";
+	lang?: Lang;
+	dict?: Dict;
+}
+
+const { profile = "se", lang = "en", dict } = Astro.props;
+
+const sub =
+	profile === "knowme"
+		? (dict?.footerSubKnowMe ??
+			"Software Engineer · Entrepreneur · Nasheed Artist · Hafiz-Alem · Public Figure — Dhaka, Bangladesh")
+		: (dict?.footerSubSe ??
+			"Software Engineer · Entrepreneur · Islamic Artist — Dhaka, Bangladesh");
+
+const year = new Date().getFullYear();
+const rightsLabel = dict?.footerRights ?? "All rights reserved.";
+---
+
+<footer class="site-footer">
+	<div
+		style="display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;"
+	>
+		<div style="min-width:0;">
+			{/* Identity line: display name — Bangla on /bn/ pages.
+			    The COPYRIGHT line below keeps the Latin name. */}
+			<p class="footer-identity">{displayName(lang)}</p>
+			<p class="footer-sub">{sub}</p>
+		</div>
+	</div>
+	<p class="footer-copyright">
+		© {year} {PROFILE.name}. {rightsLabel}
+	</p>
+</footer>

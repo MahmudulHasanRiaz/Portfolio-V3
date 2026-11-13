@@ -1,0 +1,228 @@
+---
+// ArchiveFilter — ONE shared filter control for every archive page
+// (projects, posts, ventures, releases — EN + BN).
+//
+// MOBILE-FIRST: a single horizontally scrollable chip row. ALL
+// categories are chips in the row — there is NO "More" button and NO
+// dropdown. The old "More +" pattern hid categories behind an extra
+// tap, and its dropdown overflowed off the left edge and overlapped
+// the content below on mobile. The row scrolls (swipe on touch,
+// wheel/drag on desktop), the scrollbar is hidden, edge fades hint
+// that there is more, and tapping a chip scrolls it fully into view.
+// The list grows without breaking: chips just extend the row.
+//
+//   - "All" + every option, sorted by item count desc (ties:
+//     alphabetical), so the biggest categories are visible first.
+//   - Every chip shows its item count (the counts used to live in
+//     the dropdown; they now live on the chips themselves).
+//   - The active filter chip is highlighted.
+//
+// Filtering is still client-side, no framework, one tiny inline
+// script: cards are matched per `mode` — "card-tag-text" (projects:
+// a .tag descendant's text), "card-data-tags" (posts/ventures: the
+// card's data-tags CSV), "card-data-type" (releases: the card's
+// data-type). No URL state, same as before. Counts are computed by
+// the page from the same data it already renders and passed in as
+// `items`.
+interface FilterItem {
+	value: string;
+	label: string;
+	count: number;
+}
+
+interface Props {
+	items: FilterItem[];
+	allLabel: string;
+	mode: "card-tag-text" | "card-data-tags" | "card-data-type";
+	gridSelector: string;
+	countSelector: string;
+	cardSelector: string;
+	id?: string;
+	style?: string;
+}
+
+const {
+	items,
+	allLabel,
+	mode,
+	gridSelector,
+	countSelector,
+	cardSelector,
+	id,
+	style,
+} = Astro.props;
+
+// Biggest categories first (ties: alphabetical), so the row opens on
+// the most relevant chips and the rest are a swipe away. Every option
+// is a chip — nothing is hidden behind a menu.
+const sorted = [...items].sort(
+	(a, b) => b.count - a.count || a.label.localeCompare(b.label),
+);
+---
+
+<div
+	class="chip-row"
+	id={id}
+	style={style}
+	data-archive-filter
+	data-mode={mode}
+	data-grid={gridSelector}
+	data-count={countSelector}
+	data-card={cardSelector}
+>
+	<button
+		type="button"
+		class="chip active"
+		data-filter="all"
+		aria-pressed="true"
+	>
+		{allLabel}
+	</button>
+	{
+		sorted.map((item) => (
+			<button
+				type="button"
+				class="chip"
+				data-filter={item.value}
+				aria-pressed="false"
+			>
+				{item.label}
+				<span class="chip-count" aria-hidden="true">
+					{item.count}
+				</span>
+			</button>
+		))
+	}
+</div>
+
+<script is:inline>
+	// Archive filter (shared ArchiveFilter.astro): a horizontally
+	// scrollable chip row. Tapping a chip filters the cards by the
+	// page's matching mode. No framework, no dropdown.
+	(function () {
+		function init() {
+			var root = document.querySelector("[data-archive-filter]");
+			if (!root) return;
+			var mode = root.getAttribute("data-mode");
+			var grid = document.querySelector(root.getAttribute("data-grid"));
+			if (!grid) return;
+			var cardSel = root.getAttribute("data-card") || ".grid-card";
+			var cards = Array.prototype.slice.call(
+				grid.querySelectorAll(cardSel),
+			);
+			var countEl = document.querySelector(
+				root.getAttribute("data-count"),
+			);
+			var total = cards.length;
+			var template = countEl
+				? countEl.getAttribute("data-count-template") || ""
+				: "";
+			var fmt = function (n) {
+				return template.indexOf("টি") !== -1
+					? n.toLocaleString("bn-BD")
+					: String(n);
+			};
+
+			function matches(card, value) {
+				if (value === "all") return true;
+				if (mode === "card-data-tags") {
+					var tags = (card.getAttribute("data-tags") || "")
+						.split(",")
+						.map(function (s) {
+							return s.trim();
+						});
+					return tags.indexOf(value) !== -1;
+				}
+				if (mode === "card-data-type") {
+					return card.getAttribute("data-type") === value;
+				}
+				// card-tag-text (projects): a .tag descendant's text.
+				var tagEls = card.querySelectorAll(".tag");
+				for (var i = 0; i < tagEls.length; i++) {
+					if ((tagEls[i].textContent || "").trim() === value)
+						return true;
+				}
+				return false;
+			}
+
+			function apply(value) {
+				var shown = 0;
+				cards.forEach(function (card) {
+					var show = matches(card, value);
+					card.style.display = show ? "" : "none";
+					if (show) shown++;
+				});
+				var activeChip = null;
+				root.querySelectorAll(".chip[data-filter]").forEach(
+					function (chip) {
+						var active =
+							chip.getAttribute("data-filter") === value;
+						chip.classList.toggle("active", active);
+						chip.setAttribute(
+							"aria-pressed",
+							active ? "true" : "false",
+						);
+						if (active) activeChip = chip;
+					},
+				);
+				if (countEl) {
+					countEl.textContent = template
+						? template
+								.replace("{shown}", fmt(shown))
+								.replace("{total}", fmt(total))
+						: "Showing " + shown + " of " + total;
+				}
+				// Keep the tapped chip fully visible in the scrollable
+				// row (a chip half cut off at the edge scrolls in).
+				if (
+					activeChip &&
+					typeof activeChip.scrollIntoView === "function"
+				) {
+					activeChip.scrollIntoView({
+						behavior: "smooth",
+						inline: "nearest",
+						block: "nearest",
+					});
+				}
+			}
+
+			// Edge fades: hint that the row scrolls. The CSS fades the
+			// right edge by default (row starts at the left); these
+			// classes describe where the scroll position is so the
+			// fades stay truthful as the user swipes.
+			function updateFades() {
+				var max = root.scrollWidth - root.clientWidth;
+				if (max <= 0) {
+					root.classList.add("no-scroll");
+					root.classList.remove("scrolled", "at-end");
+					return;
+				}
+				root.classList.remove("no-scroll");
+				var atStart = root.scrollLeft <= 1;
+				var atEnd = root.scrollLeft >= max - 1;
+				root.classList.toggle("scrolled", !atStart && !atEnd);
+				root.classList.toggle("at-end", !atStart && atEnd);
+			}
+			root.addEventListener("scroll", updateFades, {
+				passive: true,
+			});
+			window.addEventListener("resize", updateFades);
+			updateFades();
+
+			// One delegated click handler for the chips.
+			root.addEventListener("click", function (event) {
+				var target = event.target;
+				if (!(target instanceof HTMLElement)) return;
+				var option = target.closest("[data-filter]");
+				if (!option) return;
+				apply(option.getAttribute("data-filter") || "all");
+			});
+		}
+
+		if (document.readyState === "loading") {
+			document.addEventListener("DOMContentLoaded", init);
+		} else {
+			init();
+		}
+	})();
+</script>

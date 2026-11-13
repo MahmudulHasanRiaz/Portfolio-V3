@@ -1,0 +1,49 @@
+---
+import { STATS } from "../data/site";
+import { getStats } from "../lib/content";
+import { applySiteCopy, getDict, type Lang } from "../lib/i18n";
+import { getSiteSettings } from "../lib/settings";
+
+interface Props {
+	lang?: Lang;
+}
+
+const { lang = "en" } = Astro.props;
+// Stat values + EN labels come live from the API (settings.stats,
+// dashboard migration 0031 reconciled the DB row to the live copy),
+// merged over build-time STATS — live wins per slot, build-time fills
+// gaps. On /bn/ pages the admin's positional bn.statsLabels overlay
+// wins per slot, with `null` meaning "no Bangla yet" → the dictionary
+// Bangla label (which itself may carry the admin site_copy overlay).
+// On EN pages the live label wins over the dictionary label (which
+// itself may carry the admin site_copy overlay) — the stats row is the
+// dedicated home for stats copy, so it outranks the generic site_copy
+// keys; the values are identical today, so either order renders the
+// same copy.
+const stats = await getStats();
+const settings = await getSiteSettings();
+const t = applySiteCopy(getDict(lang), lang, settings);
+const bnLabels = lang === "bn" ? (settings.bn?.statsLabels ?? []) : [];
+const dictLabels = [t.statYears, t.statProjects, t.statClients, t.statReleases];
+const labels = dictLabels.map((dictLabel, i) => {
+	if (lang === "bn") {
+		const bnLabel = bnLabels[i];
+		return typeof bnLabel === "string" && bnLabel ? bnLabel : dictLabel;
+	}
+	return stats[i]?.label ?? dictLabel;
+});
+// The section is designed as four cells; live-only extras (a fifth
+// stat added in the admin panel) do not render here.
+const display = stats.slice(0, STATS.length);
+---
+
+<section class="glass section stats-glass" id="stats">
+	<div class="proof-strip">
+		{display.map((stat, i) => (
+			<div class="proof-cell">
+				<div class="proof-num">{stat.value}</div>
+				<div class="proof-label">{labels[i] ?? stat.label}</div>
+			</div>
+		))}
+	</div>
+</section>

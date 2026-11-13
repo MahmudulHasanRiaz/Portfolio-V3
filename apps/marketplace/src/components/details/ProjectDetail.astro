@@ -1,0 +1,122 @@
+---
+// Twin SSR fallback — project detail template.
+//
+// The SAME markup as the static project detail page
+// (src/pages/projects/[slug].astro), driven by the view model built in
+// src/lib/twin-detail.ts from the LIVE row only (a twin slug is never
+// in the build-time collections, so there is no markdown `Content`).
+// The static page is the source of truth — keep this in sync with it.
+import DetailMedia from "../DetailMedia.astro";
+import DetailVideoFacade from "../DetailVideoFacade.astro";
+import KeyStrip from "../KeyStrip.astro";
+import MarkdownBody from "../MarkdownBody.astro";
+import PrevNext from "../PrevNext.astro";
+import TechChips from "../TechChips.astro";
+import { formatDate } from "../../lib/content";
+import { isRealUrl, serviceForTags } from "../../lib/detail";
+import { langUrl, type Dict, type Lang } from "../../lib/i18n";
+import { optimizedImageUrl, optimizedSrcset } from "../../lib/images";
+import type { ProjectView } from "../../lib/twin-detail";
+
+interface Props {
+	view: ProjectView;
+	lang: Lang;
+	t: Dict;
+}
+
+const { view, lang, t } = Astro.props;
+const d = view.d;
+---
+
+{
+	view.found && d ? (
+		<section class="glass">
+			{view.jsonLd && (
+				<script
+					type="application/ld+json"
+					set:html={JSON.stringify(view.jsonLd)}
+				/>
+			)}
+
+			<a class="back-link" href={view.backHref}>
+				{view.backLabel}
+			</a>
+			{d.thumbnail &&
+				(view.isVideoThumb && view.videoSrc ? (
+					<div class="detail-hero">
+						<DetailVideoFacade
+							src={view.videoSrc}
+							poster={view.videoPoster}
+							title={d.title}
+							lang={lang}
+							dict={t}
+						/>
+					</div>
+				) : (
+					<div class="detail-hero">
+						<img
+							src={optimizedImageUrl(d.thumbnail, 1200)}
+							alt={d.title}
+							fetchpriority="high"
+							decoding="async"
+							srcset={d.thumbnail?.includes("images.unsplash.com") ? `${d.thumbnail.replace(/w=\d+/, "w=800").replace(/q=\d+/, "q=75")} 800w, ${d.thumbnail.replace(/q=\d+/, "q=75")} 1200w` : optimizedSrcset(d.thumbnail, [800, 1200])}
+							sizes="(max-width: 640px) 100vw, 1088px"
+						/>
+					</div>
+				))}
+			<h1 class="detail-title">{d.title}</h1>
+			{d.tags?.length ? (
+				<div class="tag-row" style="margin-top:12px;">
+					{d.tags.map((tag) => (
+						<span class="tag">{tag}</span>
+					))}
+				</div>
+			) : null}
+			<KeyStrip
+				items={[
+					d.client ? { label: t.clientLabel, value: d.client } : null,
+					d.role ? { label: t.roleLabel, value: d.role } : null,
+					{
+						label: t.publishedLabel,
+						value: formatDate(d.publishedAt, lang) || d.year,
+					},
+					d.tags?.length
+						? { label: t.categoryLabel, value: d.tags.join(", ") }
+						: null,
+					d.status ? { label: t.statusLabel, value: d.status } : null,
+					d.liveUrl && isRealUrl(d.liveUrl)
+						? { label: t.liveSiteLabel, value: t.visitSite, href: d.liveUrl }
+						: null,
+				]}
+			/>
+			<section class="detail-section" aria-label={t.aboutProject}>
+				<h2 class="detail-h2">{t.aboutProject}</h2>
+				{view.storyBlocks.length > 0 ? (
+					<MarkdownBody blocks={view.storyBlocks} />
+				) : view.showDescriptionFallback ? (
+					<div class="detail-body">
+						<p>{d.description}</p>
+					</div>
+				) : null}
+			</section>
+			<TechChips techs={d.techs ?? []} lang={lang} dict={t} />
+			<DetailMedia
+				lang={lang}
+				dict={t}
+				gallery={d.gallery ?? []}
+				videos={d.videos ?? []}
+				exclude={d.thumbnail}
+				altBase={`${d.title} ${t.galleryImage}`}
+			/>
+			<PrevNext prev={view.prev} next={view.next} lang={lang} dict={t} />
+		</section>
+	) : (
+		<section class="glass">
+			<a class="back-link" href={langUrl("/projects", lang)}>
+				{t.backAllProjects}
+			</a>
+			<h1 class="detail-title">{t.notFoundProject}</h1>
+			<p class="empty-state">{t.notPublishedProject}</p>
+		</section>
+	)
+}

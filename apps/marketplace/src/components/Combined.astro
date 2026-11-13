@@ -1,0 +1,180 @@
+---
+import ThumbImage from "./ThumbImage.astro";
+import { getVentures, truncateShort } from "../lib/content";
+import { applySiteCopy, getDict, langUrl, localizeData, type Lang } from "../lib/i18n";
+import { getSiteSettings } from "../lib/settings";
+import { HOMEPAGE_VENTURES_LIMIT } from "../lib/homepage-limits";
+
+interface Props {
+	lang?: Lang;
+}
+
+const { lang = "en" } = Astro.props;
+const settings = await getSiteSettings();
+const t = applySiteCopy(getDict(lang), lang, settings);
+// Founder summary from the admin (fix plan §3 Break 2): the
+// multi-sentence bio from the homepage founder section. Bangla
+// wins on /bn/ pages, English is the fallback; absent = render
+// nothing extra (the dict entrepreneurText above stays as-is).
+const founderSummary =
+	lang === "bn"
+		? (settings.bn?.founderSummary ?? settings.founderSummary)
+		: settings.founderSummary;
+
+const venturesRaw = await getVentures();
+const ventures = venturesRaw
+	.slice(0, HOMEPAGE_VENTURES_LIMIT)
+	.map((v) => ({
+		...v,
+		data: localizeData(v.data, lang),
+	}));
+// MARKETPLACE COPY: the live music platforms fetch (getPlatforms) and
+// the platform chips under the artist half are removed — no platform
+// links on this copy (docs/MARKETPLACE.md). The artist points stay.
+// Mini-rows render the venture's own description (live API row,
+// build-time row as fallback) and its own thumbnail, or a letter
+// tile when it has none — no slug-keyed copy or thumbnails here:
+// the HisabKit / CloudDesk / SkillBridge rows were archived, so
+// their short copy, order list and fallback images were removed
+// with them (fix plan §1a).
+// Short artist points, verbatim from the React preview (English) /
+// faithful Bangla translation (dictionary).
+const artistShortPoints = t.artistPoints;
+---
+
+<section class="glass section" id="beyond">
+	<div class="section-head">
+		<h2>{t.beyondTitle}</h2>
+	</div>
+	<p class="muted" style="margin:0 0 16px;font-size:14px;">
+		{t.beyondSub}
+	</p>
+	<div class="combined-grid">
+		<div class="combined-half">
+			<h3>
+				<span class="half-icon" aria-hidden="true">
+					<svg
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+						<path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+						<path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+						<path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+					</svg>
+				</span>
+				{t.entrepreneurTitle}
+			</h3>
+			<p>
+				{t.entrepreneurText}
+			</p>
+			{founderSummary ? <p>{founderSummary}</p> : null}
+			{
+				ventures.length === 0 ? (
+					<p class="muted" style="margin:0;font-size:14px;">
+						{t.venturesEmptyShort}
+					</p>
+				) : (
+					ventures.map((venture) => (
+						<a
+							class="mini-row"
+							href={langUrl(`/ventures/${venture.data.slug}`, lang)}
+						>
+							<span class="mini-thumb">
+								{venture.data.thumbnailType === "video" &&
+								venture.data.thumbnail ? (
+									<video
+										src={venture.data.thumbnail}
+										aria-label={venture.data.title}
+										muted
+										loop
+										playsinline
+										autoplay={venture.data.thumbnailAutoplay !== false}
+										preload="metadata"
+									/>
+								) : venture.data.thumbnail ? (
+									<ThumbImage
+										src={venture.data.thumbnail}
+										alt=""
+										widths={[72, 144]}
+										sizes="72px"
+										width={64}
+										height={48}
+									/>
+								) : (
+									<span
+										style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:var(--accent);background:var(--accent-wash);"
+										aria-hidden="true"
+									>
+										{venture.data.title.charAt(0)}
+									</span>
+								)}
+							</span>
+							<span class="mini-text">
+								<b>{venture.data.title}</b>
+								{venture.data.description ? (
+									<span>
+										{truncateShort(venture.data.description)}
+									</span>
+								) : null}
+							</span>
+							<span
+								class="mini-arrow"
+								style="margin-left:auto;flex:none;color:var(--accent-strong);font-weight:700;"
+								aria-hidden="true"
+							>
+								→
+							</span>
+						</a>
+					))
+				)
+			}
+			<p style="margin:14px 0 0;text-align:right;">
+				<a class="view-all" href={langUrl("/ventures", lang)}>
+					{t.viewAllVentures}
+				</a>
+			</p>
+		</div>
+		<div class="combined-half">
+			<h3>
+				<span class="half-icon" aria-hidden="true">
+					<svg
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+						<path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+						<line x1="12" x2="12" y1="19" y2="22" />
+					</svg>
+				</span>
+				{t.artistTitle}
+			</h3>
+			<ul class="artist-points">
+				{artistShortPoints.map((point) => (
+					<li>{point}</li>
+				))}
+			</ul>
+			{/* MARKETPLACE COPY: the music platform chips were removed
+			    here — no platform links on this copy. */}
+		</div>
+	</div>
+	<div class="combined-cta">
+		<p>
+			<strong>{t.wantWholePicture}</strong>
+			{t.wholePictureText}
+		</p>
+		<a class="btn" href={langUrl("/know-me", lang)}>{t.knowMeCta}</a>
+	</div>
+</section>

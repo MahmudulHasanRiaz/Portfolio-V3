@@ -1,0 +1,97 @@
+---
+import { SERVICES, type Service } from "../data/site";
+import BrandIcon from "./BrandIcon.astro";
+import ServiceIcon from "./ServiceIcon";
+import ServiceModal from "./ServiceModal";
+import { getDict, pickDict, SERVICE_MODAL_DICT_KEYS, type Lang } from "../lib/i18n";
+import { HOMEPAGE_SERVICES_LIMIT } from "../lib/homepage-limits";
+
+interface Props {
+	lang?: Lang;
+	/** Live-merged services (getServices()); defaults to build-time SERVICES. */
+	services?: Service[];
+}
+
+const { lang = "en", services = SERVICES } = Astro.props;
+const t = getDict(lang);
+// The services-grid CSS is designed for exactly 5 cards (3+2 at
+// >=1024px) — a 6th card would break the layout, so cap the preview
+// here (and pass the same capped list to the modal).
+const visibleServices = services.slice(0, HOMEPAGE_SERVICES_LIMIT);
+---
+
+<section class="glass section" id="services">
+	<div class="section-head">
+		<div>
+			<h2>{t.servicesTitle}</h2>
+			<p>{t.servicesSub}</p>
+		</div>
+	</div>
+	<div class="services-grid">
+		{visibleServices.map((service) => {
+			const displayName =
+				lang === "bn" && service.bn?.title
+					? service.bn.title
+					: service.name;
+			return (
+			<button
+				type="button"
+				class="service-card"
+				style="text-align:left;"
+				data-service-slug={service.slug}
+				aria-haspopup="dialog"
+				aria-label={`${t.learnMoreAbout} ${displayName}`}
+			>
+				<span class="service-icon">
+					{service.icon ? (
+						<BrandIcon icon={service.icon} name={displayName} size={26} decorative />
+					) : (
+						// Generic Lucide resolver (was a hardcoded
+						// Database / Code / fallback switch — any other
+						// live icon name showed the fallback). No client
+						// directive: renders as static SVG, no JS shipped.
+						<ServiceIcon name={service.lucide} size={26} />
+					)}
+				</span>
+				<span style="min-width:0;flex:1;">
+					<h3>{displayName}</h3>
+				</span>
+			</button>
+			);
+		})}
+	</div>
+	{/* Service detail modal — the service brief lives here, not on
+	    the card. (MARKETPLACE COPY: the modal has no contact CTA.) */}
+	{/* Subset dict only (Issue 7B): 3 keys, not the whole dictionary. */}
+	{/* client:idle (not client:visible): the modal renders null while
+	    closed, so the island has no size and the visibility observer
+	    never fires — the modal could never open. */}
+	<ServiceModal services={visibleServices} lang={lang} dict={pickDict(t, SERVICE_MODAL_DICT_KEYS)} client:idle />
+</section>
+
+<style>
+	/* Cards show name + icon only: centre the name against the icon tile. */
+	.service-card {
+		align-items: center;
+	}
+</style>
+
+<script>
+	// Opens the service detail modal (ServiceModal island listens for
+	// "open-service"). Guarded against double-binding: Services.astro is
+	// rendered on both the home and Know Me pages, so an element already
+	// bound by the other instance is skipped.
+	document
+		.querySelectorAll("[data-service-slug]:not([data-service-bound])")
+		.forEach((el) => {
+			el.setAttribute("data-service-bound", "");
+			el.addEventListener("click", () => {
+				const target = el as HTMLElement;
+				window.dispatchEvent(
+					new CustomEvent("open-service", {
+						detail: { slug: target.dataset.serviceSlug },
+					}),
+				);
+			});
+		});
+</script>

@@ -1,0 +1,189 @@
+---
+import { youtubeThumb } from "../lib/youtube";
+import { applySiteCopy, getDict, langUrl, type Lang } from "../lib/i18n";
+import { getSiteSettings } from "../lib/settings";
+import { KNOW_ME_RELEASES_LIMIT } from "../lib/homepage-limits";
+
+export interface ReleaseCardItem {
+	slug: string;
+	title: string;
+	description?: string;
+	releaseType?: string;
+	publishedAt?: string;
+	youtubeId?: string;
+	platforms: Array<{ name: string; url: string }>;
+}
+
+interface Props {
+	releases: ReleaseCardItem[];
+	lang?: Lang;
+}
+
+const { releases, lang = "en" } = Astro.props;
+const t = applySiteCopy(getDict(lang), lang, await getSiteSettings());
+
+// MARKETPLACE COPY: the RELEASE_PLATFORM_ICONS map and the platform
+// icon row on release cards are removed — no platform links/icons on
+// this copy. The audio tile below uses a generic music-note icon.
+// (release.platforms is still read for the hasYouTube check, which
+// only decides the "Audio only" badge — it renders no links.)
+
+// The DB seed used 2021-01-01 as a placeholder date for the four
+// audio-only singles, so all four render the identical "1 Jan 2021" —
+// a placeholder shown as fact. Until the real Spotify release dates
+// are known, omit it rather than display it. (Live API wins the merge,
+// so editing the build-time .md dates alone would not fix the live
+// site — the DB rows need the real dates.)
+const PLACEHOLDER_DATE = "2021-01-01";
+
+function releaseYear(publishedAt?: string): string {
+	if (!publishedAt || publishedAt.startsWith(PLACEHOLDER_DATE)) return "";
+	return publishedAt.slice(0, 4);
+}
+
+function typeLabel(releaseType?: string): string {
+	const key = (releaseType ?? "").toLowerCase();
+	if (key === "nasheed") return t.releaseTypeNasheed;
+	if (key === "tilawat") return t.releaseTypeTilawat;
+	if (key === "podcast") return t.releaseTypePodcast;
+	if (key === "lecture") return t.releaseTypeLecture;
+	if (key === "other") return t.releaseTypeOther;
+	if (!releaseType) return "";
+	return releaseType.charAt(0).toUpperCase() + releaseType.slice(1);
+}
+---
+
+<!-- Releases — the preview's 3-column card grid (NOT full-width rows):
+     aspect-video thumbnail on top + p-4 body with title, type · year
+     meta, and an "Audio only — not on YouTube" pill for audio singles.
+     The card carries NO description — the full description lives on the
+     detail page. The whole card links to the detail page.
+     MARKETPLACE COPY: the platform icon row opposite the title is
+     removed — no platform links/icons on this copy. -->
+<section class="glass section" id="releases">
+	<div class="section-head">
+		<div>
+			<h2>{t.statReleases}</h2>
+			<p>
+				{t.releasesSub}
+			</p>
+		</div>
+		<a class="view-all" href={langUrl("/releases", lang)}>{t.viewAllReleases}</a>
+	</div>
+	{
+		releases.length === 0 ? (
+			<p class="empty-state">{t.emptyReleases}</p>
+		) : (
+			<ul class="release-grid">
+				{releases.slice(0, KNOW_ME_RELEASES_LIMIT).map((release) => {
+					const hasYouTube = release.platforms.some(
+						(p) => p.name === "YouTube",
+					);
+					const thumb = release.youtubeId
+						? youtubeThumb(release.youtubeId)
+						: null;
+					const year = releaseYear(release.publishedAt);
+					const type = typeLabel(release.releaseType);
+					const meta = [type, year].filter(Boolean).join(" · ");
+					return (
+						<li class="release-card">
+							<a
+								class="release-card-link"
+								href={langUrl(`/releases/${release.slug}`, lang)}
+								aria-label={`${t.viewDetailsFor} ${release.title}`}
+							>
+								<span class="release-card-thumb">
+									{thumb ? (
+										<>
+											<img
+												src={thumb}
+												alt={release.title}
+												width="480"
+												height="360"
+												loading="lazy"
+												decoding="async"
+											/>
+											<span
+												class="release-play"
+												aria-hidden="true"
+											>
+												<svg
+													width="18"
+													height="18"
+													viewBox="0 0 24 24"
+													fill="currentColor"
+													aria-hidden="true"
+												>
+													<path d="M8 5.5v13l11-6.5z" />
+												</svg>
+											</span>
+										</>
+									) : (
+										<span
+											class="release-audio-tile"
+											aria-hidden="true"
+										>
+											{/* MARKETPLACE COPY: generic music-note icon — the
+											    Spotify brand icon was removed with the
+											    platform links. */}
+											<svg
+												width="52"
+												height="52"
+												viewBox="0 0 24 24"
+												fill="none"
+												stroke="currentColor"
+												stroke-width="1.5"
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												aria-hidden="true"
+											>
+												<path d="M9 18V5l12-2v13" />
+												<circle cx="6" cy="18" r="3" />
+												<circle cx="18" cy="16" r="3" />
+											</svg>
+										</span>
+									)}
+								</span>
+								<span class="release-card-body">
+									<span class="release-card-top">
+										<span class="release-card-title">
+											<span class="release-title">
+												{release.title}
+											</span>
+											{meta ? (
+												<span class="release-meta">
+													{meta}
+												</span>
+											) : null}
+										</span>
+										{/* MARKETPLACE COPY: the platform icon row was removed
+										    here — no platform links/icons on this copy. */}
+									</span>
+									{!hasYouTube ? (
+										<span class="audio-badge">
+											<svg
+												width="12"
+												height="12"
+												viewBox="0 0 24 24"
+												fill="none"
+												stroke="currentColor"
+												stroke-width="2.4"
+												stroke-linecap="round"
+												aria-hidden="true"
+											>
+												<path d="M9 18V5l12-2v13" />
+												<circle cx="6" cy="18" r="3" />
+												<circle cx="18" cy="16" r="3" />
+											</svg>
+											{t.audioOnly}
+										</span>
+									) : null}
+								</span>
+							</a>
+						</li>
+					);
+				})}
+			</ul>
+		)
+	}
+</section>

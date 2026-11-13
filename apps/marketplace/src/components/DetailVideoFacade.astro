@@ -1,0 +1,88 @@
+---
+// Video thumbnail facade (preview's DemoVideoPlayer pattern): a poster
+// image with a play control — the video itself loads only when the
+// visitor taps play. The swap to a <video> element is wired by the
+// shared public/js/detail.js (delegated, no inline script in <main>).
+// When there is no poster image, an accent tile with a play button
+// stands in — never a black void.
+import { getDict, type Dict, type Lang } from "../lib/i18n";
+import { optimizedImageUrl, optimizedSrcset } from "../lib/images";
+
+interface Props {
+	/** Video URL (thumbnailVideoUrl when present, else the thumbnail). */
+	src: string;
+	/** Poster image URL, when the thumbnail is an image. */
+	poster?: string | null;
+	title: string;
+	lang?: Lang;
+	dict?: Dict;
+}
+
+const { src, poster, title, lang = "en", dict } = Astro.props;
+// Defense-in-depth: a poster must never be a video URL. If the poster
+// is the video itself (or looks like a video file), treat it as absent
+// so no broken <img> renders and no <video poster> is set.
+const safePoster =
+	poster && poster !== src && !/\.(mp4|webm|mov|m4v)([?#]|$)/i.test(poster)
+		? poster
+		: null;
+// Poster display: the facade <img> and the <video poster> detail.js
+// sets on tap both use the optimized URL — a files.riaz.com.bd
+// poster goes through /api/image (w=800, the Unsplash parity
+// width), an Unsplash poster keeps its w=800 rewrite, anything else
+// renders unchanged.
+const posterSrc = safePoster
+	? safePoster.includes("images.unsplash.com")
+		? safePoster.replace(/w=\d+/, "w=800").replace(/q=\d+/, "q=75")
+		: (optimizedImageUrl(safePoster, 800) ?? safePoster)
+	: null;
+const posterSrcset = safePoster
+	? optimizedSrcset(safePoster, [360, 720, 1024])
+	: undefined;
+const t = dict ?? getDict(lang);
+const playLabel = lang === "bn" ? `${title} প্লে করুন` : `Play ${title}`;
+---
+
+<button
+	type="button"
+	class="video-facade"
+	data-video-facade
+	data-src={src}
+	data-poster={posterSrc ?? ""}
+	aria-label={playLabel}
+>
+	{safePoster ? (
+		<img
+			src={posterSrc}
+			srcset={posterSrcset}
+			sizes={posterSrcset ? "(max-width: 640px) 100vw, 1088px" : undefined}
+			alt={title}
+			loading="lazy"
+			decoding="async"
+		/>
+	) : (
+		<span class="video-facade-tile" aria-hidden="true">
+			<svg
+				width="52"
+				height="52"
+				viewBox="0 0 24 24"
+				fill="currentColor"
+				aria-hidden="true"
+			>
+				<path d="M8 5.5v13l11-6.5z" />
+			</svg>
+		</span>
+	)}
+	<span class="play-btn" aria-hidden="true">
+		<svg
+			width="28"
+			height="28"
+			viewBox="0 0 24 24"
+			fill="currentColor"
+			aria-hidden="true"
+		>
+			<path d="M8 5.5v13l11-6.5z" />
+		</svg>
+	</span>
+	<span class="play-label">{t.playVideo}</span>
+</button>

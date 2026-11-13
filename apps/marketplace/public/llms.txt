@@ -1,0 +1,49 @@
+# Mahmudul Hasan Riaz
+
+> Software Engineer, Entrepreneur and Nasheed Artist based in Dhaka, Bangladesh. This site is his portfolio and personal brand platform: software engineering work, ventures, nasheed releases, and writing — in English and Bangla.
+
+<!-- MARKETPLACE COPY (see docs/MARKETPLACE.md): no contact information
+     anywhere on this copy — no contact section, no email, no phone,
+     no WhatsApp, no social-media links, no "contact me" CTA. The
+     Platforms page and the Contact section are removed. -->
+
+## Pages
+
+- [Home](/): Software Engineer profile — services, projects, stack, clients, latest posts.
+- [Know Me](/know-me): the whole person — all five identities, releases, ventures, services, selected projects, clients, posts.
+- [Projects](/projects): selected software engineering projects.
+- [Case Studies](/case-studies): problem, fix and result for selected work.
+- [Ventures](/ventures): companies and products he is building.
+- [Releases](/releases): nasheed, tilawat, podcast and lecture releases, with credits.
+- [Posts](/posts): writing on software, e-commerce and recording.
+
+## Services
+
+- ERP/CRM Development
+- Custom Website Development
+- Ecommerce Consultancy
+- WordPress Website and Theme/Plugin Development
+- Shopify Development
+
+## Selected Projects
+
+- [Jannat Fashion ERP](/projects/jannat-fashion-erp): Next.js ERP for Jannat Fashion — 2,000 to 5,000 orders a day across multiple WooCommerce stores, with payroll, accounting, fraud blocking, an SR portal and wholesale.
+- [EcoMate](/projects/ecomate): single-tenant SaaS ERP and e-commerce platform — one Docker deployment per client, with inventory, POS, multi-branch and HR. Used by Fixed Plus and Avelto.
+- [SurgicalX](/projects/surgicalx): WordPress e-commerce store for surgical products, built on Flatsome.
+- [WooMate Lite](/projects/woomate-lite): WordPress plugin for Bangladeshi WooCommerce stores — fraud blocking, four courier integrations, and IP, phone and device blocking.
+- [StyleNest](/projects/stylenest-fashion-ecommerce): fashion e-commerce — fixing a slow WooCommerce store with heavy cash-on-delivery fraud.
+- [PharmaTrack](/projects/pharmatrack-pharmacy-erp): pharmacy ERP replacing paper registers across eighteen branches.
+
+## Ventures
+
+- [HisabKit](/ventures/hisabkit)
+- [CloudDesk](/ventures/clouddesk)
+- [SkillBridge](/ventures/skillbridge)
+
+## Releases
+
+Nasheed, tilawat, podcast and lecture releases. Each release has full credits on its detail page.
+
+## Languages
+
+English (default) and Bangla. English at `/`, Bangla at `/bn/`.

@@ -1,0 +1,277 @@
+/* Loading feedback — worker G (skeleton + loader round).
+   Glass design language: frosted surfaces, teal accent, soft shimmer.
+   Kept in its own file so it never touches glass.css (worker E owns it).
+   Everything here respects prefers-reduced-motion: shimmer/spinner
+   animations stop and skeletons render as static frosted blocks. */
+
+/* ---- 1. Top page-navigation progress bar (Layout.astro) ---- */
+#page-progress {
+	position: fixed;
+	top: 0;
+	left: 0;
+	z-index: 9999;
+	height: 3px;
+	width: 0;
+	opacity: 0;
+	background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+	box-shadow: 0 0 12px var(--border-glow-soft);
+	border-radius: 0 3px 3px 0;
+	pointer-events: none;
+	transition:
+		width 350ms ease,
+		opacity 200ms ease;
+	/* Animation isolation: fixed bar — the `width` transition cannot
+	   move page layout or scroll (zero CLS by construction). Converting
+	   it to transform: scaleX needs the Layout.astro script, which sets
+	   style.width — reported to worker H, not changed here. */
+	contain: layout style;
+}
+#page-progress.is-active {
+	opacity: 1;
+}
+#page-progress.is-done {
+	width: 100%;
+	opacity: 0;
+}
+
+/* A link/card that was just clicked gets a pressed state instantly, so
+   the tap itself is acknowledged even before the bar paints. */
+a.is-navigating,
+button.is-navigating {
+	opacity: 0.72;
+}
+
+/* ---- 2. Skeleton primitives ---- */
+.skel {
+	position: relative;
+	overflow: hidden;
+	border-radius: var(--radius-xs);
+	background: var(--accent-wash);
+	border: 1px solid var(--card-border);
+	/* Animation isolation: the shimmer ::after animates translateX
+	   only (compositor); paint containment matches the overflow clip. */
+	contain: layout paint;
+	isolation: isolate;
+}
+.skel::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		100deg,
+		transparent 20%,
+		rgba(255, 255, 255, 0.55) 50%,
+		transparent 80%
+	);
+	transform: translateX(-100%);
+	animation: skel-shimmer 1.6s ease-in-out infinite;
+}
+[data-theme="dark"] .skel::after {
+	background: linear-gradient(
+		100deg,
+		transparent 20%,
+		rgba(255, 255, 255, 0.09) 50%,
+		transparent 80%
+	);
+}
+@keyframes skel-shimmer {
+	to {
+		transform: translateX(100%);
+	}
+}
+.skel-line {
+	height: 12px;
+	margin: 10px 0;
+}
+.skel-line--title {
+	height: 18px;
+	width: 62%;
+}
+.skel-line--short {
+	width: 42%;
+}
+
+/* Skeleton card (carousel pre-hydration + modal fallback): same
+   footprint as a real grid/deck card so nothing jumps when content lands. */
+.skel-card {
+	border-radius: var(--radius);
+	border: 1px solid var(--card-border);
+	background: var(--card);
+	backdrop-filter: blur(18px) saturate(1.4);
+	-webkit-backdrop-filter: blur(18px) saturate(1.4);
+	box-shadow: var(--shadow-soft);
+	overflow: hidden;
+	/* Animation isolation: skeleton shimmer inside is transform-only. */
+	contain: layout style;
+}
+.skel-card .skel-thumb {
+	aspect-ratio: 16 / 9;
+	border-radius: 0;
+	border: 0;
+}
+.skel-card .skel-body {
+	padding: 16px;
+}
+.skel-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+	gap: 16px;
+}
+/* Footprint match (2026-11-10): the grid renders 6 cards (2 rows) from
+   640px, but the mobile carousel shows ONE card — so below 640px only
+   the first skeleton card shows, matching the single carousel card's
+   footprint instead of 3 stacked cards (~900px of "empty gap"). */
+@media (max-width: 639px) {
+	.skel-grid .skel-card:nth-child(n + 2) {
+		display: none;
+	}
+}
+
+/* Modal skeleton: shown inside the sheet for the first frame(s) while
+   the modal content mounts, so the sheet itself is never a dead wait. */
+.modal-skel {
+	display: grid;
+	gap: 12px;
+	padding-top: 8px;
+	/* Animation isolation: skeleton lines shimmer by transform only;
+	   contained inside the modal sheet. */
+	contain: layout style;
+}
+.modal-skel .skel-line--title {
+	height: 22px;
+	width: 55%;
+	margin: 0;
+}
+
+/* ---- 3. Image placeholders ----
+   Thumb containers get a frosted shimmer behind the image; the image
+   fades in once loaded (class added by the Layout script / React
+   onLoad). Broken images reveal the fallback instead of a blank box. */
+.grid-thumb,
+.deck-thumb,
+.deck-peek-thumb,
+.release-card-thumb,
+.mini-thumb {
+	background:
+		linear-gradient(100deg, var(--accent-wash), var(--accent-soft), var(--accent-wash));
+	background-size: 200% 100%;
+	animation: skel-shimmer-bg 1.6s ease-in-out infinite;
+	/* Animation isolation: the shimmer animates background-position
+	   (paint-only, no layout); containment keeps it inside the thumb. */
+	contain: layout paint;
+}
+.grid-thumb img,
+.deck-thumb img,
+.deck-peek-thumb img,
+.release-card-thumb img,
+.mini-thumb img {
+	opacity: 0;
+	transition: opacity 300ms ease;
+	/* Safety net (2026-11-09 navigation fix): if the JS that adds
+	   .img-loaded never runs (e.g. a script failure after a View
+	   Transition navigation), the image can no longer stay invisible
+	   forever — it fades in on its own after 5s. In the normal path
+	   the image already has .img-loaded (and opacity 1) long before
+	   this fires, so nothing changes visually. */
+	animation: img-reveal-safety 300ms ease 5s forwards;
+}
+@keyframes img-reveal-safety {
+	to {
+		opacity: 1;
+	}
+}
+.grid-thumb img.img-loaded,
+.grid-thumb video.img-loaded,
+.deck-thumb img.img-loaded,
+.deck-thumb video.img-loaded,
+.release-card-thumb img.img-loaded,
+.mini-thumb img.img-loaded,
+.mini-thumb video.img-loaded {
+	opacity: 1;
+}
+.grid-thumb:has(img.img-loaded),
+.grid-thumb:has(video.img-loaded),
+.deck-thumb:has(img.img-loaded),
+.deck-thumb:has(video.img-loaded),
+.release-card-thumb:has(img.img-loaded),
+.mini-thumb:has(img.img-loaded),
+.mini-thumb:has(video.img-loaded) {
+	animation: none;
+	background: none;
+}
+@keyframes skel-shimmer-bg {
+	0% {
+		background-position: 200% 0;
+	}
+	100% {
+		background-position: -200% 0;
+	}
+}
+
+/* ---- 4. Buttons / forms: spinner + disabled state ---- */
+.btn-spinner {
+	display: inline-block;
+	width: 16px;
+	height: 16px;
+	flex: none;
+	vertical-align: -3px;
+	margin-right: 8px;
+	border-radius: 50%;
+	border: 2px solid rgba(255, 255, 255, 0.45);
+	border-top-color: #fff;
+	animation: btn-spin 700ms linear infinite;
+}
+@keyframes btn-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+.btn[disabled],
+.btn-submit-full[disabled],
+.chip[aria-busy="true"] {
+	cursor: wait;
+	opacity: 0.65;
+}
+.btn-submit-full[disabled] {
+	pointer-events: none;
+}
+form[data-busy="true"] input,
+form[data-busy="true"] select,
+form[data-busy="true"] textarea {
+	opacity: 0.7;
+}
+
+/* Filter chips: instant pressed feedback (aria-pressed mirrors .active). */
+.chip[aria-pressed="true"] {
+	cursor: default;
+}
+
+/* ---- Reduced motion: no shimmer, no spin, no fade ---- */
+@media (prefers-reduced-motion: reduce) {
+	.skel::after,
+	.grid-thumb,
+	.deck-thumb,
+	.deck-peek-thumb,
+	.release-card-thumb,
+	.mini-thumb {
+		animation: none;
+	}
+	.btn-spinner {
+		animation: none;
+		border-top-color: rgba(255, 255, 255, 0.45);
+	}
+	.grid-thumb img,
+	.grid-thumb video,
+	.deck-thumb img,
+	.deck-thumb video,
+	.release-card-thumb img,
+	.mini-thumb img,
+	.mini-thumb video {
+		transition: none;
+		animation: none;
+		opacity: 1;
+	}
+	#page-progress {
+		transition: opacity 200ms ease;
+	}
+}

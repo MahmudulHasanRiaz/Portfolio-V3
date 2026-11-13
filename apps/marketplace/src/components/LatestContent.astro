@@ -1,0 +1,103 @@
+---
+import {
+	formatDate,
+	getPosts,
+	readingTimeFromText,
+} from "../lib/content";
+import {
+	applySiteCopy,
+	getDict,
+	langUrl,
+	localizeData,
+	readingTimeLabel,
+	type Lang,
+} from "../lib/i18n";
+import { getSiteSettings } from "../lib/settings";
+import ThumbImage from "./ThumbImage.astro";
+
+// "Latest" block — preview presentation: cards with thumbnail (or a
+// deliberate monogram tile when a post has none) + tag chip + title +
+// "date · reading time". No description/excerpt on the card — the preview
+// shows title + other info only. Reading time is computed from the
+// actual post text (body, then live API content), never the stored
+// value on its own — the API ships readingTime: 1 for every post.
+interface Props {
+	lang?: Lang;
+}
+
+const { lang = "en" } = Astro.props;
+const t = applySiteCopy(getDict(lang), lang, await getSiteSettings());
+
+// Unsplash card thumbs ship at w=1200 in content/API rows but render at
+// ~360px wide (2x retina ≈ 720px) — request w=800/q=75 instead: measured
+// 124KB → 67KB per image (~46% less). Non-Unsplash URLs pass through.
+const sizedThumb = (url: string | null | undefined, w = 800) =>
+	url?.includes("images.unsplash.com")
+		? url.replace(/w=\d+/, `w=${w}`).replace(/q=\d+/, "q=75")
+		: url;
+
+const postsRaw = await getPosts();
+const posts = postsRaw.map((p) => ({
+	...p,
+	data: localizeData(p.data, lang),
+}));
+const latest = posts.slice(0, 3);
+---
+
+{
+	latest.length === 0 ? (
+		<p class="empty-state">{t.emptyPosts}</p>
+	) : (
+		<div class="card-grid">
+			{latest.map((post) => {
+				const postText =
+					post.body ?? (post.data as { content?: string }).content ?? "";
+				const readingTime =
+					readingTimeFromText(postText) ?? post.data.readingTime ?? undefined;
+				return (
+					<a class="grid-card" href={langUrl(`/posts/${post.data.slug}`, lang)}>
+						<div class="grid-thumb">
+							{post.data.thumbnailType === "video" &&
+							post.data.thumbnail ? (
+								<video
+									src={post.data.thumbnail}
+									aria-label={post.data.title}
+									muted
+									loop
+									playsinline
+									autoplay={post.data.thumbnailAutoplay !== false}
+									preload="metadata"
+								/>
+							) : post.data.thumbnail ? (
+								<ThumbImage
+									src={post.data.thumbnail}
+									alt={post.data.title}
+									widths={[360, 720, 1080]}
+									sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 360px"
+									width={800}
+									height={500}
+								/>
+							) : (
+								<span class="thumb-fallback" aria-hidden="true">
+									{post.data.title.charAt(0)}
+								</span>
+							)}
+						</div>
+						<div class="grid-body">
+							{post.data.tags?.[0] ? (
+								<div class="tag-row">
+									<span class="tag">{post.data.tags[0]}</span>
+								</div>
+							) : null}
+							<h3>{post.data.title}</h3>
+							<p class="post-meta">
+								{formatDate(post.data.publishedAt, lang)}
+								{readingTime ? ` · ${readingTimeLabel(readingTime, lang)}` : ""}
+							</p>
+						</div>
+					</a>
+				);
+			})}
+		</div>
+	)
+}
