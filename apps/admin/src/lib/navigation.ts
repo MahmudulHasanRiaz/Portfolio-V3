@@ -150,7 +150,11 @@ export const navigation: NavItem[] = [
       { title: "Pages", href: "/dashboard/analytics/pages", icon: FileText },
       { title: "Referrers", href: "/dashboard/analytics/referrers", icon: Users },
       { title: "UTM Campaigns", href: "/dashboard/analytics/utm", icon: Megaphone },
-      { title: "Search", href: "/dashboard/analytics/search", icon: Search },
+      // NOTE: there was a "Search" item here (top search queries), but
+      // it was removed: the public site has NO search UI, so nothing
+      // ever logs a search query and the page could never show data.
+      // It was a dead menu item. If a site search is built later,
+      // re-add it with the analytics/search endpoint (which exists).
     ],
   },
   {

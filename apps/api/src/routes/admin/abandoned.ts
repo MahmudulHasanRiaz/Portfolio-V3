@@ -26,6 +26,7 @@ import { createAbandonedLeadSchema } from "@repo/validation";
 import { abandonedLeads } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import { createRateLimiter } from "../../lib/rate-limit";
 import {
   invalidParam,
   isRecord,
@@ -90,7 +91,19 @@ app.get("/", async (c) => {
 // POST / — capture an abandoned lead (AbandonedRepository.capture).
 // INTENTIONALLY UNAUTHENTICATED: public capture endpoint. Do not
 // require a session here.
-app.post("/", async (c) => {
+//
+// STANDARD: public write endpoints are rate-limited per IP — 10/min
+// here (a visitor abandons a form at most a few times, so 10/min is
+// far above legitimate use and only stops a hammering loop). The
+// helper is in-memory per isolate (best-effort under multi-isolate);
+// a limited request gets 429 + Retry-After, legitimate single
+// submissions are unaffected.
+const publicWriteLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: "Too many requests. Please try again later.",
+});
+app.post("/", publicWriteLimiter, async (c) => {
   try {
     const body = await readJsonBody(c);
     if (!isRecord(body)) {

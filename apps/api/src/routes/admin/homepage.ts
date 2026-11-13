@@ -174,11 +174,13 @@ app.patch("/sections/:id", async (c) => {
     if (!id) return invalidParam(c, "id");
     const body = await readJsonBody(c);
     if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
-    // Reuse the shared update schema for the content record shape; the
-    // per-section content shape is genuinely ambiguous, so only the
-    // record itself is enforced — no per-section schema is invented.
-    // Server-managed fields (id, createdAt, updatedAt) are in the
-    // partial schema but are never read below, so they cannot be written.
+    // STANDARD: keep the record-only check. The per-section content
+    // shape is genuinely ambiguous, so only the record itself is
+    // enforced — no per-section Zod schema is invented (a strict schema
+    // risks rejecting valid section content whose exact shape is not
+    // known). Server-managed fields (id, createdAt, updatedAt) are in
+    // the partial schema but are never read below, so they cannot be
+    // written.
     const v = validateBody(body, updateHomepageSectionSchema);
     if ("error" in v) return c.json({ error: v.error }, 400);
     const content = v.data.content;

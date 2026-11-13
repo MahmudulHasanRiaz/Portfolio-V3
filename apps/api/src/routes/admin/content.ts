@@ -793,10 +793,11 @@ app.post("/:type", async (c) => {
 });
 
 // PUT /:type/:id — update (ContentService.update)
-// NOTE (follow-up decision, left as-is): PUT still allows a direct
-// `status` change, bypassing the transition endpoint / workflow. The
-// update schemas validate `status` against the type's status enum, but
-// no workflow check is applied here.
+// STANDARD: status changes must go through the transition endpoint
+// (POST /:type/:id/transition) only. A `status` field in a PUT body
+// is rejected with a 400 — never silently stripped, and never routed
+// through validateTransition here — so a caller cannot bypass the
+// workflow by editing directly.
 app.put("/:type/:id", async (c) => {
   try {
     const user = await requireAuth(c);
@@ -808,6 +809,14 @@ app.put("/:type/:id", async (c) => {
     if (!id) return invalidParam(c, "id");
     const body = await readJsonBody(c);
     if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    // STANDARD (see above): status changes go through the transition
+    // endpoint only — reject a `status` field here with a clear 400.
+    if ("status" in body) {
+      return c.json(
+        { error: "status cannot be changed here; use the transition endpoint" },
+        400,
+      );
+    }
     const updateSchema = UPDATE_SCHEMAS[type];
     if (!updateSchema) return c.json({ error: "Unknown content type" }, 404);
     const v = validateBody(body, updateSchema);

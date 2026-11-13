@@ -29,6 +29,8 @@ import profileRoutes from "./profile";
 import faqsRoutes from "./faqs";
 import timelineRoutes from "./timeline";
 import contentTaxonomyRoutes from "./content-taxonomy";
+import seoRoutes from "./seo";
+import portalRoutes from "./portal";
 
 type Env = {
   Bindings: {
@@ -66,5 +68,7 @@ app.route("/profile", profileRoutes);
 app.route("/faqs", faqsRoutes);
 app.route("/timeline-events", timelineRoutes);
 app.route("/content-taxonomy", contentTaxonomyRoutes);
+app.route("/seo", seoRoutes);
+app.route("/portal", portalRoutes);
 
 export default app;
