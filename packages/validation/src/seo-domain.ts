@@ -40,7 +40,7 @@ export const slugRedirectSchema = z.object({
   id: uuidSchema,
   sourceSlug: z.string().max(255),
   destinationUrl: z.string(),
-  redirectType: z.coerce.number().int(),
+  redirectType: z.union([z.literal(301), z.literal(302), z.literal(307), z.literal(308)]),
   entityType: z.string().max(50).optional(),
   isActive: z.boolean(),
   createdAt: timestampSchema,
@@ -49,7 +49,7 @@ export const slugRedirectSchema = z.object({
 export const createSlugRedirectSchema = z.object({
   sourceSlug: z.string().max(255),
   destinationUrl: z.string(),
-  redirectType: z.coerce.number().int(),
+  redirectType: z.union([z.literal(301), z.literal(302), z.literal(307), z.literal(308)]),
   entityType: z.string().max(50).optional(),
   isActive: z.boolean(),
 });

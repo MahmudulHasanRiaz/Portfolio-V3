@@ -5,6 +5,7 @@
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./schema": "./src/schema/index.ts",
     "./repository/search": "./src/repository/search.ts",
     "./repository/search-analytics": "./src/repository/search-analytics.ts",
     "./repository/seo": "./src/repository/seo.ts",

@@ -6,7 +6,7 @@ import { uuidSchema, timestampSchema } from "./common";
 export const leadSchema = z.object({
   id: uuidSchema,
   fullName: z.string(),
-  email: z.string().max(255),
+  email: z.string().max(255).email(),
   phone: z.string().max(50).optional(),
   company: z.string().optional(),
   country: z.string().max(100).optional(),
@@ -37,7 +37,7 @@ export const leadSchema = z.object({
 
 export const createLeadSchema = z.object({
   fullName: z.string(),
-  email: z.string().max(255),
+  email: z.string().max(255).email(),
   phone: z.string().max(50).optional(),
   company: z.string().optional(),
   country: z.string().max(100).optional(),
@@ -111,7 +111,7 @@ export const updateLeadNoteSchema = leadNoteSchema.partial();
 
 export const abandonedLeadSchema = z.object({
   id: uuidSchema,
-  email: z.string().max(255),
+  email: z.string().max(255).email(),
   phone: z.string().max(50).optional(),
   sourcePage: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
@@ -119,7 +119,7 @@ export const abandonedLeadSchema = z.object({
 });
 
 export const createAbandonedLeadSchema = z.object({
-  email: z.string().max(255),
+  email: z.string().max(255).email(),
   phone: z.string().max(50).optional(),
   sourcePage: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),

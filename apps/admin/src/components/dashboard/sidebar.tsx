@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown, ChevronLeft, Menu, X } from "lucide-react";
@@ -51,6 +51,14 @@ const s: Record<string, React.CSSProperties> = {
     color: "#fff",
     fontWeight: 700,
     fontSize: 15,
+    flexShrink: 0,
+  },
+  // Favicon logo (same 34px brand mark as logoIcon, but an image).
+  logoImg: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    objectFit: "cover",
     flexShrink: 0,
   },
   logoText: {
@@ -177,6 +185,29 @@ export function DashboardSidebar({ userRoles }: { userRoles: string[] | null }) 
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Brand mark: the favicon set in Settings → Brand Identity
+  // (GET /api/settings/favicon, via the Hono proxy). When one is set it
+  // is shown here instead of the "P" placeholder; when none is set (or
+  // the fetch fails) the "P" mark stays. Fetched once when the sidebar
+  // mounts — the dashboard layout persists across client navigations,
+  // so this does not re-fetch on every tab switch.
+  const [faviconUrl, setFaviconUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/settings/favicon")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data && typeof data.faviconUrl === "string" && data.faviconUrl) {
+          setFaviconUrl(data.faviconUrl);
+        }
+      })
+      .catch(() => {
+        // Keep the "P" placeholder when the favicon cannot be loaded.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const navItems = filterNavigation(userRoles);
 
   // Accordion: ONE group open at a time. Initially open the group that
@@ -282,7 +313,12 @@ export function DashboardSidebar({ userRoles }: { userRoles: string[] | null }) 
       }}
     >
       <div style={s.logo}>
-        <div style={s.logoIcon}>P</div>
+        {faviconUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={faviconUrl} alt="" style={s.logoImg} />
+        ) : (
+          <div style={s.logoIcon}>P</div>
+        )}
         {!collapsed && (
           <span style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <span style={s.logoText}>Portfolio OS</span>

@@ -6,10 +6,13 @@ import { uuidSchema, timestampSchema, slugSchema } from "./common";
 export const releaseSchema = z.object({
   id: uuidSchema,
   title: z.string().optional(),
+  titleBn: z.string().optional(),
   slug: slugSchema.optional(),
   type: z.enum(["nasheed", "tilawat", "acting", "podcast", "interview", "documentary"]).optional(),
   coverImage: z.string().optional(),
   description: z.string().optional(),
+  descriptionBn: z.string().optional(),
+  releaseFormat: z.string().max(50).optional(),
   releaseDate: z.string().optional(),
   isFeatured: z.boolean().optional(),
   status: z.enum(["draft", "published", "archived"]).optional(),
@@ -27,10 +30,13 @@ export const releaseSchema = z.object({
 
 export const createReleaseSchema = z.object({
   title: z.string().optional(),
+  titleBn: z.string().optional(),
   slug: slugSchema.optional(),
   type: z.enum(["nasheed", "tilawat", "acting", "podcast", "interview", "documentary"]).optional(),
   coverImage: z.string().optional(),
   description: z.string().optional(),
+  descriptionBn: z.string().optional(),
+  releaseFormat: z.string().max(50).optional(),
   releaseDate: z.string().optional(),
   isFeatured: z.boolean().optional(),
   status: z.enum(["draft", "published", "archived"]).optional(),
@@ -81,3 +87,14 @@ export const createReleaseLyricSchema = z.object({
 });
 
 export const updateReleaseLyricSchema = releaseLyricSchema.partial();
+
+// ─── Release Videos ──────────────────────────────────────────────────────────
+
+export const createReleaseVideoSchema = z.object({
+  platformName: z.string().max(100).optional(),
+  videoUrl: z.string().optional(),
+  title: z.string().optional(),
+  sortOrder: z.coerce.number().int().optional(),
+});
+
+export const updateReleaseVideoSchema = createReleaseVideoSchema.partial();

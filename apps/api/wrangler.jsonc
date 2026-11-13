@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "portfolio-v3-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-12",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  // Service binding to the public site worker (2026-11-13). The
+  // purgePublicCache side effect (lib/side-effects.ts) calls the
+  // public worker's /api/cache/invalidate to purge the edge cache on
+  // admin saves. A Worker CANNOT fetch another Worker's
+  // `*.workers.dev` URL from inside the Worker (Cloudflare "error
+  // code: 1042"), so the purge goes through this binding instead of
+  // over HTTPS — the only free-tier path that works without a custom
+  // domain. The PUBLIC_SITE_URL var is still kept as the local-dev /
+  // no-binding fallback.
+  "services": [{ "binding": "PUBLIC_SITE", "service": "portfolio-v3-public" }],
+  // Workers Cron Trigger (2026-11-13): the V2 stack ran its scheduler
+  // sidecar every 5 minutes, calling both cron routes (publish +
+  // workflows). This trigger replaces it — one `*/5 * * * *` tick,
+  // and the `scheduled` handler in src/index.ts invokes both routes
+  // internally (same handlers, same x-cron-secret gate). CRON_SECRET
+  // is already set on this Worker (verified live: the cron routes
+  // answer 401 without the header, not 500).
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "vars": {
+    "BETTER_AUTH_URL": "https://portfolio-v3-api.riaaz.workers.dev",
+    // Public r2.dev URL of the portfolio-v3-media R2 bucket. The PDF
+    // routes (finance invoices, proposal documents) store generated
+    // PDFs under documents/ and return { pdfUrl } built from this
+    // base; without it they fall back to "<bucket>/documents/<file>",
+    // which is not directly openable. Public URL, not a secret.
+    "R2_PUBLIC_URL": "https://pub-d9ea4c7692ee4f9994115a16899922b0.r2.dev"
+  }
+}

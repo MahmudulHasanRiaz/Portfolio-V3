@@ -14,6 +14,19 @@
 			// see https://opennext.js.org/cloudflare/caching
 			"binding": "WORKER_SELF_REFERENCE",
 			"service": "portfolio-v3-admin"
+		},
+		{
+			// Hono API service binding (2026-11-13, Hono cutover). A
+			// Worker CANNOT fetch another Worker's `*.workers.dev` URL
+			// from inside the Worker (Cloudflare "error code: 1042" —
+			// the `workers.dev` hostname does not resolve in the
+			// Worker's subrequest context). The /api/* proxy route
+			// (src/app/api/[...path]/route.ts) and the server actions
+			// (src/lib/hono-client.ts) therefore reach Hono through
+			// this binding instead of over HTTPS. It is the only
+			// free-tier path that works without a custom domain.
+			"binding": "HONO_API",
+			"service": "portfolio-v3-api"
 		}
 	],
 	"vars": {
@@ -21,6 +34,14 @@
 		// DATABASE_URL (Neon pooled), DIRECT_DATABASE_URL (Neon direct),
 		// BETTER_AUTH_SECRET, BETTER_AUTH_URL, PUBLIC_SITE_URL,
 		// CACHE_INVALIDATE_SECRET, R2_* vars.
+		// Hono cutover: HONO_API_URL is the Hono worker base URL used by
+		// the server actions (src/lib/hono-client.ts, runtime env — it
+		// CAN be changed without a rebuild). NEXT_PUBLIC_API_URL is the
+		// same URL for the browser-side /api/* rewrite proxy in
+		// next.config.mjs, but it is read at BUILD time, so it must be
+		// set in the build environment, not here. Both default to the
+		// production worker when unset.
+		"HONO_API_URL": "https://portfolio-v3-api.riaaz.workers.dev",
 		"NODE_ENV": "production"
 	},
 	"r2_buckets": [

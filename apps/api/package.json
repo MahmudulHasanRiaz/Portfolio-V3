@@ -1,0 +1,32 @@
+{
+  "name": "@repo/api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1167.0",
+    "@neondatabase/serverless": "^1.2.0",
+    "@repo/database": "*",
+    "@repo/validation": "*",
+    "better-auth": "^1.7.22",
+    "drizzle-orm": "^0.45.4",
+    "hono": "^4.13.18",
+    "pdf-lib": "^1.17.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261112.1",
+    "@repo/eslint-config": "*",
+    "@repo/typescript-config": "*",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.161.0"
+  }
+}

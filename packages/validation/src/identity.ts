@@ -5,7 +5,7 @@ import { uuidSchema, timestampSchema } from "./common";
 
 export const userSchema = z.object({
   id: uuidSchema,
-  email: z.string().max(255),
+  email: z.string().max(255).email(),
   emailVerified: z.boolean().default(false),
   name: z.string().optional(),
   avatarUrl: z.string().optional(),
@@ -16,7 +16,7 @@ export const userSchema = z.object({
 });
 
 export const createUserSchema = z.object({
-  email: z.string().max(255),
+  email: z.string().max(255).email(),
   name: z.string().optional(),
   avatarUrl: z.string().optional(),
   phone: z.string().max(50).optional(),
@@ -90,7 +90,7 @@ export const personProfileSchema = z.object({
   profileImage: z.string().optional(),
   coverImage: z.string().optional(),
   location: z.string().optional(),
-  email: z.string().optional(),
+  email: z.string().email().optional(),
   phone: z.string().optional(),
   website: z.string().optional(),
   resumeUrl: z.string().optional(),
@@ -102,7 +102,6 @@ export const personProfileSchema = z.object({
 });
 
 export const createPersonProfileSchema = z.object({
-  id: uuidSchema,
   fullName: z.string().optional(),
   headline: z.string().optional(),
   bioShort: z.string().optional(),
@@ -110,7 +109,7 @@ export const createPersonProfileSchema = z.object({
   profileImage: z.string().optional(),
   coverImage: z.string().optional(),
   location: z.string().optional(),
-  email: z.string().optional(),
+  email: z.string().email().optional(),
   phone: z.string().optional(),
   website: z.string().optional(),
   resumeUrl: z.string().optional(),
@@ -132,7 +131,6 @@ export const developerProfileSchema = z.object({
 });
 
 export const createDeveloperProfileSchema = z.object({
-  id: uuidSchema,
   yearsExperience: z.coerce.number().int().optional(),
   skills: z.record(z.string(), z.unknown()).optional(),
   certifications: z.record(z.string(), z.unknown()).optional(),
@@ -152,7 +150,6 @@ export const entrepreneurProfileSchema = z.object({
 });
 
 export const createEntrepreneurProfileSchema = z.object({
-  id: uuidSchema,
   founderStory: z.string().optional(),
   businessPhilosophy: z.string().optional(),
   missionStatement: z.string().optional(),
@@ -172,7 +169,6 @@ export const artistProfileSchema = z.object({
 });
 
 export const createArtistProfileSchema = z.object({
-  id: uuidSchema,
   artistName: z.string().optional(),
   biography: z.string().optional(),
   genre: z.string().optional(),

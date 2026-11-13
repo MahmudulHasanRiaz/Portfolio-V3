@@ -1,0 +1,182 @@
+// Internal cron routes — Hono port of
+// apps/admin/src/app/api/cron/publish/route.ts (GET) and
+// apps/admin/src/app/api/cron/workflows/route.ts (GET).
+//
+// Mounted at /api/admin/cron (see routes/admin/index.ts).
+//
+// Auth: x-cron-secret header vs CRON_SECRET, fail-closed — 500 when
+// the secret is not configured, 401 on mismatch. Preserved exactly
+// from the sources (both cron routes are GET in the original, not
+// POST; no session auth is used).
+//
+// TODO (cutover): the Workers Cron Trigger is WIRED (2026-11-13):
+// wrangler.jsonc triggers.crons ["*/5 * * * *"] (the V2 scheduler
+// sidecar ran every 5 minutes) and the `scheduled` handler in
+// src/index.ts invokes both routes internally. CRON_SECRET is already
+// set on this Worker (verified live: 401 without the header).
+//
+// SchedulingService.processScheduledContent (packages/cms/src/scheduling.ts)
+// is re-implemented here with direct Drizzle over getApiDb() (Neon
+// HTTP) — the CMS service calls getDb() (postgres.js, TCP) and is not
+// Workers-safe. The status updates are the same (scheduled → published
+// for due publishAt, published → draft for due unpublishAt), and the
+// ContentService.transition() side effects (search-index update and
+// purgePublicCache) are wired via lib/side-effects.
+import { Hono } from "hono";
+import type { Context } from "hono";
+import { and, eq, isNotNull, lte } from "drizzle-orm";
+import { posts } from "@repo/database/schema";
+import { getApiDb } from "../../db";
+import { processNextRun } from "./workflows";
+import {
+  cacheTagsForContentType,
+  deleteSearchEntity,
+  indexSearchEntity,
+  purgePublicCache,
+  waitUntilOf,
+} from "../../lib/side-effects";
+
+type Env = {
+  Bindings: {
+    DATABASE_URL?: string;
+    BETTER_AUTH_SECRET?: string;
+    PUBLIC_SITE_URL?: string;
+    CACHE_INVALIDATE_SECRET?: string;
+  };
+};
+
+const app = new Hono<Env>();
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : "Unknown error";
+}
+
+const MAX_RUNS_PER_TICK = 25;
+
+/**
+ * Fail-closed cron-secret gate, exactly as in the Next.js sources.
+ * Returns a Response to send immediately, or null when authorised.
+ * NOTE: reads process.env.CRON_SECRET, following the house pattern
+ * in this API (db.ts / admin-auth.ts also read process.env); cutover
+ * must ensure CRON_SECRET is set in the Worker env.
+ */
+function checkCronSecret(c: Context): Response | null {
+  const configured = process.env.CRON_SECRET;
+  if (!configured) {
+    return new Response(
+      JSON.stringify({ error: "CRON_SECRET is not configured" }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+  if (c.req.header("x-cron-secret") !== configured) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  return null;
+}
+
+// GET /publish — publish due scheduled posts, unpublish due ones.
+// Returns { success: true, published, unpublished }.
+app.get("/publish", async (c) => {
+  const gate = checkCronSecret(c);
+  if (gate) return gate;
+
+  try {
+    const db = getApiDb();
+    const now = new Date();
+
+    const toPublish = await db
+      .select({ id: posts.id })
+      .from(posts)
+      .where(
+        and(
+          isNotNull(posts.publishAt),
+          lte(posts.publishAt, now),
+          eq(posts.status, "scheduled"),
+        ),
+      );
+
+    const toUnpublish = await db
+      .select({ id: posts.id })
+      .from(posts)
+      .where(
+        and(
+          isNotNull(posts.unpublishAt),
+          lte(posts.unpublishAt, now),
+          eq(posts.status, "published"),
+        ),
+      );
+
+    // Side effects (wired at cutover via lib/side-effects): the original
+    // routes each post through ContentService.transition(), which also
+    // fires the search-index update (index on publish / de-index on
+    // unpublish) and purgePublicCache. The status flips below are the
+    // same transitions (scheduled → published and published → draft are
+    // both valid per the posts workflow), run as sequential statements —
+    // Neon HTTP has no transaction support. The per-post purge is
+    // coalesced into one purge when anything flipped (same tags).
+    for (const post of toPublish) {
+      await db
+        .update(posts)
+        .set({ status: "published", updatedAt: new Date() })
+        .where(eq(posts.id, post.id));
+      void indexSearchEntity(db, "post", post.id, c.env, waitUntilOf(c));
+    }
+
+    for (const post of toUnpublish) {
+      await db
+        .update(posts)
+        .set({ status: "draft", updatedAt: new Date() })
+        .where(eq(posts.id, post.id));
+      void deleteSearchEntity(db, "post", post.id, waitUntilOf(c));
+    }
+
+    if (toPublish.length > 0 || toUnpublish.length > 0) {
+      void purgePublicCache(
+        c.env,
+        cacheTagsForContentType("posts"),
+        waitUntilOf(c),
+      );
+    }
+
+    return c.json({
+      success: true,
+      published: toPublish.length,
+      unpublished: toUnpublish.length,
+    });
+  } catch {
+    return c.json({ error: "Failed to process scheduled content" }, 500);
+  }
+});
+
+// GET /workflows — execute up to 25 pending workflow runs, one per
+// processNext tick. Returns { success: true, processed, runs }.
+//
+// TODO (cutover): each tick executes a run synchronously in-request
+// (see the TODO on workflows /process) — 25 sequential runs can
+// exceed Workers max duration. Cutover must decide the per-tick
+// budget (or move execution to a queue) when wiring the trigger.
+app.get("/workflows", async (c) => {
+  const gate = checkCronSecret(c);
+  if (gate) return gate;
+
+  try {
+    const db = getApiDb();
+    const runs: { runId?: string; status?: string }[] = [];
+    for (let i = 0; i < MAX_RUNS_PER_TICK; i++) {
+      const result = await processNextRun(db);
+      if (!result.processed) break;
+      runs.push({ runId: result.runId, status: result.status });
+    }
+    return c.json({ success: true, processed: runs.length, runs });
+  } catch (err) {
+    return c.json(
+      { error: errorMessage(err) || "Failed to process workflow runs" },
+      500,
+    );
+  }
+});
+
+export default app;
