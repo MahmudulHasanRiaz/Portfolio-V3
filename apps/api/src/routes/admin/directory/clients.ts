@@ -42,15 +42,19 @@ const app = new Hono();
 // asSortOrder accepted before.
 const createClientSchema = z.object({
   name: z.string().min(1).max(255),
-  logoUrl: z.string().url().optional(),
+  // Nullable: the admin sends null (not undefined) for every empty
+  // optional field (its asText/asSortOrder), so the schema must accept
+  // null or the save 400s with "expected string, received null"
+  // (Fixed Plus, 2026-11-14: nameBn null rejected the whole update).
+  logoUrl: z.string().url().nullable().optional(),
   // "logo" = logo image only (the default, also what NULL means),
   // "name_logo" = square icon beside the client name. Nullable
   // because the admin sends null for an unset field (its asText);
   // any other value is rejected, never stored.
   logoDisplayMode: z.enum(["logo", "name_logo"]).nullable().optional(),
-  website: z.string().url().optional(),
-  nameBn: z.string().optional(),
-  sortOrder: z.coerce.number().int().optional(),
+  website: z.string().url().nullable().optional(),
+  nameBn: z.string().nullable().optional(),
+  sortOrder: z.coerce.number().int().nullable().optional(),
 });
 const updateClientSchema = createClientSchema;
 

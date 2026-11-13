@@ -43,14 +43,17 @@ const createPlatformSchema = z.object({
   name: z.string().min(1).max(255),
   url: z.string().url().max(2048),
   group: z.enum(["music", "social", "professional"]),
-  handle: z.string().optional(),
-  icon: z.string().optional(),
-  subtitle: z.string().optional(),
-  note: z.string().optional(),
-  nameBn: z.string().optional(),
-  subtitleBn: z.string().optional(),
+  // Nullable: the admin sends null (not undefined) for every empty
+  // optional field (its asText/asSortOrder) — same 400 as clients
+  // (2026-11-14) if the schema rejects null.
+  handle: z.string().nullable().optional(),
+  icon: z.string().nullable().optional(),
+  subtitle: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
+  nameBn: z.string().nullable().optional(),
+  subtitleBn: z.string().nullable().optional(),
   isPrimary: z.boolean().optional(),
-  sortOrder: z.coerce.number().int().optional(),
+  sortOrder: z.coerce.number().int().nullable().optional(),
 });
 const updatePlatformSchema = createPlatformSchema;
 
