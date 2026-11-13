@@ -34,6 +34,36 @@ function createAuth() {
     account: { modelName: "ba_account" },
     verification: { modelName: "ba_verification" },
     emailAndPassword: { enabled: true },
+    // Mirror the admin's databaseHooks (packages/auth/src/auth.ts):
+    // after a ba_user row is created, also create the internal users
+    // record (bridged by email) so role-gated admin features work.
+    // Unlike the admin instance, this uses the Neon HTTP drizzle db
+    // already in scope — postgres.js (TCP) cannot run on Workers.
+    // The insert is best-effort: a DB hiccup must not break sign-up,
+    // so errors are logged and swallowed.
+    databaseHooks: {
+      user: {
+        create: {
+          after: async (user) => {
+            try {
+              await db
+                .insert(schema.users)
+                .values({
+                  email: user.email,
+                  name: user.name ?? null,
+                  isActive: true,
+                })
+                .onConflictDoNothing({ target: schema.users.email });
+            } catch (error) {
+              console.error(
+                "[auth] failed to create internal users record",
+                error,
+              );
+            }
+          },
+        },
+      },
+    },
     secret: process.env.BETTER_AUTH_SECRET,
     // Trusted origins for Better Auth's Origin check on non-GET
     // /api/auth/* calls (2026-11-13, admin cutover). The browser signs
