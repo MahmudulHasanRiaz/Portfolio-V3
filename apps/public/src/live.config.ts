@@ -190,6 +190,11 @@ const liveClients = defineLiveCollection({
 		logo_url: z.string().optional(),
 		logoUrl: z.string().optional(),
 		logo: z.string().optional(),
+		// "logo" = logo image only (default), "name_logo" = square
+		// icon beside the name. Both spellings declared: zod strips
+		// undeclared live fields.
+		logo_display_mode: z.enum(["logo", "name_logo"]).optional(),
+		logoDisplayMode: z.enum(["logo", "name_logo"]).optional(),
 		website: z.string().optional(),
 		url: z.string().optional(),
 		sort_order: z.number().optional(),

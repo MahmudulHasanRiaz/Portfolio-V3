@@ -68,5 +68,18 @@ export function unlockBodyScroll(): void {
 	body.style.width = savedBody.width;
 	// Restore the exact pre-modal scroll position. The body was fixed
 	// at -savedScrollY, so without this the page would land at the top.
-	window.scrollTo(0, savedScrollY);
+	// The restore MUST be instant: styles/glass.css sets
+	// `html { scroll-behavior: smooth; }`, so a bare window.scrollTo
+	// would ANIMATE from the top (where un-fixing the body lands) back
+	// down to savedScrollY — the visitor sees the hero, then a scroll
+	// back down. Belt and suspenders, all synchronous so no paint
+	// happens in between: (1) force the html element's inline
+	// scroll-behavior to "auto" (inline beats the stylesheet),
+	// (2) scroll with behavior "instant", (3) restore the inline
+	// value. The stylesheet's smooth behaviour is left untouched —
+	// anchor navigation elsewhere relies on it.
+	const savedScrollBehavior = docEl.style.scrollBehavior;
+	docEl.style.scrollBehavior = "auto";
+	window.scrollTo({ top: savedScrollY, behavior: "instant" });
+	docEl.style.scrollBehavior = savedScrollBehavior;
 }

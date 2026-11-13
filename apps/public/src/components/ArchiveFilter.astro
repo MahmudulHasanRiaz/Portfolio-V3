@@ -2,25 +2,28 @@
 // ArchiveFilter — ONE shared filter control for every archive page
 // (projects, posts, ventures, releases — EN + BN).
 //
-// WHY IT EXISTS (2026-11-12): every archive used to render ALL of its
-// tags as chips in one wrapping row. /projects/ had 18 chips over 6 rows
-// on mobile — a jungle that only gets worse as categories grow. This
-// component caps the visible row and puts the rest behind a "More" menu:
+// MOBILE-FIRST: a single horizontally scrollable chip row. ALL
+// categories are chips in the row — there is NO "More" button and NO
+// dropdown. The old "More +" pattern hid categories behind an extra
+// tap, and its dropdown overflowed off the left edge and overlapped
+// the content below on mobile. The row scrolls (swipe on touch,
+// wheel/drag on desktop), the scrollbar is hidden, edge fades hint
+// that there is more, and tapping a chip scrolls it fully into view.
+// The list grows without breaking: chips just extend the row.
 //
-//   - "All" + the top 5 options by item count (ties: alphabetical) as
-//     chips. 6 or fewer options total: all of them as chips, no menu.
-//   - A "More" button (+N = how many more exist) opening a dropdown
-//     with EVERY option, alphabetical, each with its item count.
-//   - The active filter is always visible: a primary chip goes .active,
-//     or — when the selection lives only in the menu — the "More" button
-//     itself shows the selected label and goes .active.
+//   - "All" + every option, sorted by item count desc (ties:
+//     alphabetical), so the biggest categories are visible first.
+//   - Every chip shows its item count (the counts used to live in
+//     the dropdown; they now live on the chips themselves).
+//   - The active filter chip is highlighted.
 //
-// Filtering is still client-side, no framework, one tiny inline script:
-// cards are matched per `mode` — "card-tag-text" (projects: a .tag
-// descendant's text), "card-data-tags" (posts/ventures: the card's
-// data-tags CSV), "card-data-type" (releases: the card's data-type).
-// No URL state, same as before. Counts are computed by the page from
-// the same data it already renders and passed in as `items`.
+// Filtering is still client-side, no framework, one tiny inline
+// script: cards are matched per `mode` — "card-tag-text" (projects:
+// a .tag descendant's text), "card-data-tags" (posts/ventures: the
+// card's data-tags CSV), "card-data-type" (releases: the card's
+// data-type). No URL state, same as before. Counts are computed by
+// the page from the same data it already renders and passed in as
+// `items`.
 interface FilterItem {
 	value: string;
 	label: string;
@@ -30,7 +33,6 @@ interface FilterItem {
 interface Props {
 	items: FilterItem[];
 	allLabel: string;
-	moreLabel: string;
 	mode: "card-tag-text" | "card-data-tags" | "card-data-type";
 	gridSelector: string;
 	countSelector: string;
@@ -42,7 +44,6 @@ interface Props {
 const {
 	items,
 	allLabel,
-	moreLabel,
 	mode,
 	gridSelector,
 	countSelector,
@@ -51,23 +52,12 @@ const {
 	style,
 } = Astro.props;
 
-// 6 or fewer options: show them all, no menu. Above that, 5 primary
-// chips + the menu (which lists every option, so nothing is reachable
-// only through a hidden chip).
-const SHOW_ALL_UP_TO = 6;
-const PRIMARY_COUNT = 5;
-const showAll = items.length <= SHOW_ALL_UP_TO;
-const primary = showAll
-	? items
-	: [...items]
-			.sort(
-				(a, b) => b.count - a.count || a.label.localeCompare(b.label),
-			)
-			.slice(0, PRIMARY_COUNT);
-const menuItems = [...items].sort((a, b) =>
-	a.label.localeCompare(b.label),
+// Biggest categories first (ties: alphabetical), so the row opens on
+// the most relevant chips and the rest are a swipe away. Every option
+// is a chip — nothing is hidden behind a menu.
+const sorted = [...items].sort(
+	(a, b) => b.count - a.count || a.label.localeCompare(b.label),
 );
-const overflowCount = items.length - primary.length;
 ---
 
 <div
@@ -89,7 +79,7 @@ const overflowCount = items.length - primary.length;
 		{allLabel}
 	</button>
 	{
-		primary.map((item) => (
+		sorted.map((item) => (
 			<button
 				type="button"
 				class="chip"
@@ -97,57 +87,18 @@ const overflowCount = items.length - primary.length;
 				aria-pressed="false"
 			>
 				{item.label}
+				<span class="chip-count" aria-hidden="true">
+					{item.count}
+				</span>
 			</button>
 		))
-	}
-	{
-		!showAll && (
-			<span class="filter-more-wrap" data-filter-more-wrap>
-				<button
-					type="button"
-					class="chip filter-more"
-					data-filter-more
-					aria-haspopup="true"
-					aria-expanded="false"
-				>
-					<span data-filter-more-label>{moreLabel}</span>{" "}
-					<span class="filter-more-n" data-filter-more-n>
-						+{overflowCount}
-					</span>
-					<span class="filter-caret" aria-hidden="true">
-						▾
-					</span>
-				</button>
-				<span
-					class="filter-menu"
-					role="menu"
-					data-filter-menu
-					aria-label={moreLabel}
-				>
-					{menuItems.map((item) => (
-						<button
-							type="button"
-							class="filter-menu-item"
-							role="menuitemradio"
-							aria-checked="false"
-							data-filter={item.value}
-						>
-							<span class="filter-menu-check" aria-hidden="true">
-								✓
-							</span>
-							<span class="filter-menu-label">{item.label}</span>
-							<span class="filter-menu-count">{item.count}</span>
-						</button>
-					))}
-				</span>
-			</span>
-		)
 	}
 </div>
 
 <script is:inline>
-	// Archive filter (shared ArchiveFilter.astro): chips + "More" menu
-	// toggle cards by the page's matching mode. No framework.
+	// Archive filter (shared ArchiveFilter.astro): a horizontally
+	// scrollable chip row. Tapping a chip filters the cards by the
+	// page's matching mode. No framework, no dropdown.
 	(function () {
 		function init() {
 			var root = document.querySelector("[data-archive-filter]");
@@ -171,18 +122,6 @@ const overflowCount = items.length - primary.length;
 					? n.toLocaleString("bn-BD")
 					: String(n);
 			};
-			var moreWrap = root.querySelector("[data-filter-more-wrap]");
-			var moreBtn = root.querySelector("[data-filter-more]");
-			var moreLabelEl = moreBtn
-				? moreBtn.querySelector("[data-filter-more-label]")
-				: null;
-			var moreN = moreBtn
-				? moreBtn.querySelector("[data-filter-more-n]")
-				: null;
-			var menu = root.querySelector("[data-filter-menu]");
-			var defaultMoreLabel = moreLabelEl
-				? moreLabelEl.textContent
-				: "";
 
 			function matches(card, value) {
 				if (value === "all") return true;
@@ -206,17 +145,6 @@ const overflowCount = items.length - primary.length;
 				return false;
 			}
 
-			function menuLabelFor(value) {
-				if (!menu) return "";
-				var safe = value
-					.replace(/\\/g, "\\\\")
-					.replace(/"/g, '\\"');
-				var item = menu.querySelector(
-					'[data-filter="' + safe + '"] .filter-menu-label',
-				);
-				return item ? item.textContent || "" : "";
-			}
-
 			function apply(value) {
 				var shown = 0;
 				cards.forEach(function (card) {
@@ -224,8 +152,7 @@ const overflowCount = items.length - primary.length;
 					card.style.display = show ? "" : "none";
 					if (show) shown++;
 				});
-				// Primary chips (incl. All).
-				var primaryActive = false;
+				var activeChip = null;
 				root.querySelectorAll(".chip[data-filter]").forEach(
 					function (chip) {
 						var active =
@@ -235,37 +162,9 @@ const overflowCount = items.length - primary.length;
 							"aria-pressed",
 							active ? "true" : "false",
 						);
-						if (active) primaryActive = true;
+						if (active) activeChip = chip;
 					},
 				);
-				// Menu items.
-				if (menu) {
-					menu.querySelectorAll(
-						".filter-menu-item",
-					).forEach(function (item) {
-						item.setAttribute(
-							"aria-checked",
-							item.getAttribute("data-filter") === value
-								? "true"
-								: "false",
-						);
-					});
-				}
-				// The "More" button shows the selection when it lives
-				// only in the menu; otherwise it stays "More +N".
-				if (moreBtn && moreLabelEl) {
-					if (value === "all" || primaryActive) {
-						moreLabelEl.textContent = defaultMoreLabel;
-						if (moreN) moreN.style.display = "";
-						moreBtn.classList.remove("active");
-						moreBtn.setAttribute("aria-pressed", "false");
-					} else {
-						moreLabelEl.textContent = menuLabelFor(value);
-						if (moreN) moreN.style.display = "none";
-						moreBtn.classList.add("active");
-						moreBtn.setAttribute("aria-pressed", "true");
-					}
-				}
 				if (countEl) {
 					countEl.textContent = template
 						? template
@@ -273,84 +172,50 @@ const overflowCount = items.length - primary.length;
 								.replace("{total}", fmt(total))
 						: "Showing " + shown + " of " + total;
 				}
-			}
-
-			function setOpen(open, focusItem) {
-				if (!moreWrap || !moreBtn || !menu) return;
-				moreWrap.classList.toggle("open", open);
-				moreBtn.setAttribute(
-					"aria-expanded",
-					open ? "true" : "false",
-				);
-				if (open && focusItem) {
-					var items = menu.querySelectorAll(
-						".filter-menu-item",
-					);
-					var checked = menu.querySelector(
-						'.filter-menu-item[aria-checked="true"]',
-					);
-					(checked || items[0]).focus();
+				// Keep the tapped chip fully visible in the scrollable
+				// row (a chip half cut off at the edge scrolls in).
+				if (
+					activeChip &&
+					typeof activeChip.scrollIntoView === "function"
+				) {
+					activeChip.scrollIntoView({
+						behavior: "smooth",
+						inline: "nearest",
+						block: "nearest",
+					});
 				}
 			}
 
-			function isOpen() {
-				return !!(
-					moreWrap && moreWrap.classList.contains("open")
-				);
+			// Edge fades: hint that the row scrolls. The CSS fades the
+			// right edge by default (row starts at the left); these
+			// classes describe where the scroll position is so the
+			// fades stay truthful as the user swipes.
+			function updateFades() {
+				var max = root.scrollWidth - root.clientWidth;
+				if (max <= 0) {
+					root.classList.add("no-scroll");
+					root.classList.remove("scrolled", "at-end");
+					return;
+				}
+				root.classList.remove("no-scroll");
+				var atStart = root.scrollLeft <= 1;
+				var atEnd = root.scrollLeft >= max - 1;
+				root.classList.toggle("scrolled", !atStart && !atEnd);
+				root.classList.toggle("at-end", !atStart && atEnd);
 			}
+			root.addEventListener("scroll", updateFades, {
+				passive: true,
+			});
+			window.addEventListener("resize", updateFades);
+			updateFades();
 
-			// One delegated click handler: chips, menu items, More btn.
+			// One delegated click handler for the chips.
 			root.addEventListener("click", function (event) {
 				var target = event.target;
 				if (!(target instanceof HTMLElement)) return;
-				if (moreBtn && target.closest("[data-filter-more]")) {
-					setOpen(!isOpen(), true);
-					return;
-				}
 				var option = target.closest("[data-filter]");
 				if (!option) return;
 				apply(option.getAttribute("data-filter") || "all");
-				if (isOpen()) setOpen(false, false);
-			});
-
-			// Close the menu on outside click / Escape; arrow keys move
-			// between menu items.
-			document.addEventListener("click", function (event) {
-				if (!isOpen()) return;
-				var target = event.target;
-				if (
-					target instanceof Node &&
-					moreWrap &&
-					!moreWrap.contains(target)
-				) {
-					setOpen(false, false);
-				}
-			});
-			document.addEventListener("keydown", function (event) {
-				if (!isOpen()) return;
-				if (event.key === "Escape") {
-					setOpen(false, false);
-					if (moreBtn) moreBtn.focus();
-					return;
-				}
-				if (!menu) return;
-				var items = Array.prototype.slice.call(
-					menu.querySelectorAll(".filter-menu-item"),
-				);
-				var idx = items.indexOf(document.activeElement);
-				if (event.key === "ArrowDown") {
-					event.preventDefault();
-					(items[idx + 1] || items[0]).focus();
-				} else if (event.key === "ArrowUp") {
-					event.preventDefault();
-					(items[idx - 1] || items[items.length - 1]).focus();
-				} else if (event.key === "Home") {
-					event.preventDefault();
-					items[0].focus();
-				} else if (event.key === "End") {
-					event.preventDefault();
-					items[items.length - 1].focus();
-				}
 			});
 		}
 

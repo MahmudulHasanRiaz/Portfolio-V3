@@ -4,6 +4,7 @@ import ThumbImage from "./ThumbImage.astro";
 import { getPlatforms, getVentures, truncateShort } from "../lib/content";
 import { applySiteCopy, getDict, langUrl, localizeData, type Lang } from "../lib/i18n";
 import { getSiteSettings } from "../lib/settings";
+import { HOMEPAGE_VENTURES_LIMIT } from "../lib/homepage-limits";
 
 interface Props {
 	lang?: Lang;
@@ -22,10 +23,16 @@ const founderSummary =
 		: settings.founderSummary;
 
 const venturesRaw = await getVentures();
-const ventures = venturesRaw.map((v) => ({
-	...v,
-	data: localizeData(v.data, lang),
-}));
+// Homepage preview cap: 4 mini-rows keeps the Combined section
+// balanced against the artist column. The full /ventures/ listing
+// page is NOT capped. Slicing before the map keeps the
+// `ventures.length === 0` empty check below working unchanged.
+const ventures = venturesRaw
+	.slice(0, HOMEPAGE_VENTURES_LIMIT)
+	.map((v) => ({
+		...v,
+		data: localizeData(v.data, lang),
+	}));
 // Live music platforms over the build-time fallback (bn overlay on
 // /bn/ — platform names are proper nouns, subtitles localise).
 const platforms = (await getPlatforms()).map((p) =>

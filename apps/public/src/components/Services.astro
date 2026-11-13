@@ -4,6 +4,7 @@ import BrandIcon from "./BrandIcon.astro";
 import ServiceIcon from "./ServiceIcon";
 import ServiceModal from "./ServiceModal";
 import { getDict, pickDict, SERVICE_MODAL_DICT_KEYS, type Lang } from "../lib/i18n";
+import { HOMEPAGE_SERVICES_LIMIT } from "../lib/homepage-limits";
 
 interface Props {
 	lang?: Lang;
@@ -12,6 +13,11 @@ interface Props {
 }
 
 const { lang = "en", services = SERVICES } = Astro.props;
+// Homepage preview cap: the services-grid CSS is designed for exactly
+// 5 cards (3+2 at >=1024px) — a 6th would break the layout. The same
+// capped list feeds the cards AND the ServiceModal, so the modal can
+// never open a service the grid does not show.
+const visibleServices = services.slice(0, HOMEPAGE_SERVICES_LIMIT);
 const t = getDict(lang);
 ---
 
@@ -23,7 +29,7 @@ const t = getDict(lang);
 		</div>
 	</div>
 	<div class="services-grid">
-		{services.map((service) => {
+		{visibleServices.map((service) => {
 			const displayName =
 				lang === "bn" && service.bn?.title
 					? service.bn.title
@@ -61,7 +67,7 @@ const t = getDict(lang);
 	    closed, so the island has no size and the visibility observer
 	    never fires — the modal could never open. ContactModal (Layout)
 	    already uses client:idle for the same reason. */}
-	<ServiceModal services={services} lang={lang} dict={pickDict(t, SERVICE_MODAL_DICT_KEYS)} client:idle />
+	<ServiceModal services={visibleServices} lang={lang} dict={pickDict(t, SERVICE_MODAL_DICT_KEYS)} client:idle />
 </section>
 
 <style>

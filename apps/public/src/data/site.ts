@@ -384,6 +384,9 @@ export interface Client {
 	name: string;
 	/** Logo image URL (admin media). Absent = text wordmark. */
 	logo_url?: string;
+	/** How a set logo renders: "logo" (default) = logo image only;
+	 *  "name_logo" = square icon beside the name. Absent = "logo". */
+	logo_display_mode?: "logo" | "name_logo";
 	/** Live website URL. Present = the cell links out. */
 	website?: string;
 	sort_order?: number;

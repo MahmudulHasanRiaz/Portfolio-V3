@@ -48,6 +48,17 @@ export function DirectoryForm({
   );
   const logoRef = useRef<HTMLInputElement>(null);
   const [logoPickerOpen, setLogoPickerOpen] = useState(false);
+  // Client logo display mode — the select below only shows when a
+  // logo URL is set. "logo" (default) renders the logo image only;
+  // "name_logo" renders a square icon beside the client name.
+  const [logoUrlValue, setLogoUrlValue] = useState<string>(
+    (initial?.logoUrl as string) || "",
+  );
+  const [logoDisplayMode, setLogoDisplayMode] = useState<string>(
+    (initial?.logoDisplayMode as string) === "name_logo"
+      ? "name_logo"
+      : "logo",
+  );
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -88,6 +99,8 @@ export function DirectoryForm({
       Object.assign(data, {
         name: form.get("name"),
         logoUrl: form.get("logoUrl"),
+        // No logo = no mode (NULL = the "logo" default server-side).
+        logoDisplayMode: logoUrlValue.trim() ? logoDisplayMode : null,
         website: form.get("website"),
         nameBn: form.get("nameBn"),
       });
@@ -192,7 +205,7 @@ export function DirectoryForm({
             <div>
               <label style={labelStyle}>Logo URL</label>
               <div style={{ display: "flex", gap: 8 }}>
-                <Input ref={logoRef} name="logoUrl" defaultValue={(initial?.logoUrl as string) || ""} placeholder="https://... (image, optional)" style={{ flex: 1 }} />
+                <Input ref={logoRef} name="logoUrl" value={logoUrlValue} onChange={(e) => setLogoUrlValue(e.target.value)} placeholder="https://... (image, optional)" style={{ flex: 1 }} />
                 <Button type="button" variant="outline" onClick={() => setLogoPickerOpen(true)}>Choose from library</Button>
               </div>
               <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
@@ -201,6 +214,23 @@ export function DirectoryForm({
                 optimized for the public site.
               </p>
             </div>
+            {logoUrlValue.trim() !== "" && (
+              <div>
+                <label style={labelStyle}>Logo display</label>
+                <Select value={logoDisplayMode} onValueChange={setLogoDisplayMode}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="logo">Logo only — show just the logo image</SelectItem>
+                    <SelectItem value="name_logo">Name + Logo — square icon beside the name</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
+                  {logoDisplayMode === "name_logo"
+                    ? "For square / 1:1 icon-style logos (favicon-like, round or square) that do NOT have the name in them — the icon shows beside the client name."
+                    : "For wide logos (wider than tall) that already contain the name — only the logo image shows. This is the default."}
+                </p>
+              </div>
+            )}
             <div>
               <label style={labelStyle}>Website</label>
               <Input name="website" defaultValue={(initial?.website as string) || ""} placeholder="https://... (optional)" />
@@ -224,6 +254,7 @@ export function DirectoryForm({
           onOpenChange={setLogoPickerOpen}
           onSelect={(url) => {
             if (logoRef.current) logoRef.current.value = url;
+            setLogoUrlValue(url);
           }}
           type="image"
           title="Choose client logo"

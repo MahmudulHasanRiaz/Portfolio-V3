@@ -12,12 +12,18 @@ const { lang = "en" } = Astro.props;
 const t = applySiteCopy(getDict(lang), lang, await getSiteSettings());
 
 // Live clients over the build-time CLIENTS fallback — until the API
-// `clients` type exists this is the same 2 rows. Logo renders when
-// `logo_url` exists (CSS caps it at 36px), else the text wordmark;
-// the cell links out only when a real `website` exists.
+// `clients` type exists this is the same 2 rows. How a client renders:
+//   - no logo: the text wordmark (the name), exactly as before.
+//   - logo + mode "name_logo": a square 36px icon BESIDE the name
+//     (for 1:1 icon-style logos that do NOT contain the name).
+//   - logo + mode "logo" (or no mode — the default): just the logo
+//     image (for wide logos that already contain the name).
 // A files.riaz.com.bd logo goes through /api/image at width 144
 // (clamped to the 360 minimum — a 36px logo never needs more);
-// any other logo URL renders unchanged.
+// any other logo URL renders unchanged. The cell links out only
+// when a real `website` exists, and a linked name never shows an
+// underline (`.client-cell` sets `text-decoration: none`) — the
+// name looks like plain text even though it is clickable.
 //
 // The list is a horizontal scroll-snap slider, NOT a grid: the
 // client count grows (5 today — Fixed Plus, Avelto, Plus Time, Your
@@ -88,7 +94,21 @@ const clients = (await getClients()).map((c) =>
 				tabindex="0"
 			>
 				{clients.map((client) => {
-					const inner = client.logo_url ? (
+					const nameLogo =
+						client.logo_url &&
+						client.logo_display_mode === "name_logo";
+					const inner = nameLogo ? (
+						<>
+							<img
+								class="client-logo-icon"
+								src={optimizedImageUrl(client.logo_url, 144)}
+								alt=""
+								loading="lazy"
+								decoding="async"
+							/>
+							<span class="client-wordmark">{client.name}</span>
+						</>
+					) : client.logo_url ? (
 						<>
 							<img
 								src={optimizedImageUrl(client.logo_url, 144)}
@@ -103,9 +123,12 @@ const clients = (await getClients()).map((c) =>
 					) : (
 						<span class="client-wordmark">{client.name}</span>
 					);
+					const cellClass = nameLogo
+						? "client-cell client-cell--name-logo"
+						: "client-cell";
 					return client.website ? (
 						<a
-							class="client-cell"
+							class={cellClass}
 							href={client.website}
 							target="_blank"
 							rel="noopener noreferrer"
@@ -113,7 +136,7 @@ const clients = (await getClients()).map((c) =>
 							{inner}
 						</a>
 					) : (
-						<div class="client-cell">{inner}</div>
+						<div class={cellClass}>{inner}</div>
 					);
 				})}
 			</div>
