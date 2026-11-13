@@ -34,6 +34,7 @@
 import { and, asc, eq, isNull } from "drizzle-orm";
 import {
   caseStudies,
+  faqs,
   pageViews,
   pages,
   posts,
@@ -42,6 +43,7 @@ import {
   releases,
   searchIndex,
   services,
+  timelineEvents,
   ventures,
   workflowRuns,
   workflows,
@@ -405,6 +407,48 @@ async function loadSearchEntity(
         thumbnail: str(r.coverImage),
         publishedAt: dateOrNull(r.releaseDate),
         contentType: "release",
+        locale: null,
+      };
+    }
+    case "faq": {
+      // Mirrors SearchIndexerService.loadFaqs (single-id).
+      const [r] = await db
+        .select()
+        .from(faqs)
+        .where(eq(faqs.id, entityId))
+        .limit(1);
+      if (!r) return null;
+      return {
+        entityType: "faq",
+        entityId: r.id,
+        title: str(r.question),
+        content: str(r.answer),
+        summary: "",
+        url: `${baseUrl}/faq#${r.id}`,
+        thumbnail: "",
+        publishedAt: null,
+        contentType: "faq",
+        locale: null,
+      };
+    }
+    case "timeline_event": {
+      // Mirrors SearchIndexerService.loadTimelineEvents (single-id).
+      const [r] = await db
+        .select()
+        .from(timelineEvents)
+        .where(eq(timelineEvents.id, entityId))
+        .limit(1);
+      if (!r) return null;
+      return {
+        entityType: "timeline_event",
+        entityId: r.id,
+        title: str(r.title),
+        content: str(r.description),
+        summary: "",
+        url: str(r.url) || `${baseUrl}/timeline#${r.id}`,
+        thumbnail: str(r.icon),
+        publishedAt: dateOrNull(r.eventDate),
+        contentType: "timeline_event",
         locale: null,
       };
     }

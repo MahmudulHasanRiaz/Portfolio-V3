@@ -15,6 +15,14 @@
   // domain. The PUBLIC_SITE_URL var is still kept as the local-dev /
   // no-binding fallback.
   "services": [{ "binding": "PUBLIC_SITE", "service": "portfolio-v3-public" }],
+  // Workers Cron Trigger (2026-11-13): the V2 stack ran its scheduler
+  // sidecar every 5 minutes, calling both cron routes (publish +
+  // workflows). This trigger replaces it — one `*/5 * * * *` tick,
+  // and the `scheduled` handler in src/index.ts invokes both routes
+  // internally (same handlers, same x-cron-secret gate). CRON_SECRET
+  // is already set on this Worker (verified live: the cron routes
+  // answer 401 without the header, not 500).
+  "triggers": { "crons": ["*/5 * * * *"] },
   "vars": {
     "BETTER_AUTH_URL": "https://portfolio-v3-api.riaaz.workers.dev",
     // Public r2.dev URL of the portfolio-v3-media R2 bucket. The PDF

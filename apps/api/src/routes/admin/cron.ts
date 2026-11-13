@@ -9,11 +9,11 @@
 // from the sources (both cron routes are GET in the original, not
 // POST; no session auth is used).
 //
-// TODO (cutover): the Workers Cron Trigger is NOT wired — nothing
-// invokes these routes on a schedule yet. Cutover must add the
-// trigger (wrangler.toml [[triggers]] / scheduled handler) and set
-// CRON_SECRET in the Worker env; until then these routes only run
-// when called manually with the header.
+// TODO (cutover): the Workers Cron Trigger is WIRED (2026-11-13):
+// wrangler.jsonc triggers.crons ["*/5 * * * *"] (the V2 scheduler
+// sidecar ran every 5 minutes) and the `scheduled` handler in
+// src/index.ts invokes both routes internally. CRON_SECRET is already
+// set on this Worker (verified live: 401 without the header).
 //
 // SchedulingService.processScheduledContent (packages/cms/src/scheduling.ts)
 // is re-implemented here with direct Drizzle over getApiDb() (Neon

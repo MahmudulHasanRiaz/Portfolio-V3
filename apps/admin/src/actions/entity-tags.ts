@@ -1,17 +1,17 @@
 "use server";
 
-import { eq, inArray } from "drizzle-orm";
-import { getDb, tags, projectTags, caseStudyTags } from "@repo/database";
 import { getServerSession } from "@/lib/get-server-session";
+import { honoFetch } from "@/lib/hono-client";
 
 // Project / case-study tags.
 //
-// Posts already have tags via the `post_tags` join (ContentTaxonomyService);
-// projects and case studies get the same shape from migration 0028:
-// `project_tags` (project_id, tag_id) and `case_study_tags`
-// (case_study_id, tag_id), both pointing at the existing `tags` table
-// (slug is unique). Tags are entered by name (comma-separated); missing
-// tag rows are created, and the entity's links are replaced wholesale.
+// Hono cutover: get/set entity tags now go to the Hono worker
+// (GET/POST /api/admin/entity-tags/:entity/:id) via the typed fetch
+// wrapper in @/lib/hono-client — Hono's entity-tags router mirrors
+// this file's validation, tag-name parsing and error messages, so the
+// return shapes and thrown errors are unchanged. The DB-direct
+// implementation (drizzle + @repo/database getDb, postgres.js) is
+// gone — it cannot run on the admin Worker.
 
 export type TaggableEntity = "projects" | "case_studies";
 
@@ -25,34 +25,6 @@ function requireUserId(
   return session.user.id;
 }
 
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 80);
-}
-
-function parseTagNames(value: string): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const part of value.split(",")) {
-    const name = part.trim();
-    if (!name) continue;
-    const key = slugify(name);
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    out.push(name);
-  }
-  return out;
-}
-
-function toNames(rows: { name: string | null }[]): string[] {
-  return rows
-    .map((r) => (typeof r.name === "string" ? r.name : ""))
-    .filter(Boolean);
-}
-
 export async function getEntityTags(
   entity: TaggableEntity,
   id: string,
@@ -60,23 +32,7 @@ export async function getEntityTags(
   const session = await getServerSession();
   requireUserId(session);
   if (!UUID_RE.test(id)) throw new Error("Invalid id");
-  const db = getDb();
-  if (entity === "projects") {
-    const rows = await db
-      .select({ name: tags.name })
-      .from(tags)
-      .innerJoin(projectTags, eq(projectTags.tagId, tags.id))
-      .where(eq(projectTags.projectId, id))
-      .orderBy(tags.name);
-    return toNames(rows);
-  }
-  const rows = await db
-    .select({ name: tags.name })
-    .from(tags)
-    .innerJoin(caseStudyTags, eq(caseStudyTags.tagId, tags.id))
-    .where(eq(caseStudyTags.caseStudyId, id))
-    .orderBy(tags.name);
-  return toNames(rows);
+  return honoFetch<string[]>(`/api/admin/entity-tags/${entity}/${id}`);
 }
 
 export async function setEntityTags(
@@ -87,38 +43,8 @@ export async function setEntityTags(
   const session = await getServerSession();
   requireUserId(session);
   if (!UUID_RE.test(id)) throw new Error("Invalid id");
-  const db = getDb();
-  const clean = parseTagNames(rawTags);
-  // Ensure the tag rows exist (slug is unique on `tags`).
-  for (const name of clean) {
-    await db
-      .insert(tags)
-      .values({ name, slug: slugify(name) })
-      .onConflictDoNothing({ target: tags.slug });
-  }
-  const slugs = clean.map((n) => slugify(n));
-  const tagRows =
-    slugs.length > 0
-      ? await db
-          .select({ id: tags.id })
-          .from(tags)
-          .where(inArray(tags.slug, slugs))
-      : [];
-  // Replace this entity's links wholesale.
-  if (entity === "projects") {
-    await db.delete(projectTags).where(eq(projectTags.projectId, id));
-    if (tagRows.length > 0) {
-      await db
-        .insert(projectTags)
-        .values(tagRows.map((t) => ({ projectId: id, tagId: t.id })));
-    }
-  } else {
-    await db.delete(caseStudyTags).where(eq(caseStudyTags.caseStudyId, id));
-    if (tagRows.length > 0) {
-      await db
-        .insert(caseStudyTags)
-        .values(tagRows.map((t) => ({ caseStudyId: id, tagId: t.id })));
-    }
-  }
-  return clean;
+  return honoFetch<string[]>(`/api/admin/entity-tags/${entity}/${id}`, {
+    method: "POST",
+    json: { tags: rawTags },
+  });
 }

@@ -23,6 +23,12 @@ import cronRoutes from "./cron";
 import mediaRoutes from "./media";
 import productsRoutes from "./products";
 import freelanceRoutes from "./freelance";
+import entityTagsRoutes from "./entity-tags";
+import entityTechnologiesRoutes from "./entity-technologies";
+import profileRoutes from "./profile";
+import faqsRoutes from "./faqs";
+import timelineRoutes from "./timeline";
+import contentTaxonomyRoutes from "./content-taxonomy";
 
 type Env = {
   Bindings: {
@@ -54,5 +60,11 @@ app.route("/cron", cronRoutes);
 app.route("/media", mediaRoutes);
 app.route("/products", productsRoutes);
 app.route("/freelance", freelanceRoutes);
+app.route("/entity-tags", entityTagsRoutes);
+app.route("/entity-technologies", entityTechnologiesRoutes);
+app.route("/profile", profileRoutes);
+app.route("/faqs", faqsRoutes);
+app.route("/timeline-events", timelineRoutes);
+app.route("/content-taxonomy", contentTaxonomyRoutes);
 
 export default app;

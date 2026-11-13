@@ -504,4 +504,140 @@ app.get("/seo/validate", async (c) => {
   }
 });
 
+// ─── Synonyms CRUD ─────────────────────────────────────────────────────────
+// Hono port of apps/admin/src/actions/search.ts (listSynonyms /
+// createSynonym / updateSynonym / deleteSynonym), the server actions
+// the admin's Search Management page uses. These are NOT the dead
+// /api/search/synonyms API routes (which gate on session.user.role and
+// always 403) — those stay unported. These endpoints require a valid
+// session (requireAuth → 401), exactly like the actions did.
+//
+// Fidelity notes:
+// - GET returns the full rows, ordered by term — exactly what the
+//   action returned (the page casts them to { id, term, synonyms,
+//   isEnabled }).
+// - POST returns the created row (201); PATCH returns the updated
+//   row (404 when the id does not exist — the action returned
+//   undefined there, but the page only ever updates rows it listed,
+//   and a 404 surfaces the same "not found" as the other routers);
+//   DELETE returns { ok: true } (the action returned void).
+
+// GET /search/synonyms — list all synonyms, ordered by term.
+app.get("/search/synonyms", async (c) => {
+  try {
+    const user = await requireAuth(c);
+    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const db = getApiDb();
+    const rows = await db
+      .select()
+      .from(searchSynonyms)
+      .orderBy(searchSynonyms.term);
+    return c.json(rows);
+  } catch (err) {
+    console.error("[Search Synonyms API] Error:", err);
+    return c.json(
+      { error: err instanceof Error ? err.message : "Failed to list synonyms." },
+      500,
+    );
+  }
+});
+
+// POST /search/synonyms — create a synonym.
+app.post("/search/synonyms", async (c) => {
+  try {
+    const user = await requireAuth(c);
+    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const body = (await c.req.json().catch(() => null)) as {
+      term?: unknown;
+      synonyms?: unknown;
+    } | null;
+    if (typeof body?.term !== "string" || body.term.trim() === "") {
+      return c.json({ error: "term is required" }, 400);
+    }
+    const synonyms = Array.isArray(body.synonyms)
+      ? body.synonyms.filter((s): s is string => typeof s === "string")
+      : [];
+    const db = getApiDb();
+    const [row] = await db
+      .insert(searchSynonyms)
+      .values({ term: body.term, synonyms })
+      .returning();
+    if (!row) return c.json({ error: "Failed to create synonym" }, 500);
+    return c.json(row, 201);
+  } catch (err) {
+    console.error("[Search Synonyms API] Error:", err);
+    return c.json(
+      { error: err instanceof Error ? err.message : "Failed to create synonym." },
+      500,
+    );
+  }
+});
+
+// PATCH /search/synonyms/:id — update a synonym.
+app.patch("/search/synonyms/:id", async (c) => {
+  try {
+    const user = await requireAuth(c);
+    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const body = (await c.req.json().catch(() => null)) as {
+      term?: unknown;
+      synonyms?: unknown;
+      isEnabled?: unknown;
+    } | null;
+    const patch: Record<string, unknown> = {};
+    if (body?.term !== undefined) {
+      if (typeof body.term !== "string" || body.term.trim() === "") {
+        return c.json({ error: "term must be a non-empty string" }, 400);
+      }
+      patch.term = body.term;
+    }
+    if (body?.synonyms !== undefined) {
+      if (!Array.isArray(body.synonyms)) {
+        return c.json({ error: "synonyms must be an array" }, 400);
+      }
+      patch.synonyms = body.synonyms.filter(
+        (s): s is string => typeof s === "string",
+      );
+    }
+    if (body?.isEnabled !== undefined) {
+      if (typeof body.isEnabled !== "boolean") {
+        return c.json({ error: "isEnabled must be a boolean" }, 400);
+      }
+      patch.isEnabled = body.isEnabled;
+    }
+    const db = getApiDb();
+    const [row] = await db
+      .update(searchSynonyms)
+      .set(patch)
+      .where(eq(searchSynonyms.id, c.req.param("id")))
+      .returning();
+    if (!row) return c.json({ error: "Synonym not found" }, 404);
+    return c.json(row);
+  } catch (err) {
+    console.error("[Search Synonyms API] Error:", err);
+    return c.json(
+      { error: err instanceof Error ? err.message : "Failed to update synonym." },
+      500,
+    );
+  }
+});
+
+// DELETE /search/synonyms/:id — delete a synonym.
+app.delete("/search/synonyms/:id", async (c) => {
+  try {
+    const user = await requireAuth(c);
+    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const db = getApiDb();
+    await db
+      .delete(searchSynonyms)
+      .where(eq(searchSynonyms.id, c.req.param("id")));
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error("[Search Synonyms API] Error:", err);
+    return c.json(
+      { error: err instanceof Error ? err.message : "Failed to delete synonym." },
+      500,
+    );
+  }
+});
+
 export default app;

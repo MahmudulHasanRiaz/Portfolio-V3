@@ -129,4 +129,43 @@ api.onError((err, c) => {
 // above for what this type does and does not yet cover.
 export type AppType = typeof api;
 
-export default api;
+// ─── Workers Cron Trigger ────────────────────────────────────────────────────
+// The V2 stack ran its scheduler sidecar every 5 minutes, calling both
+// cron routes (publish + workflows). The `triggers.crons` entry in
+// wrangler.jsonc (`*/5 * * * *`) replaces it: on each tick this
+// `scheduled` handler invokes both routes internally via api.request()
+// — the same handlers, the same x-cron-secret gate (CRON_SECRET is
+// already set on this Worker). The Worker's env + executionCtx are
+// passed through so the route handlers see the real bindings and the
+// side effects' waitUntil works. Publish runs first, then workflows.
+export default {
+  fetch: api.fetch,
+  async scheduled(
+    controller: ScheduledController,
+    env: Env["Bindings"],
+    ctx: ExecutionContext,
+  ) {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) {
+      console.error(
+        "[cron] CRON_SECRET is not configured — scheduled tick skipped",
+      );
+      return;
+    }
+    const headers = { "x-cron-secret": secret };
+    for (const path of ["/api/admin/cron/publish", "/api/admin/cron/workflows"]) {
+      try {
+        const res = await api.request(path, { headers }, env, ctx);
+        const body = await res.text().catch(() => "");
+        console.log(
+          `[cron] ${controller.cron} ${path} → ${res.status} ${body.slice(0, 200)}`,
+        );
+      } catch (err) {
+        console.error(
+          `[cron] ${controller.cron} ${path} failed:`,
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    }
+  },
+};

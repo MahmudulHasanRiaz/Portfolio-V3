@@ -1,7 +1,12 @@
 "use server";
 
-import { ContentTaxonomyService, FAQService, TimelineEventService } from "@repo/cms";
-import type { CategoryData, ContentTypeName, TagData } from "@repo/cms";
+import type {
+  CategoryData,
+  ContentTypeName,
+  FAQData,
+  TagData,
+  TimelineEventData,
+} from "@repo/cms";
 import { SearchIndexerService } from "@repo/database";
 import { purgePublicCache, type PaginatedResponse } from "@repo/shared";
 import { dispatchTrigger } from "@repo/workflows";
@@ -30,10 +35,11 @@ import { HonoApiError, honoFetch } from "@/lib/hono-client";
 //    packages/cms/src/content-service.ts (the maps below are copied
 //    from there; it stays the source of truth).
 //  - FAQ, timeline events and the content taxonomy (set/get categories
-//    and tags per content item) have NO Hono endpoint yet — the Hono
-//    content router explicitly leaves them out — so those functions
-//    still use the @repo/cms services directly. They move when Hono
-//    gains the endpoints.
+//    and tags per content item) now go to the Hono worker too
+//    (GET/POST/PUT/DELETE /api/admin/faqs, /api/admin/timeline-events
+//    and /api/admin/content-taxonomy/*) — Hono's routers mirror the
+//    @repo/cms services' behaviour, so the return shapes callers
+//    depend on are unchanged.
 
 const searchIndexer = new SearchIndexerService();
 
@@ -245,105 +251,125 @@ export async function deleteTag(id: string): Promise<void> {
 }
 
 // ─── Content taxonomy, FAQs, timeline events ─────────────────────────────────
-// No Hono endpoints yet (see the header note) — still DB-direct via
-// @repo/cms, unchanged from before the cutover.
+// Hono endpoints (see the header note) — the @repo/cms services are no
+// longer called here; Hono's faqs / timeline-events / content-taxonomy
+// routers mirror them.
 
-export async function setContentCategories(contentType: ContentTypeName, contentId: string, categoryIds: string[]) {
+export async function setContentCategories(contentType: ContentTypeName, contentId: string, categoryIds: string[]): Promise<void> {
   const session = await getServerSession();
   getUserId(session);
-  const service = new ContentTaxonomyService();
-  return service.setCategories(contentType, contentId, categoryIds);
+  await honoFetch<{ ok: boolean }>(
+    `/api/admin/content-taxonomy/${contentType}/${contentId}/categories`,
+    { method: "POST", json: { categoryIds } },
+  );
 }
 
-export async function getContentCategories(contentType: ContentTypeName, contentId: string) {
+export async function getContentCategories(contentType: ContentTypeName, contentId: string): Promise<CategoryData[]> {
   const session = await getServerSession();
   getUserId(session);
-  const service = new ContentTaxonomyService();
-  return service.getCategories(contentType, contentId);
+  return honoFetch<CategoryData[]>(
+    `/api/admin/content-taxonomy/${contentType}/${contentId}/categories`,
+  );
 }
 
-export async function setContentTags(contentType: ContentTypeName, contentId: string, tagIds: string[]) {
+export async function setContentTags(contentType: ContentTypeName, contentId: string, tagIds: string[]): Promise<void> {
   const session = await getServerSession();
   getUserId(session);
-  const service = new ContentTaxonomyService();
-  return service.setTags(contentType, contentId, tagIds);
+  await honoFetch<{ ok: boolean }>(
+    `/api/admin/content-taxonomy/${contentType}/${contentId}/tags`,
+    { method: "POST", json: { tagIds } },
+  );
 }
 
-export async function getContentTags(contentType: ContentTypeName, contentId: string) {
+export async function getContentTags(contentType: ContentTypeName, contentId: string): Promise<TagData[]> {
   const session = await getServerSession();
   getUserId(session);
-  const service = new ContentTaxonomyService();
-  return service.getTags(contentType, contentId);
+  return honoFetch<TagData[]>(
+    `/api/admin/content-taxonomy/${contentType}/${contentId}/tags`,
+  );
 }
 
-export async function listFAQs(entityType?: string, entityId?: string) {
+export async function listFAQs(entityType?: string, entityId?: string): Promise<FAQData[]> {
   const session = await getServerSession();
   getUserId(session);
-  const service = new FAQService();
-  return service.list(entityType, entityId);
+  return honoFetch<FAQData[]>("/api/admin/faqs", {
+    query: { entityType, entityId },
+  });
 }
 
 export async function createFAQ(data: {
   question: string; answer?: string; sortOrder?: number;
   entityType?: string; entityId?: string;
-}) {
+}): Promise<FAQData> {
   const session = await getServerSession();
   getUserId(session);
-  const service = new FAQService();
-  return service.create(data);
+  return honoFetch<FAQData>("/api/admin/faqs", {
+    method: "POST",
+    json: data,
+  });
 }
 
 export async function updateFAQ(id: string, data: {
   question?: string; answer?: string; sortOrder?: number;
-}) {
+}): Promise<FAQData> {
   const session = await getServerSession();
   getUserId(session);
-  const service = new FAQService();
-  return service.update(id, data);
+  return honoFetch<FAQData>(`/api/admin/faqs/${id}`, {
+    method: "PUT",
+    json: data,
+  });
 }
 
-export async function deleteFAQ(id: string) {
+export async function deleteFAQ(id: string): Promise<void> {
   const session = await getServerSession();
   getUserId(session);
-  const service = new FAQService();
-  return service.delete(id);
+  await honoFetch<{ ok: boolean }>(`/api/admin/faqs/${id}`, {
+    method: "DELETE",
+  });
 }
 
 export async function listTimelineEvents(params?: {
   sourceType?: string; sourceId?: string; eventType?: string;
   page?: number; pageSize?: number;
-}) {
+}): Promise<PaginatedResponse<TimelineEventData>> {
   const session = await getServerSession();
   getUserId(session);
-  const service = new TimelineEventService();
-  return service.list(params);
+  return honoFetch<PaginatedResponse<TimelineEventData>>(
+    "/api/admin/timeline-events",
+    { query: params },
+  );
 }
 
 export async function createTimelineEvent(data: {
   sourceType?: string; sourceId?: string; eventType?: string;
   title: string; description?: string; eventDate: string;
   icon?: string; url?: string; sortOrder?: number;
-}) {
+}): Promise<TimelineEventData> {
   const session = await getServerSession();
   getUserId(session);
-  const service = new TimelineEventService();
-  return service.create(data);
+  return honoFetch<TimelineEventData>("/api/admin/timeline-events", {
+    method: "POST",
+    json: data,
+  });
 }
 
 export async function updateTimelineEvent(id: string, data: {
   sourceType?: string; sourceId?: string; eventType?: string;
   title?: string; description?: string; eventDate?: string;
   icon?: string; url?: string; sortOrder?: number;
-}) {
+}): Promise<TimelineEventData> {
   const session = await getServerSession();
   getUserId(session);
-  const service = new TimelineEventService();
-  return service.update(id, data);
+  return honoFetch<TimelineEventData>(`/api/admin/timeline-events/${id}`, {
+    method: "PUT",
+    json: data,
+  });
 }
 
-export async function deleteTimelineEvent(id: string) {
+export async function deleteTimelineEvent(id: string): Promise<void> {
   const session = await getServerSession();
   getUserId(session);
-  const service = new TimelineEventService();
-  return service.delete(id);
+  await honoFetch<{ ok: boolean }>(`/api/admin/timeline-events/${id}`, {
+    method: "DELETE",
+  });
 }

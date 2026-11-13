@@ -1,18 +1,18 @@
 "use server";
 
-import { asc, eq, inArray } from "drizzle-orm";
-import { getDb, technologies, projectTechnologies } from "@repo/database";
 import { getServerSession } from "@/lib/get-server-session";
+import { honoFetch } from "@/lib/hono-client";
 
 // Project technologies.
 //
-// The public API already serves a project's techs from the
-// `project_technologies` join (project_id, technology_id) + the
-// `technologies` taxonomy table; only the admin form was missing them.
-// `updateContent` does NOT accept a technologies array (the project zod
-// schema has no such field — an unknown key is silently stripped), so
-// technologies are saved by this parallel action, following the
-// `getEntityTags` / `setEntityTags` pattern in ./entity-tags.ts.
+// Hono cutover: list/get/set entity technologies now go to the Hono
+// worker (GET /api/admin/entity-technologies,
+// GET/POST /api/admin/entity-technologies/:entity/:id) via the typed
+// fetch wrapper in @/lib/hono-client — Hono's entity-technologies
+// router mirrors this file's validation and error messages, so the
+// return shapes and thrown errors are unchanged. The DB-direct
+// implementation (drizzle + @repo/database getDb, postgres.js) is
+// gone — it cannot run on the admin Worker.
 //
 // Difference from tags: technologies are picked from the existing
 // taxonomy (managed at Dashboard → Technologies), never free text —
@@ -36,30 +36,10 @@ function requireUserId(
   return session.user.id;
 }
 
-function cleanIds(ids: unknown): string[] {
-  if (!Array.isArray(ids)) return [];
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const id of ids) {
-    if (typeof id !== "string" || !UUID_RE.test(id)) continue;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    out.push(id);
-  }
-  return out;
-}
-
 export async function listTechnologies(): Promise<TechnologyOption[]> {
   const session = await getServerSession();
   requireUserId(session);
-  const db = getDb();
-  const rows = await db
-    .select({ id: technologies.id, name: technologies.name })
-    .from(technologies)
-    .orderBy(asc(technologies.name));
-  return rows
-    .filter((r): r is { id: string; name: string } => typeof r.name === "string" && r.name !== "")
-    .map((r) => ({ id: r.id, name: r.name }));
+  return honoFetch<TechnologyOption[]>("/api/admin/entity-technologies");
 }
 
 export async function getEntityTechnologies(
@@ -70,19 +50,8 @@ export async function getEntityTechnologies(
   requireUserId(session);
   if (!UUID_RE.test(id)) throw new Error("Invalid id");
   if (entity !== "projects") throw new Error("Unknown entity");
-  const db = getDb();
-  const rows = await db
-    .select({ id: technologies.id, name: technologies.name })
-    .from(technologies)
-    .innerJoin(
-      projectTechnologies,
-      eq(projectTechnologies.technologyId, technologies.id),
-    )
-    .where(eq(projectTechnologies.projectId, id))
-    .orderBy(asc(technologies.name));
-  return rows.filter(
-    (r): r is TechnologyOption =>
-      typeof r.name === "string" && r.name !== "",
+  return honoFetch<TechnologyOption[]>(
+    `/api/admin/entity-technologies/${entity}/${id}`,
   );
 }
 
@@ -95,29 +64,8 @@ export async function setEntityTechnologies(
   requireUserId(session);
   if (!UUID_RE.test(id)) throw new Error("Invalid id");
   if (entity !== "projects") throw new Error("Unknown entity");
-  const db = getDb();
-  const clean = cleanIds(technologyIds);
-  // Only link technologies that exist — the join has no FK, so an
-  // unknown ID would otherwise become a dangling row.
-  const existing =
-    clean.length > 0
-      ? await db
-          .select({ id: technologies.id, name: technologies.name })
-          .from(technologies)
-          .where(inArray(technologies.id, clean))
-      : [];
-  const valid = existing.filter(
-    (r): r is TechnologyOption =>
-      typeof r.name === "string" && r.name !== "",
+  return honoFetch<TechnologyOption[]>(
+    `/api/admin/entity-technologies/${entity}/${id}`,
+    { method: "POST", json: { technologyIds } },
   );
-  // Replace this entity's links wholesale.
-  await db
-    .delete(projectTechnologies)
-    .where(eq(projectTechnologies.projectId, id));
-  if (valid.length > 0) {
-    await db
-      .insert(projectTechnologies)
-      .values(valid.map((t) => ({ projectId: id, technologyId: t.id })));
-  }
-  return valid;
 }
