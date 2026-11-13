@@ -563,6 +563,50 @@ app.get("/seo/validate", async (c) => {
 //   and a 404 surfaces the same "not found" as the other routers);
 //   DELETE returns { ok: true } (the action returned void).
 
+// GET /search/analytics — search usage statistics for the System →
+// Search → Statistics page. Hono port of the kept Next.js route
+// apps/admin/src/app/api/search/analytics/route.ts, which gated on
+// session.user.role (never populated on Workers) and used
+// SearchAnalyticsRepository (postgres.js TCP) — so it always 403'd.
+// Re-implemented here with requireAuth + getApiDb() (Neon HTTP);
+// the four aggregations are verbatim from
+// packages/database/src/repository/search-analytics.ts.
+app.get("/search/analytics", async (c) => {
+  try {
+    const user = await requireAuth(c);
+    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const db = getApiDb();
+    const [popularQueries, totalQueries, queriesByType, zeroResultQueries] =
+      await Promise.all([
+        db
+          .select({ query: searchAnalytics.query, count: count() })
+          .from(searchAnalytics)
+          .groupBy(searchAnalytics.query)
+          .orderBy(desc(count()))
+          .limit(20),
+        db.select({ count: count() }).from(searchAnalytics).then((r) => r[0]?.count ?? 0),
+        db
+          .select({ entityType: searchAnalytics.entityType, count: count() })
+          .from(searchAnalytics)
+          .where(sql`${searchAnalytics.entityType} IS NOT NULL`)
+          .groupBy(searchAnalytics.entityType)
+          .orderBy(desc(count()))
+          .limit(10),
+        db
+          .select({ query: searchAnalytics.query, count: count() })
+          .from(searchAnalytics)
+          .where(eq(searchAnalytics.resultCount, 0))
+          .groupBy(searchAnalytics.query)
+          .orderBy(desc(count()))
+          .limit(20),
+      ]);
+    return c.json({ popularQueries, totalQueries, queriesByType, zeroResultQueries });
+  } catch (err) {
+    console.error("[Search Analytics API] Error:", err);
+    return c.json({ error: "Failed to fetch analytics." }, 500);
+  }
+});
+
 // GET /search/synonyms — list all synonyms, ordered by term.
 app.get("/search/synonyms", async (c) => {
   try {

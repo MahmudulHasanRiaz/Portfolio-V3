@@ -48,7 +48,7 @@
 //   document 20 MB / archive 50 MB. The original trusts the
 //   caller-supplied MIME — detectMimeType (magic bytes) exists in the
 //   package but is never called on the upload path; that behaviour is
-//   preserved here (see TODO below).
+//   preserved here by design (see the STANDARD note below).
 // - Download streams the R2 object body straight through (GetObject
 //   body as the response body) with the same Content-Type /
 //   Content-Disposition / Content-Length headers as the original, which
@@ -70,9 +70,12 @@
 // - purgePublicCache / dispatchTrigger / search-indexer side effects:
 //   the media routes never called any of these in Next.js, so there is
 //   nothing to wire — noted only so a later audit does not assume a gap.
-// - TODO (magic bytes): wire detectMimeType on the upload path so the
-//   stored MIME is verified against the file bytes instead of trusting
-//   the caller-supplied MIME (the original never did this).
+// - STANDARD (magic bytes — intentionally NOT done): the stored MIME
+//   is NOT verified against the file bytes. Only authenticated admins
+//   can upload, and the existing extension + MIME + size checks are
+//   the right level for an admin-only upload path; a magic-byte check
+//   risks rejecting legitimate files (e.g. a valid image whose header
+//   the detector misreads). detectMimeType stays unused here.
 //
 // Env: R2_ENDPOINT / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY /
 // R2_BUCKET (+ optional R2_PUBLIC_URL) must be set as Worker secrets /
@@ -126,8 +129,9 @@ import {
 
 // Local schema for the POST /upload multipart form fields. The file
 // itself keeps the existing validateFile MIME/extension/size checks
-// exactly as-is (no magic-byte verification — see the header TODO);
-// only the text fields are Zod-validated here.
+// exactly as-is (no magic-byte verification — intentionally not done,
+// see the STANDARD note in the header); only the text fields are
+// Zod-validated here.
 const uploadFormSchema = z.object({
   folder: z.string().max(255).optional(),
   folderId: uuidSchema.optional(),
@@ -1222,7 +1226,8 @@ app.post("/upload", async (c) => {
 
     // Zod-validate the text form fields only. The file itself keeps
     // the existing validateFile MIME/extension/size checks exactly
-    // as-is (no magic-byte verification — see the header TODO).
+    // as-is (no magic-byte verification — intentionally not done, see
+    // the STANDARD note in the header).
     const fields = validateBody(
       {
         ...(folder !== undefined ? { folder } : {}),

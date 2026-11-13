@@ -42,6 +42,7 @@ type Env = {
     BETTER_AUTH_SECRET?: string;
     PUBLIC_SITE_URL?: string;
     CACHE_INVALIDATE_SECRET?: string;
+    CRON_SECRET?: string;
   };
 };
 
@@ -56,12 +57,13 @@ const MAX_RUNS_PER_TICK = 25;
 /**
  * Fail-closed cron-secret gate, exactly as in the Next.js sources.
  * Returns a Response to send immediately, or null when authorised.
- * NOTE: reads process.env.CRON_SECRET, following the house pattern
- * in this API (db.ts / admin-auth.ts also read process.env); cutover
- * must ensure CRON_SECRET is set in the Worker env.
+ * STANDARD: the secret is read from c.env first (the Worker env —
+ * the correct source on Cloudflare Workers) with a process.env
+ * fallback for local dev. A missing secret fails closed with 500;
+ * a wrong header fails with 401 (never 200).
  */
-function checkCronSecret(c: Context): Response | null {
-  const configured = process.env.CRON_SECRET;
+function checkCronSecret(c: Context<Env>): Response | null {
+  const configured = c.env.CRON_SECRET ?? process.env.CRON_SECRET;
   if (!configured) {
     return new Response(
       JSON.stringify({ error: "CRON_SECRET is not configured" }),

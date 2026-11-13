@@ -43,7 +43,7 @@ const s: Record<string, React.CSSProperties> = {
   logoIcon: {
     width: 34,
     height: 34,
-    borderRadius: 9,
+    borderRadius: 10,
     backgroundColor: "var(--brand)",
     display: "flex",
     alignItems: "center",
@@ -57,9 +57,10 @@ const s: Record<string, React.CSSProperties> = {
   logoImg: {
     width: 34,
     height: 34,
-    borderRadius: 9,
+    borderRadius: 10,
     objectFit: "cover",
     flexShrink: 0,
+    boxShadow: "0 1px 4px rgba(0, 0, 0, 0.25)",
   },
   logoText: {
     fontSize: 16,
@@ -75,12 +76,13 @@ const s: Record<string, React.CSSProperties> = {
     color: "var(--text-muted)",
     whiteSpace: "nowrap",
     overflow: "hidden",
+    textOverflow: "ellipsis",
     lineHeight: 1.2,
   },
   nav: {
     flex: 1,
     overflowY: "auto",
-    padding: "8px 12px",
+    padding: "10px 12px",
     display: "flex",
     flexDirection: "column",
     gap: 2,
@@ -89,8 +91,8 @@ const s: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     gap: 10,
-    padding: "8px 10px",
-    borderRadius: 9,
+    padding: "9px 10px",
+    borderRadius: 10,
     cursor: "pointer",
     color: "var(--text-secondary)",
     fontSize: 13.8,
@@ -149,6 +151,7 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 13.8,
     fontWeight: 600,
     width: "100%",
+    transition: "background-color 0.15s, color 0.15s",
   },
   mobileSidebarBtn: {
     background: "none",
@@ -181,7 +184,7 @@ function hasActiveDescendant(item: NavItem, pathname: string): boolean {
   );
 }
 
-export function DashboardSidebar({ userRoles }: { userRoles: string[] | null }) {
+export function DashboardSidebar({ userRoles, siteHost }: { userRoles: string[] | null; siteHost: string }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -210,20 +213,44 @@ export function DashboardSidebar({ userRoles }: { userRoles: string[] | null }) 
   }, []);
   const navItems = filterNavigation(userRoles);
 
-  // Accordion: ONE group open at a time. Initially open the group that
-  // contains the current route (if any), so the active child is visible.
+  // Accordion: groups toggle INDEPENDENTLY. Initially open every group
+  // that contains the current route (top-level and any nested group),
+  // so the active child is visible.
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
-    const active = navItems.find(
-      (item) => item.children && hasActiveDescendant(item, pathname),
-    );
-    return active ? new Set([active.href]) : new Set();
+    const open = new Set<string>();
+    const walk = (items: NavItem[]) => {
+      for (const item of items) {
+        if (item.children && hasActiveDescendant(item, pathname)) {
+          open.add(item.href);
+          walk(item.children);
+        }
+      }
+    };
+    walk(navItems);
+    return open;
   });
 
-  // Opening one group closes the others; tapping the open group closes it.
+  // Accordion: groups toggle INDEPENDENTLY. An earlier version replaced
+  // the whole expanded set with just the clicked href ("one group open
+  // at a time"), which meant clicking a NESTED group (e.g. Proposals
+  // under Portal & Proposals) closed its parent — the submenu could
+  // never open, so Proposals looked disabled/dead. Independent toggles
+  // keep a parent open while its nested group expands, and multiple
+  // top-level groups may stay open (the modern sidebar behaviour).
   const toggleGroup = (href: string) => {
-    setExpandedGroups((prev) =>
-      prev.has(href) ? new Set() : new Set([href]),
-    );
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(href)) {
+        // Closing a group also closes any nested group inside it.
+        next.delete(href);
+        for (const h of [...next]) {
+          if (h.startsWith(href + "/")) next.delete(h);
+        }
+      } else {
+        next.add(href);
+      }
+      return next;
+    });
   };
 
   const isActive = (href: string) =>
@@ -240,6 +267,7 @@ export function DashboardSidebar({ userRoles }: { userRoles: string[] | null }) 
       <div key={item.href}>
         <Link
           href={hasChildren ? "#" : item.href}
+          className="sidebar-nav-item"
           onClick={(e) => {
             if (hasChildren) {
               e.preventDefault();
@@ -322,7 +350,7 @@ export function DashboardSidebar({ userRoles }: { userRoles: string[] | null }) 
         {!collapsed && (
           <span style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <span style={s.logoText}>Portfolio OS</span>
-            <span style={s.logoSub}>Admin · riaz.com.bd</span>
+            <span style={s.logoSub}>{siteHost ? `Admin · ${siteHost}` : "Admin"}</span>
           </span>
         )}
       </div>
@@ -332,6 +360,7 @@ export function DashboardSidebar({ userRoles }: { userRoles: string[] | null }) 
       {!collapsed && (
         <button
           onClick={() => setCollapsed(true)}
+          className="sidebar-collapse-btn"
           style={s.collapseBtn}
           title="Collapse sidebar"
         >
@@ -342,6 +371,7 @@ export function DashboardSidebar({ userRoles }: { userRoles: string[] | null }) 
       {collapsed && (
         <button
           onClick={() => setCollapsed(false)}
+          className="sidebar-collapse-btn"
           style={{ ...s.collapseBtn, justifyContent: "center", padding: 0 }}
           title="Expand sidebar"
         >
@@ -393,6 +423,16 @@ export function DashboardSidebar({ userRoles }: { userRoles: string[] | null }) 
       <style jsx>{`
         .mobile-sidebar-toggle {
           display: none;
+        }
+        /* Modern hover states: a soft wash on nav items and the
+           collapse button (inline styles cannot express :hover). */
+        .sidebar-nav-item:hover {
+          background-color: var(--bg-active, rgba(255, 255, 255, 0.06));
+          color: var(--text-primary);
+        }
+        .sidebar-collapse-btn:hover {
+          background-color: var(--bg-active, rgba(255, 255, 255, 0.06));
+          color: var(--text-primary);
         }
         @media (max-width: 1023px) {
           .desktop-sidebar {

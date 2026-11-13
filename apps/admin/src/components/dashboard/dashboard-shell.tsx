@@ -6,7 +6,7 @@ import { DashboardHeader } from "./header";
 import { CommandPalette } from "./command-palette";
 import { useSession } from "@/components/providers/session-provider";
 
-export function DashboardShell({ children }: { children: React.ReactNode }) {
+export function DashboardShell({ children, siteHost }: { children: React.ReactNode; siteHost: string }) {
   const { session, isLoading } = useSession();
   // null = roles not known yet (still loading, or the request failed).
   // filterNavigation(null) shows all items: navigation is not a security
@@ -55,7 +55,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         backgroundColor: "var(--bg-primary)",
       }}
     >
-      <DashboardSidebar userRoles={userRoles} />
+      <DashboardSidebar userRoles={userRoles} siteHost={siteHost} />
       <div
         style={{
           flex: 1,

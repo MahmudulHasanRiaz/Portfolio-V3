@@ -11,7 +11,8 @@ interface PortalSessionDetail {
   projectId: string;
   portalToken: string;
   clientEmail: string | null;
-  passwordHash: string | null;
+  // The API returns hasPassword (boolean), never the hash itself.
+  hasPassword: boolean;
   lastAccessedAt: string | null;
   expiresAt: string | null;
   createdAt: string | null;
@@ -117,7 +118,7 @@ export default function PortalSessionDetailPage() {
             </div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-muted)" }}>Password Set</div>
-              <div style={{ fontSize: 14 }}>{session.passwordHash ? "Yes" : "No"}</div>
+              <div style={{ fontSize: 14 }}>{session.hasPassword ? "Yes" : "No"}</div>
             </div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-muted)" }}>Last Accessed</div>

@@ -24,6 +24,7 @@ type Env = {
     DATABASE_URL?: string;
     BETTER_AUTH_SECRET?: string;
     BETTER_AUTH_URL?: string;
+    CRON_SECRET?: string;
   };
 };
 
@@ -145,7 +146,12 @@ export default {
     env: Env["Bindings"],
     ctx: ExecutionContext,
   ) {
-    const secret = process.env.CRON_SECRET;
+    // STANDARD: the cron secret comes from the Worker env first
+    // (env.CRON_SECRET — the correct source on Cloudflare Workers),
+    // falling back to process.env for local dev. process.env alone
+    // is NOT set on a deployed Worker, so reading only it would make
+    // every scheduled tick skip silently.
+    const secret = env.CRON_SECRET ?? process.env.CRON_SECRET;
     if (!secret) {
       console.error(
         "[cron] CRON_SECRET is not configured — scheduled tick skipped",

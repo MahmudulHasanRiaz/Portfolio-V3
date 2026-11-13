@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button, Input, Textarea, Badge, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@repo/ui";
-import { getContentById, updateContent } from "@/actions/content";
+import { getContentById, transitionContent, updateContent } from "@/actions/content";
 import { useRouter, useParams } from "next/navigation";
 
 export default function EditPage() {
@@ -24,7 +24,17 @@ export default function EditPage() {
     setLoading(true); setError("");
     const form = new FormData(e.currentTarget);
     try {
-      await updateContent("pages", params.id, { title: form.get("title"), slug: form.get("slug"), content: form.get("content"), status });
+      await updateContent("pages", params.id, { title: form.get("title"), slug: form.get("slug"), content: form.get("content") });
+      // Status changes go through the transition endpoint only (the
+      // content PUT rejects a `status` field). Map the selected status
+      // to the workflow action; the transition endpoint enforces the
+      // workflow (e.g. draft can only go to published).
+      const currentStatus = (data?.status as string) || "draft";
+      if (status !== currentStatus) {
+        const action =
+          status === "published" ? "publish" : status === "archived" ? "archive" : "unpublish";
+        await transitionContent("pages", params.id, action);
+      }
       router.push("/dashboard/content/pages");
     } catch (err) { setError(err instanceof Error ? err.message : "Failed"); }
     finally { setLoading(false); }

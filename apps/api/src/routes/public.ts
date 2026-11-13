@@ -13,6 +13,7 @@ import { z } from "zod";
 import { leads } from "@repo/database/schema";
 import { getApiDb } from "../db";
 import { isRecord, readJsonBody } from "../lib/validate";
+import { createRateLimiter } from "../lib/rate-limit";
 import {
   getPublicContent,
   getPublicSettings,
@@ -190,39 +191,25 @@ const publicLeadSchema = z
       "Please give a Bangladeshi mobile number — 01XXXXXXXXX or +8801XXXXXXXXX.",
   });
 
-// --- Rate limit (10/hour per IP, in-memory) -------------------------
-// TODO (cutover): this Map is per-instance — on Workers each isolate
-// keeps its own count, so the limit is best-effort only under
-// multi-instance deployment. A shared limiter (KV / Durable Object)
-// is a cutover concern; single-instance behaviour matches the
-// original exactly.
-const MAX_PER_HOUR = 10;
-const WINDOW_MS = 60 * 60 * 1000;
-const hitsByIp = new Map<string, { count: number; resetAt: number }>();
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const entry = hitsByIp.get(ip);
-  if (!entry || now >= entry.resetAt) {
-    hitsByIp.set(ip, { count: 1, resetAt: now + WINDOW_MS });
-    return false;
-  }
-  if (entry.count >= MAX_PER_HOUR) return true;
-  entry.count += 1;
-  return false;
-}
-
-function clientIp(c: { req: { header: (name: string) => string | undefined } }): string {
-  const forwarded = c.req.header("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0]?.trim() || "unknown";
-  return c.req.header("x-real-ip")?.trim() || "unknown";
-}
+// --- Rate limit (10/hour per IP) -------------------------------------
+// STANDARD: public write endpoints use the shared helper in
+// lib/rate-limit.ts (10/hour per IP here — the original's limit,
+// preserved exactly). The helper is in-memory per isolate
+// (best-effort under multi-isolate; a shared KV / Durable Object
+// limiter is a cutover concern, not a prerequisite), reads
+// cf-connecting-ip as the client IP, and answers 429 + Retry-After.
+// Legitimate single submissions are unaffected.
+const leadsLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  message: "Too many requests. Please try again later.",
+});
 
 function asField(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-app.post("/leads", async (c) => {
+app.post("/leads", leadsLimiter, async (c) => {
   try {
     const ok = await isAuthorized(
       c.req.raw,
@@ -230,12 +217,6 @@ app.post("/leads", async (c) => {
       waitUntilOf(c),
     );
     if (!ok) return c.json({ error: "Unauthorized" }, 401);
-    if (isRateLimited(clientIp(c))) {
-      return c.json(
-        { error: "Too many requests. Please try again later." },
-        429,
-      );
-    }
     const body = await readJsonBody(c);
     if (body === null) {
       return c.json(

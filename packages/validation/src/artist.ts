@@ -77,6 +77,11 @@ export const releaseLyricSchema = z.object({
   lyricsText: z.string().optional(),
   lyricsLanguage: z.string().max(10).optional(),
   translations: z.record(z.string(), z.unknown()).optional(),
+  // STANDARD: lyrics `status` is a plain validated string — NO enum.
+  // The DB column is varchar(20) with no known status set, so the
+  // schema only caps the length (20, matching the column). The route
+  // handler reads it as a string and defaults to "draft" on create.
+  status: z.string().max(20).optional(),
 });
 
 export const createReleaseLyricSchema = z.object({
@@ -84,6 +89,7 @@ export const createReleaseLyricSchema = z.object({
   lyricsText: z.string().optional(),
   lyricsLanguage: z.string().max(10).optional(),
   translations: z.record(z.string(), z.unknown()).optional(),
+  status: z.string().max(20).optional(),
 });
 
 export const updateReleaseLyricSchema = releaseLyricSchema.partial();

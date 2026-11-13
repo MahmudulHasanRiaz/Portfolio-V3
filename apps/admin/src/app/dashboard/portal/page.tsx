@@ -18,11 +18,26 @@ interface PortalSession {
 export default function PortalSessionsListPage() {
   const [sessions, setSessions] = useState<PortalSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     fetch("/api/portal/sessions")
       .then((r) => r.json())
-      .then(setSessions)
+      .then((data) => {
+        // The API returns a bare array. If it ever returns an error
+        // object instead (auth/DB failure), do not crash on .map —
+        // show the error. (An earlier version blindly setSessions on
+        // whatever came back, so a 401 { error } crashed the page
+        // with "e.map is not a function".)
+        if (Array.isArray(data)) {
+          setSessions(data);
+        } else {
+          setLoadError(
+            typeof data?.error === "string" ? data.error : "Failed to load portal sessions.",
+          );
+        }
+      })
+      .catch(() => setLoadError("Failed to load portal sessions."))
       .finally(() => setLoading(false));
   }, []);
 
@@ -31,6 +46,12 @@ export default function PortalSessionsListPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--text-primary)" }}>Client Portal Sessions</h1>
       </div>
+
+      {loadError && (
+        <div style={{ padding: "8px 12px", borderRadius: 6, backgroundColor: "var(--bg-danger, #fef2f2)", color: "var(--text-danger, #dc2626)", fontSize: 13, marginBottom: 16 }}>
+          {loadError}
+        </div>
+      )}
 
       {loading ? (
         <div style={{ textAlign: "center", padding: 48, color: "var(--text-muted)" }}>Loading...</div>

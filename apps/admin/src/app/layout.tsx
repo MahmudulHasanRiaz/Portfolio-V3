@@ -5,8 +5,39 @@
 // run pages). Mirrors the web app's font setup.
 import "@fontsource/dm-sans";
 import "@fontsource/jetbrains-mono";
+import type { Metadata } from "next";
 import "./globals.css";
 import { ClientProviders } from "./client-providers";
+import { honoFetch } from "@/lib/hono-client";
+
+// Tab favicon + title follow the Settings (Brand Identity), exactly like
+// the sidebar brand mark — on the admin AND (via the public site's own
+// Layout.astro) the public site. The favicon URL is read from Hono
+// (GET /api/admin/settings/favicon); when the user changes it in
+// Settings → Brand Identity, the tab icon follows. The static
+// app/icon.png (the current favicon, 512×512) is the fallback — it also
+// serves the login page, where there is no session yet and the settings
+// fetch cannot authenticate. The title is the product name, "Portfolio
+// OS"; pages that set their own title get "Page | Portfolio OS".
+export async function generateMetadata(): Promise<Metadata> {
+  let icon = "/icon.png";
+  try {
+    const data = await honoFetch<{ faviconUrl: string | null }>(
+      "/api/admin/settings/favicon",
+    );
+    if (data?.faviconUrl) icon = data.faviconUrl;
+  } catch {
+    // No session (login page) or the settings fetch failed: keep the
+    // static fallback so the tab still shows the face photo.
+  }
+  return {
+    title: {
+      default: "Portfolio OS",
+      template: "%s | Portfolio OS",
+    },
+    icons: { icon },
+  };
+}
 
 // Theme init: runs before paint so there is no light/dark flash.
 // Mirrors the theme provider's logic (components/providers/theme-provider):

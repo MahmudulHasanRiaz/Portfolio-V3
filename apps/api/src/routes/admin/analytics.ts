@@ -40,6 +40,7 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import { createRateLimiter } from "../../lib/rate-limit";
 import {
   isRecord,
   readJsonBody,
@@ -427,10 +428,18 @@ app.get("/summary", async (c) => {
 // { anonymousId, path, title?, referrer?, userAgent?, sessionId? }
 // Returns { visitorId, sessionId }.
 //
-// TODO (cutover): no rate limit exists on this endpoint today — the
-// public-write abuse decision (shared limiter) is a cutover item, not
-// something this port invents. See the file header.
-app.post("/track", async (c) => {
+// STANDARD: public write endpoints are rate-limited per IP — 10/min
+// here (a browser beacon fires a few times per visit, so 10/min is
+// far above legitimate use and only stops a hammering loop). The
+// helper is in-memory per isolate (best-effort under multi-isolate);
+// a limited request gets 429 + Retry-After, legitimate single
+// submissions are unaffected.
+const publicWriteLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: "Too many requests. Please try again later.",
+});
+app.post("/track", publicWriteLimiter, async (c) => {
   try {
     const body = await readJsonBody(c);
     if (!isRecord(body)) {
