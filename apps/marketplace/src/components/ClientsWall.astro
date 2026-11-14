@@ -25,311 +25,126 @@ const t = applySiteCopy(getDict(lang), lang, await getSiteSettings());
 // underline (`.client-cell` sets `text-decoration: none`) — the
 // name looks like plain text even though it is clickable.
 //
-// The list is a horizontal scroll-snap slider, NOT a grid: the
-// client count grows (5 today — Fixed Plus, Avelto, Plus Time, Your
-// Choice, Kidzen — and more coming), so the wall shows ~2 full cards
-// with the next one peeking at the edge and scrolls, instead of
-// reflowing into endless rows. One dot per client, one arrow step
-// per card; the count is never hard-coded. With no clients at all
-// the section renders nothing — never an empty heading.
+// The wall is a seamless, continuous marquee — NOT a slider. The
+// client list renders twice and the track glides left at one steady
+// speed, looping without ever jumping back to the first client.
+// The duration scales with the client count (6s per client, ~30s
+// for the 5 today — Fixed Plus, Avelto, Plus Time, Your Choice,
+// Kidzen), so the speed stays constant as clients are added.
+// With fewer than 2 clients the row is static (no animation, no
+// duplicate). Hover/focus pauses it; prefers-reduced-motion stops
+// it entirely (CSS). With no clients at all the section renders
+// nothing — never an empty heading.
 const clients = (await getClients()).map((c) =>
 	localizeData({ ...c }, lang),
 );
+const marquee = clients.length >= 2;
+// One steady speed: 6s of travel per client in a set.
+const duration = `${clients.length * 6}s`;
 ---
 
 {
 	clients.length > 0 && (
-		<section class="glass section" id="clients" data-clients-slider>
+		<section class="glass section" id="clients" data-clients>
 			<div class="section-head">
 				<h2>{t.clientsTitle}</h2>
-				<div class="clients-nav">
-					<button
-						type="button"
-						class="clients-arrow clients-arrow--prev"
-						data-clients-prev
-						aria-label={t.previousClient}
-					>
-						<svg
-							viewBox="0 0 24 24"
-							width="20"
-							height="20"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2.5"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							aria-hidden="true"
-						>
-							<path d="M15 18l-6-6 6-6" />
-						</svg>
-					</button>
-					<button
-						type="button"
-						class="clients-arrow clients-arrow--next"
-						data-clients-next
-						aria-label={t.nextClient}
-					>
-						<svg
-							viewBox="0 0 24 24"
-							width="20"
-							height="20"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2.5"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							aria-hidden="true"
-						>
-							<path d="M9 18l6-6-6-6" />
-						</svg>
-					</button>
+			</div>
+			<div class="clients-viewport">
+				<div
+					class={
+						marquee
+							? "clients-track clients-track--marquee"
+							: "clients-track"
+					}
+					style={
+						marquee ? `--marquee-duration: ${duration}` : undefined
+					}
+				>
+					{[0, 1].map((copy) => {
+						if (copy === 1 && !marquee) return null;
+						return (
+							<div
+								class="clients-set"
+								aria-hidden={copy === 1 ? "true" : undefined}
+							>
+								{clients.map((client) => {
+									const nameLogo =
+										client.logo_url &&
+										client.logo_display_mode ===
+											"name_logo";
+									const inner = nameLogo ? (
+										<>
+											<img
+												class="client-logo-icon"
+												src={optimizedImageUrl(
+													client.logo_url,
+													144,
+												)}
+												alt=""
+												loading="lazy"
+												decoding="async"
+											/>
+											<span class="client-wordmark">
+												{client.name}
+											</span>
+										</>
+									) : client.logo_url ? (
+										<>
+											<img
+												src={optimizedImageUrl(
+													client.logo_url,
+													144,
+												)}
+												alt={client.name}
+												loading="lazy"
+												decoding="async"
+											/>
+											<span class="client-wordmark client-wordmark--fallback">
+												{client.name}
+											</span>
+										</>
+									) : (
+										<span class="client-wordmark">
+											{client.name}
+										</span>
+									);
+									const cellClass = nameLogo
+										? "client-cell client-cell--name-logo"
+										: "client-cell";
+									return client.website ? (
+										<a
+											class={cellClass}
+											href={client.website}
+											target="_blank"
+											rel="noopener noreferrer"
+											tabindex={
+												copy === 1 ? "-1" : undefined
+											}
+										>
+											{inner}
+										</a>
+									) : (
+										<div class={cellClass}>{inner}</div>
+									);
+								})}
+							</div>
+						);
+					})}
 				</div>
-			</div>
-			<div
-				class="clients-track"
-				data-clients-track
-				role="region"
-				aria-roledescription="carousel"
-				aria-label={t.clientsTitle}
-				tabindex="0"
-			>
-				{clients.map((client) => {
-					const nameLogo =
-						client.logo_url &&
-						client.logo_display_mode === "name_logo";
-					const inner = nameLogo ? (
-						<>
-							<img
-								class="client-logo-icon"
-								src={optimizedImageUrl(client.logo_url, 144)}
-								alt=""
-								loading="lazy"
-								decoding="async"
-							/>
-							<span class="client-wordmark">{client.name}</span>
-						</>
-					) : client.logo_url ? (
-						<>
-							<img
-								src={optimizedImageUrl(client.logo_url, 144)}
-								alt={client.name}
-								loading="lazy"
-								decoding="async"
-							/>
-							<span class="client-wordmark client-wordmark--fallback">
-								{client.name}
-							</span>
-						</>
-					) : (
-						<span class="client-wordmark">{client.name}</span>
-					);
-					const cellClass = nameLogo
-						? "client-cell client-cell--name-logo"
-						: "client-cell";
-					return client.website ? (
-						<a
-							class={cellClass}
-							href={client.website}
-							target="_blank"
-							rel="noopener noreferrer"
-						>
-							{inner}
-						</a>
-					) : (
-						<div class={cellClass}>{inner}</div>
-					);
-				})}
-			</div>
-			<div class="clients-dots">
-				{clients.map((client, i) => (
-					<button
-						type="button"
-						class="clients-dot"
-						data-clients-dot={i}
-						aria-label={client.name}
-						aria-current={i === 0 ? "true" : undefined}
-					/>
-				))}
 			</div>
 		</section>
 	)
 }
 
 <script>
-	// Clients slider controls — vanilla inline script (no island, no
-	// library, ~2 kB). The track is natively swipeable/draggable; this
-	// only wires the arrows, dots, keyboard and a gentle autoplay
-	// that pauses on hover, focus, drag, or a hidden tab. When the
-	// track does not overflow (1–2 clients on a wide screen) the
-	// `has-slider` class is never added, so arrows/dots stay hidden
-	// and the row is plain static.
-	const initClientsSlider = () => {
-		const root = document.querySelector<HTMLElement>(
-			"[data-clients-slider]",
-		);
-		if (!root) return;
-		const track = root.querySelector<HTMLElement>("[data-clients-track]");
-		if (!track) return;
-		const prev =
-			root.querySelector<HTMLButtonElement>("[data-clients-prev]");
-		const next =
-			root.querySelector<HTMLButtonElement>("[data-clients-next]");
-		const dots = Array.from(
-			root.querySelectorAll<HTMLButtonElement>("[data-clients-dot]"),
-		);
-		const reduceMotion = window.matchMedia(
-			"(prefers-reduced-motion: reduce)",
-		).matches;
-
-		const step = () => {
-			const cell = track.querySelector<HTMLElement>(".client-cell");
-			if (!cell) return track.clientWidth;
-			const gap =
-				Number.parseFloat(getComputedStyle(track).columnGap) || 0;
-			return cell.offsetWidth + gap;
-		};
-		const maxScroll = () =>
-			Math.max(0, track.scrollWidth - track.clientWidth);
-		const behavior = (): ScrollBehavior =>
-			reduceMotion ? "auto" : "smooth";
-		const current = () =>
-			Math.max(
-				0,
-				Math.min(
-					dots.length - 1,
-					Math.round(track.scrollLeft / step()),
-				),
-			);
-		const goTo = (index: number) => {
-			const clamped = Math.max(0, Math.min(dots.length - 1, index));
-			track.scrollTo({ left: clamped * step(), behavior: behavior() });
-		};
-
-		let autoplay: number | null = null;
-		const stopAutoplay = () => {
-			if (autoplay !== null) {
-				window.clearInterval(autoplay);
-				autoplay = null;
-			}
-		};
-		const startAutoplay = () => {
-			if (reduceMotion || autoplay !== null || dots.length < 2) return;
-			autoplay = window.setInterval(() => {
-				if (document.hidden) return;
-				if (track.scrollLeft >= maxScroll() - 1) goTo(0);
-				else goTo(current() + 1);
-			}, 4500);
-		};
-		const restartAutoplay = () => {
-			stopAutoplay();
-			startAutoplay();
-		};
-
-		const update = () => {
-			const overflow = maxScroll() > 1;
-			root.classList.toggle("has-slider", overflow);
-			if (!overflow) {
-				stopAutoplay();
-				return;
-			}
-			// At max scroll the last client is fully visible (flush
-			// right), so the last dot is active even though its snap
-			// point is past the scroll limit.
-			const active =
-				track.scrollLeft >= maxScroll() - 1
-					? dots.length - 1
-					: current();
-			dots.forEach((dot, i) => {
-				dot.classList.toggle("is-active", i === active);
-				if (i === active) dot.setAttribute("aria-current", "true");
-				else dot.removeAttribute("aria-current");
-			});
-			if (prev) prev.disabled = track.scrollLeft <= 1;
-			if (next) next.disabled = track.scrollLeft >= maxScroll() - 1;
-		};
-
-		let raf = 0;
-		track.addEventListener(
-			"scroll",
-			() => {
-				if (raf) return;
-				raf = window.requestAnimationFrame(() => {
-					raf = 0;
-					update();
-				});
-			},
-			{ passive: true },
-		);
-		if (prev)
-			prev.addEventListener("click", () => {
-				goTo(current() - 1);
-				restartAutoplay();
-			});
-		if (next)
-			next.addEventListener("click", () => {
-				goTo(current() + 1);
-				restartAutoplay();
-			});
-		dots.forEach((dot, i) =>
-			dot.addEventListener("click", () => {
-				goTo(i);
-				restartAutoplay();
-			}),
-		);
-		track.addEventListener("keydown", (event) => {
-			if (event.key === "ArrowLeft") {
-				event.preventDefault();
-				goTo(current() - 1);
-				restartAutoplay();
-			} else if (event.key === "ArrowRight") {
-				event.preventDefault();
-				goTo(current() + 1);
-				restartAutoplay();
-			} else if (event.key === "Home") {
-				event.preventDefault();
-				goTo(0);
-				restartAutoplay();
-			} else if (event.key === "End") {
-				event.preventDefault();
-				goTo(dots.length - 1);
-				restartAutoplay();
-			}
+	// A logo URL that 404s must never leave a broken-image icon:
+	// hide the img and show the wordmark fallback instead.
+	const root = document.querySelector<HTMLElement>("[data-clients]");
+	if (root) {
+		root.querySelectorAll("img").forEach((img) => {
+			const markBroken = () => img.classList.add("is-broken");
+			if (img.complete && img.naturalWidth === 0) markBroken();
+			else img.addEventListener("error", markBroken);
 		});
-		root.addEventListener("pointerenter", stopAutoplay);
-		root.addEventListener("pointerleave", startAutoplay);
-		root.addEventListener("focusin", stopAutoplay);
-		root.addEventListener("focusout", (event) => {
-			if (
-				!(event.relatedTarget instanceof Node) ||
-				!root.contains(event.relatedTarget)
-			)
-				startAutoplay();
-		});
-		track.addEventListener("pointerdown", stopAutoplay);
-		track.addEventListener("pointerup", startAutoplay);
-		document.addEventListener("visibilitychange", () => {
-			if (document.hidden) stopAutoplay();
-			else startAutoplay();
-		});
-		if (window.ResizeObserver) {
-			new ResizeObserver(() => update()).observe(track);
-		} else {
-			window.addEventListener("resize", update);
-		}
-
-		// A logo URL that 404s must never leave a broken-image icon:
-		// hide the img and show the wordmark fallback instead.
-		root.querySelectorAll<HTMLImageElement>(".client-cell img").forEach(
-			(img) => {
-				const markBroken = () => img.classList.add("is-broken");
-				if (img.complete && img.naturalWidth === 0) markBroken();
-				else img.addEventListener("error", markBroken);
-			},
-		);
-
-		update();
-		startAutoplay();
-	};
-
-	initClientsSlider();
+	}
 </script>
