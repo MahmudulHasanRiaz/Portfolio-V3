@@ -1,0 +1,74 @@
+---
+// Previous / next detail navigation. Renders only the sides that exist;
+// an empty span holds the grid column so a lone "Next" still sits right.
+// Stacked on mobile, two columns at sm+ (preview mold); the next card
+// flips row-reverse and right-aligns. Titles wrap (min-w-0 + break
+// words) instead of truncating at the card edge. An optional 80×56
+// thumbnail renders beside the label, as in the preview.
+import { getDict, type Dict, type Lang } from "../lib/i18n";
+import ThumbImage from "./ThumbImage.astro";
+interface PrevNextItem {
+	href: string;
+	title: string;
+	thumb?: string | null;
+}
+
+interface Props {
+	prev?: PrevNextItem | null;
+	next?: PrevNextItem | null;
+	lang?: Lang;
+	dict?: Dict;
+}
+
+const { prev = null, next = null, lang = "en", dict } = Astro.props;
+const t = dict ?? getDict(lang);
+---
+
+{
+	(prev || next) && (
+		<nav class="prev-next" aria-label={`${t.previous} / ${t.next}`}>
+			{prev ? (
+				<a href={prev.href}>
+					{prev.thumb ? (
+						<ThumbImage
+							src={prev.thumb}
+							alt=""
+							widths={[80, 160]}
+							sizes="80px"
+							width={80}
+							height={56}
+							class="pn-thumb"
+						/>
+					) : null}
+					<span class="pn-body">
+						<span class="pn-label">← {t.previous}</span>
+						<span class="pn-title">{prev.title}</span>
+					</span>
+				</a>
+			) : (
+				<span />
+			)}
+			{next ? (
+				<a class="next" href={next.href}>
+					{next.thumb ? (
+						<ThumbImage
+							src={next.thumb}
+							alt=""
+							widths={[80, 160]}
+							sizes="80px"
+							width={80}
+							height={56}
+							class="pn-thumb"
+						/>
+					) : null}
+					<span class="pn-body">
+						<span class="pn-label">{t.next} →</span>
+						<span class="pn-title">{next.title}</span>
+					</span>
+				</a>
+			) : (
+				<span />
+			)}
+		</nav>
+	)
+}

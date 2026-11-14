@@ -271,6 +271,8 @@ export interface ClientRow {
   id: string;
   name: string;
   logoUrl: string | null;
+  /** "logo" | "name_logo" | null (null = "logo" default). */
+  logoDisplayMode: string | null;
   website: string | null;
   sortOrder: number | null;
   nameBn: string | null;
@@ -297,9 +299,16 @@ export async function getClientById(id: string): Promise<ClientRow> {
 export interface ClientInput {
   name: string;
   logoUrl?: string | null;
+  logoDisplayMode?: string | null;
   website?: string | null;
   sortOrder?: number | null;
   nameBn?: string | null;
+}
+
+/** Only the two known modes survive; anything else stores as NULL
+ *  (the "logo" default) instead of failing the save. */
+function asDisplayMode(value: unknown): "logo" | "name_logo" | null {
+  return value === "logo" || value === "name_logo" ? value : null;
 }
 
 function clientValues(data: ClientInput) {
@@ -308,6 +317,7 @@ function clientValues(data: ClientInput) {
   return {
     name,
     logoUrl: asText(data.logoUrl),
+    logoDisplayMode: asDisplayMode(data.logoDisplayMode),
     website: asText(data.website),
     sortOrder: asSortOrder(data.sortOrder),
     nameBn: asText(data.nameBn),

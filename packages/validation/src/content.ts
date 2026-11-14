@@ -247,22 +247,25 @@ export const updateProjectSchema = projectSchema.partial();
 export const technologySchema = z.object({
   id: uuidSchema,
   name: z.string().max(100),
-  nameBn: z.string().optional(),
-  category: z.string().max(50).optional(),
-  use: z.string().optional(),
-  useBn: z.string().optional(),
-  icon: z.string().optional(),
-  sortOrder: z.coerce.number().int().optional(),
+  // Nullable: the admin sends null (not undefined) for every empty
+  // optional field (its asText/asSortOrder) — same 400 as clients
+  // (2026-11-14) if the schema rejects null.
+  nameBn: z.string().nullable().optional(),
+  category: z.string().max(50).nullable().optional(),
+  use: z.string().nullable().optional(),
+  useBn: z.string().nullable().optional(),
+  icon: z.string().nullable().optional(),
+  sortOrder: z.coerce.number().int().nullable().optional(),
 });
 
 export const createTechnologySchema = z.object({
   name: z.string().max(100),
-  nameBn: z.string().optional(),
-  category: z.string().max(50).optional(),
-  use: z.string().optional(),
-  useBn: z.string().optional(),
-  icon: z.string().optional(),
-  sortOrder: z.coerce.number().int().optional(),
+  nameBn: z.string().nullable().optional(),
+  category: z.string().max(50).nullable().optional(),
+  use: z.string().nullable().optional(),
+  useBn: z.string().nullable().optional(),
+  icon: z.string().nullable().optional(),
+  sortOrder: z.coerce.number().int().nullable().optional(),
 });
 
 export const updateTechnologySchema = technologySchema.partial();

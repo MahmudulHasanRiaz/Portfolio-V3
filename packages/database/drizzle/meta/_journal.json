@@ -253,6 +253,13 @@
       "when": 1794416361555,
       "tag": "0035_venture_founded_year",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794576005406,
+      "tag": "0036_client_logo_display_mode",
+      "breakpoints": true
     }
   ]
 }

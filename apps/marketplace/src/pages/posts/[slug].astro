@@ -1,0 +1,350 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import {
+	getEntry,
+	getLiveEntry,
+	render,
+} from "astro:content";
+import {
+	liveCollectionReachable,
+} from "../../loaders/public-content";
+import DetailMedia from "../../components/DetailMedia.astro";
+import DetailVideoFacade from "../../components/DetailVideoFacade.astro";
+import PrevNext from "../../components/PrevNext.astro";
+import { getPosts, formatDate, readingTimeFromText } from "../../lib/content";
+import {
+	resolveCanonicalBase,
+	absUrl,
+	mergeDetail,
+	parseBodyBlocks,
+} from "../../lib/detail";
+import {
+	optimizedImageUrl,
+	optimizedSrcset,
+	remoteSrcset,
+} from "../../lib/images";
+import { PROFILE } from "../../data/site";
+import { applySiteCopy, getDict, langUrl, readingTimeLabel } from "../../lib/i18n";
+import { getSiteSettings } from "../../lib/settings";
+
+// Live detail route — on-demand SSR (2026-11-12, output "server"):
+// every request renders this page in the Worker from the Public
+// Content API. When the API is reachable the live entry is
+// authoritative (a missing live entry 404s); the build-time row is
+// only the outage fallback when the API is unreachable (fix plan §1b).
+// A slug published after a deploy shows instantly — no rebuild.
+// Route caching is in astro.config.mjs + src/middleware.ts.
+const lang = "en" as const;
+const settings = await getSiteSettings();
+const t = applySiteCopy(getDict(lang), lang, settings);
+
+const { slug } = Astro.params;
+if (!slug) Astro.response.status = 404;
+
+const liveResult = slug ? await getLiveEntry("livePosts", slug).catch(() => undefined) : undefined;
+const liveEntry = liveResult?.entry;
+if (liveEntry) Astro.cache.set(liveEntry);
+// When the live API is reachable, the live entry is authoritative:
+	// a missing live entry 404s and the build-time row is never read,
+	// so an archived/draft item cannot render from its static file.
+	// When unreachable, the build-time row is the outage fallback and
+	// mergeDetail() below still fills gaps in the live row.
+	const liveReachable = await liveCollectionReachable("posts");
+	const buildEntry =
+		liveReachable || !slug
+			? undefined
+			: await getEntry("posts", slug);
+
+const entry = liveEntry ?? buildEntry;
+if (!entry) Astro.response.status = 404;
+
+interface PostData {
+	title?: string;
+	description?: string;
+	excerpt?: string;
+	content?: string;
+	tags?: string[];
+	publishedAt?: string;
+	thumbnail?: string;
+	thumbnailType?: "image" | "video";
+	thumbnailVideoUrl?: string;
+	readingTime?: number;
+	gallery?: string[];
+	videos?: Array<{ url: string; title?: string }>;
+}
+
+const liveData = liveEntry?.data as unknown as
+	| Record<string, unknown>
+	| undefined;
+const buildData = buildEntry?.data as unknown as
+	| Record<string, unknown>
+	| undefined;
+const data = mergeDetail(buildData, liveData) as unknown as
+	| PostData
+	| undefined;
+
+// Build-time entries render their markdown natively; live entries carry
+// the body as a plain `content` string — parsed into content blocks so
+// '## ' lines become real <h2> headings instead of rendering literally
+// as markdown text (the live bug: '## One queue for every store'
+// visible on the page, zero <h2> elements).
+const rendered = buildEntry ? await render(buildEntry) : undefined;
+const Content = rendered?.Content;
+const storyBlocks =
+	!Content && data?.content ? parseBodyBlocks(data.content) : [];
+
+const posts = await getPosts();
+const idx = slug ? posts.findIndex((p) => p.data.slug === slug) : -1;
+const prev = idx > 0 ? posts[idx - 1] : undefined;
+const next = idx >= 0 && idx < posts.length - 1 ? posts[idx + 1] : undefined;
+const related = posts.filter((p) => p.data.slug !== slug).slice(0, 3);
+const thumbOf = (p: (typeof posts)[number] | undefined) =>
+	p?.data.thumbnailType !== "video" && p?.data.thumbnail
+		? p.data.thumbnail
+		: null;
+
+const title = data?.title ?? t.notFoundPost;
+const description = data?.excerpt ?? data?.description;
+const readingTime =
+	data?.readingTime ??
+	readingTimeFromText(data?.content ?? buildEntry?.body) ??
+	undefined;
+const thumb = data?.thumbnail;
+const tags = data?.tags ?? [];
+
+const isVideoThumb = data?.thumbnailType === "video";
+const videoSrc = isVideoThumb
+	? (data?.thumbnailVideoUrl ?? data?.thumbnail)
+	: undefined;
+const videoPoster =
+	isVideoThumb &&
+	data?.thumbnailVideoUrl &&
+	data?.thumbnail &&
+	data.thumbnail !== data.thumbnailVideoUrl &&
+	!/\.(mp4|webm|mov|m4v)([?#]|$)/i.test(data.thumbnail)
+		? data.thumbnail
+		: null;
+const coverImage = !isVideoThumb && thumb ? thumb : videoPoster;
+
+// Canonical base: explicit admin site_url wins; else the request
+// host (Astro.url), else the SITE_URL fallback — see detail.ts.
+const siteBase = resolveCanonicalBase(settings.siteUrl, Astro.url);
+const pageUrl = `${siteBase}/posts/${slug}`;
+const jsonLd = data
+	? {
+			"@context": "https://schema.org",
+			"@graph": [
+				{
+					"@type": "BlogPosting",
+					headline: title,
+					...(description ? { description } : {}),
+					inLanguage: "en",
+					author: { "@type": "Person", name: PROFILE.name, url: siteBase },
+					...(data.publishedAt
+						? { datePublished: data.publishedAt }
+						: {}),
+					...(coverImage ? { image: absUrl(optimizedImageUrl(coverImage, 1200), siteBase) } : {}),
+					mainEntityOfPage: pageUrl,
+				},
+				{
+					"@type": "BreadcrumbList",
+					itemListElement: [
+						{
+							"@type": "ListItem",
+							position: 1,
+							name: "Home",
+							item: siteBase,
+						},
+						{
+							"@type": "ListItem",
+							position: 2,
+							name: t.allPosts,
+							item: `${siteBase}/posts`,
+						},
+						{
+							"@type": "ListItem",
+							position: 3,
+							name: title,
+							item: pageUrl,
+						},
+					],
+				},
+			],
+		}
+	: null;
+---
+
+<Layout
+	title={`${title} — Mahmudul Hasan Riaz`}
+	description={description}
+	ogType="article"
+	ogImage={coverImage ? absUrl(optimizedImageUrl(coverImage, 1200), siteBase) : null}
+	canonical={pageUrl}
+	lang={lang}
+>
+	{!entry || !data ? (
+		<section class="glass">
+			<a href={langUrl("/posts", lang)} class="back-link">
+				{t.backAllPosts}
+			</a>
+			<h1 class="detail-title">{t.notFoundPost}</h1>
+			<p class="empty-state">{t.notPublishedPost}</p>
+		</section>
+	) : (
+		<section class="glass">
+			{jsonLd ? (
+				<script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+			) : null}
+
+			<a href={langUrl("/posts", lang)} class="back-link">
+				{t.backAllPosts}
+			</a>
+
+			{thumb &&
+				(isVideoThumb && videoSrc ? (
+					<div class="detail-hero">
+						<DetailVideoFacade
+							src={videoSrc}
+							poster={videoPoster}
+							title={title}
+							lang={lang}
+							dict={t}
+						/>
+					</div>
+				) : (
+					<div class="detail-hero">
+						<img
+							src={optimizedImageUrl(thumb, 1200)}
+							alt={title}
+							fetchpriority="high"
+							decoding="async"
+							srcset={thumb?.includes("images.unsplash.com") ? `${thumb.replace(/w=\d+/, "w=800").replace(/q=\d+/, "q=75")} 800w, ${thumb.replace(/q=\d+/, "q=75")} 1200w` : optimizedSrcset(thumb, [800, 1200])}
+							sizes="(max-width: 640px) 100vw, 1088px"
+						/>
+					</div>
+				))}
+			<h1 class="detail-title">{title}</h1>
+			<p class="detail-meta">
+				{t.authorBy} {PROFILE.name}
+				{formatDate(data.publishedAt, lang)
+					? ` · ${formatDate(data.publishedAt, lang)}`
+					: ""}
+				{readingTime ? ` · ${readingTimeLabel(readingTime, lang)}` : ""}
+			</p>
+			{tags.length ? (
+				<div class="tag-row" style="margin-top:12px;">
+					{tags.map((tag) => (
+						<span class="tag">{tag}</span>
+					))}
+				</div>
+			) : null}
+			{description ? <p class="detail-lede">{description}</p> : null}
+
+			{Content ? (
+				<div class="detail-body">
+					<Content />
+				</div>
+			) : storyBlocks.length > 0 ? (
+				<div class="detail-body">
+					{storyBlocks.map((block) =>
+						block.kind === "h2" ? (
+							<h2>{block.text}</h2>
+						) : block.kind === "img" && block.src ? (
+							<figure class="body-image">
+								<img
+									src={optimizedImageUrl(block.src, 1024)}
+									srcset={remoteSrcset(block.src, [360, 720, 1024])}
+									sizes="(max-width: 640px) 100vw, 720px"
+									alt={block.alt ?? ""}
+									loading="lazy"
+									decoding="async"
+								/>
+							</figure>
+						) : (
+							<p>{block.text}</p>
+						),
+					)}
+				</div>
+			) : description ? (
+				<div class="detail-body">
+					<p>{description}</p>
+				</div>
+			) : null}
+
+			<DetailMedia
+				lang={lang}
+				dict={t}
+				gallery={data.gallery ?? []}
+				videos={data.videos ?? []}
+				exclude={thumb}
+				altBase={`${title} ${t.galleryImage}`}
+			/>
+
+			<div class="author-card">
+				<img
+					class="author-photo"
+					src={PROFILE.photo}
+					alt={PROFILE.name}
+					width="56"
+					height="56"
+					loading="lazy"
+					decoding="async"
+				/>
+				<div class="author-info">
+					<strong>{PROFILE.name}</strong>
+					<span>
+						{t.authorLine}
+					</span>
+				</div>
+			</div>
+
+			{related.length > 0 ? (
+				<section class="section">
+					<h2 class="detail-h2">{t.morePosts}</h2>
+					<div class="card-grid">
+						{related.map((r) => {
+							const rt =
+								r.data.readingTime ??
+								readingTimeFromText(r.body) ??
+								undefined;
+							return (
+								<a class="grid-card" href={langUrl(`/posts/${r.data.slug}`, lang)}>
+									<div class="grid-body">
+										<h3>{r.data.title}</h3>
+										<p class="grid-meta">
+											{formatDate(r.data.publishedAt, lang)}
+											{rt ? ` · ${readingTimeLabel(rt, lang)}` : ""}
+										</p>
+									</div>
+								</a>
+							);
+						})}
+					</div>
+				</section>
+			) : null}
+
+			<PrevNext
+				prev={
+					prev
+						? {
+								href: langUrl(`/posts/${prev.data.slug}`, lang),
+								title: prev.data.title,
+								thumb: thumbOf(prev),
+							}
+						: null
+				}
+				next={
+					next
+						? {
+								href: langUrl(`/posts/${next.data.slug}`, lang),
+								title: next.data.title,
+								thumb: thumbOf(next),
+							}
+						: null
+				}
+				lang={lang}
+				dict={t}
+			/>
+		</section>
+	)}
+</Layout>

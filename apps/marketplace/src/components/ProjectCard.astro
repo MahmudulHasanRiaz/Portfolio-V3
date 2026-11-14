@@ -1,0 +1,73 @@
+---
+// Grid card for the projects archive — thumbnail, title, description, tags.
+import { truncateShort } from "../lib/content";
+import { langUrl, type Lang } from "../lib/i18n";
+import ThumbImage from "./ThumbImage.astro";
+
+interface Props {
+	project: {
+		slug: string;
+		title: string;
+		description: string;
+		tags: string[];
+		thumbnail?: string | null;
+		thumbnailType?: string | null;
+		thumbnailAutoplay?: boolean | null;
+	};
+	lang?: Lang;
+}
+
+const { project, lang = "en" } = Astro.props;
+
+// Unsplash card thumbs ship at w=1200 in content/API rows but render at
+// ~360px wide (2x retina ≈ 720px) — request w=800/q=75 instead: measured
+// 124KB → 67KB per image (~46% less). Non-Unsplash URLs pass through.
+const sizedThumb = (url: string | null | undefined, w = 800) =>
+	url?.includes("images.unsplash.com")
+		? url.replace(/w=\d+/, `w=${w}`).replace(/q=\d+/, "q=75")
+		: url;
+---
+
+<a class="grid-card" href={langUrl(`/projects/${project.slug}`, lang)}>
+	<div class="grid-thumb">
+		{
+			project.thumbnailType === "video" && project.thumbnail ? (
+				<video
+					src={project.thumbnail}
+					aria-label={project.title}
+					muted
+					loop
+					playsinline
+					autoplay={project.thumbnailAutoplay !== false}
+					preload="metadata"
+				/>
+			) : project.thumbnail ? (
+				<ThumbImage
+					src={project.thumbnail}
+					alt={project.title}
+					widths={[360, 720, 1080]}
+					sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 360px"
+					width={800}
+					height={500}
+				/>
+			) : (
+				<span class="thumb-fallback" aria-hidden="true">
+					{project.title.charAt(0)}
+				</span>
+			)
+		}
+	</div>
+	<div class="grid-body">
+		<h3>{project.title}</h3>
+		<p>{truncateShort(project.description)}</p>
+		{
+			project.tags.length > 0 && (
+				<div class="tag-row">
+					{project.tags.map((tag) => (
+						<span class="tag">{tag}</span>
+					))}
+				</div>
+			)
+		}
+	</div>
+</a>

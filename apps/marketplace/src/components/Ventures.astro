@@ -1,0 +1,71 @@
+---
+import { getVentures, truncateShort } from "../lib/content";
+import { applySiteCopy, getDict, langUrl, localizeData, type Lang } from "../lib/i18n";
+import { getSiteSettings } from "../lib/settings";
+import ThumbImage from "./ThumbImage.astro";
+
+interface Props {
+	lang?: Lang;
+}
+
+const { lang = "en" } = Astro.props;
+const t = applySiteCopy(getDict(lang), lang, await getSiteSettings());
+
+const venturesRaw = await getVentures();
+const ventures = venturesRaw.map((v) => ({
+	...v,
+	data: localizeData(v.data, lang),
+}));
+---
+
+<section class="glass section" id="ventures">
+	<div class="section-head">
+		<h2>{t.navVentures}</h2>
+		<a class="view-all" href={langUrl("/ventures", lang)}>{t.viewAllVentures}</a>
+	</div>
+	{
+		ventures.length === 0 ? (
+			<p class="empty-state">{t.emptyVentures}</p>
+		) : (
+			<div class="card-grid">
+				{ventures.map((venture) => (
+					<a class="grid-card" href={langUrl(`/ventures/${venture.data.slug}`, lang)}>
+						<div class="grid-thumb">
+							{venture.data.thumbnailType === "video" &&
+							venture.data.thumbnail ? (
+								<video
+									src={venture.data.thumbnail}
+									aria-label={venture.data.title}
+									muted
+									loop
+									playsinline
+									autoplay={venture.data.thumbnailAutoplay !== false}
+									preload="metadata"
+								/>
+							) : venture.data.thumbnail ? (
+								<ThumbImage
+									src={venture.data.thumbnail}
+									alt={venture.data.title}
+									widths={[360, 720, 1080]}
+									sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 360px"
+									width={800}
+									height={500}
+								/>
+							) : (
+								<div class="thumb-fallback">
+									{venture.data.title.charAt(0)}
+								</div>
+							)}
+						</div>
+						<div class="grid-body">
+							<h3>{venture.data.title}</h3>
+							{venture.data.description ? (
+								<p>{truncateShort(venture.data.description)}</p>
+							) : null}
+						</div>
+					</a>
+				))}
+			</div>
+		)
+	}
+</section>

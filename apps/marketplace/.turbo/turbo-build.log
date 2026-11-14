@@ -1,0 +1,35 @@
+
+> portfolio-marketplace@0.1.0 prebuild
+> node scripts/generate-icons.mjs
+
+[generate-icons] 46 icon(s) → src/assets/icons.svg (56.8 KiB) + src/lib/icons.ts
+
+> portfolio-marketplace@0.1.0 build
+> astro build
+
+19:36:29 [@astrojs/cloudflare] Enabling image processing with Cloudflare Images for production with the "IMAGES" Images binding.
+19:36:29 [@astrojs/cloudflare] Enabling sessions with Cloudflare KV with the "SESSION" KV binding.
+19:36:31 [content] Syncing content
+19:36:31 [WARN] [glob-loader] No files found matching "**/*.md" in directory "src/content/ventures"
+19:36:31 [WARN] [glob-loader] No files found matching "**/*.md" in directory "src/content/case-studies"
+19:36:31 [content] Synced content
+19:36:31 [types] Generated 1.73s
+19:36:31 [build] output: "server"
+19:36:31 [build] mode: "server"
+19:36:31 [build] directory: /home/hatch/workspace/v3-import/v3-tree/apps/marketplace/dist/
+19:36:31 [build] adapter: @astrojs/cloudflare
+19:36:31 [build] Collecting build info...
+19:36:31 [build] ✓ Completed in 2.08s.
+19:36:32 [build] Building server entrypoints...
+19:36:32 [vite] ✓ built in 477ms
+19:36:36 [vite] ✓ built in 4.09s
+19:36:37 [vite] ✓ built in 1.21s
+19:36:37 [vite] ✓ 3 assets moved from "ssr" to "client" build output.
+dist/client/_astro/plus-jakarta-sans-latin-wght-normal.eXO_dkmS.woff2
+dist/client/_astro/plus-jakarta-sans-vietnamese-wght-normal.qRpaaN48.woff2
+dist/client/_astro/plus-jakarta-sans-latin-ext-wght-normal.DmpS2jIq.woff2
+19:36:38 [build] Rearranging server assets...
+19:36:38 [build] ✓ Completed in 6.14s.
+19:36:38 [@astrojs/cloudflare] Injected immutable Cache-Control for /_astro/* into _headers.
+19:36:38 [build] Server built in 8.27s
+19:36:38 [build] Complete!

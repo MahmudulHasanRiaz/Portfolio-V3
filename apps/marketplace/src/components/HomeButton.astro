@@ -1,0 +1,125 @@
+---
+// Floating "back home" button (2026-11-09, home shortcut).
+//
+// A plain <a> to the lang-aware home URL, so it navigates even
+// without JS. The inline script only controls WHEN it is visible:
+// shown once the visitor has scrolled down a bit, hidden while a
+// modal is open and while the footer is in the button's zone.
+// Rendered ONLY off-home (Layout.astro skips it on / and /bn/) —
+// on the homepage it would point at the page you're already on.
+//
+// Icon: Lucide "home" (lucide-react v1.70.0, alias of "house") —
+// exact path data from the package, so this matches the header's
+// <Home> icon pixel-for-pixel. Never hand-drawn.
+interface Props {
+	/** Lang-aware home URL ("/" in EN, "/bn/" in BN). */
+	href: string;
+	/** Accessible label from the dict ("Home" / "হোম"). */
+	label: string;
+}
+
+const { href, label } = Astro.props;
+---
+
+<a
+	href={href}
+	class="home-fab"
+	data-home-fab
+	aria-label={label}
+	title={label}
+>
+	<svg
+		xmlns="http://www.w3.org/2000/svg"
+		width="20"
+		height="20"
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="2"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+		aria-hidden="true"
+	>
+		<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
+		<path
+			d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+		/>
+	</svg>
+</a>
+<script>
+	// Visibility for [data-home-fab].
+	//
+	// Bound on EVERY `astro:page-load` (initial load + every
+	// View-Transitions client navigation). A plain inline IIFE is
+	// NOT enough: Astro dedupes identical inline scripts by
+	// textContent, so it runs on initial load + the 1st client
+	// navigation only — from the 2nd navigation on, a new page's
+	// button was never wired and stayed hidden. `astro:page-load`
+	// fires on every navigation, so the current page's button is
+	// always bound. The `:not([data-home-fab-bound])` guard keeps
+	// a button from being bound twice (the immediate call + the
+	// event can both fire on the first load).
+	function bindHomeFab() {
+		// `const` (not `var`): the `!btn` guard above narrows the
+		// binding for the direct uses below; `update()` re-guards
+		// because TS does not carry narrowing into closures here
+		// (astro check reported "'btn' is possibly 'null'" without it).
+		const btn = document.querySelector(
+			"[data-home-fab]:not([data-home-fab-bound])",
+		);
+		if (!btn) return;
+		btn.setAttribute("data-home-fab-bound", "");
+		let scrolled = false;
+		let modalOpen = false;
+		let footerNear = false;
+		function update() {
+			if (!btn) return;
+			btn.classList.toggle(
+				"is-visible",
+				scrolled && !modalOpen && !footerNear,
+			);
+		}
+		function onScroll() {
+			scrolled = window.scrollY > 320;
+			update();
+		}
+		window.addEventListener("scroll", onScroll, { passive: true });
+		onScroll();
+		// Modal state: the shared scroll lock (lib/scrollLock.ts) sets
+		// <html> overflow:hidden while ANY modal is open and restores
+		// it on close — one signal covers ServiceModal + ContactModal,
+		// backdrop / Escape / close-button closes, AND the
+		// service→contact handover (the lock count never drops to 0
+		// in between, so the button never flickers back in
+		// mid-handover). No modal code was touched for this.
+		const observer = new MutationObserver(function () {
+			modalOpen =
+				document.documentElement.style.overflow === "hidden";
+			update();
+		});
+		observer.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ["style"],
+		});
+		modalOpen = document.documentElement.style.overflow === "hidden";
+		// Footer proximity: hide while the footer is within the
+		// button's bottom zone (44px button + 16px gap ≈ 72px from
+		// the viewport bottom), so the button never floats over the
+		// footer's identity / copyright lines. The shrunk root
+		// means the observer only fires once the footer has risen
+		// past that 72px strip.
+		const footer = document.querySelector(".site-footer");
+		if (footer && "IntersectionObserver" in window) {
+			new IntersectionObserver(
+				function (entries) {
+					footerNear = entries[0].isIntersecting;
+					update();
+				},
+				{ rootMargin: "0px 0px -72px 0px" },
+			).observe(footer);
+		}
+		update();
+	}
+	document.addEventListener("astro:page-load", bindHomeFab);
+	bindHomeFab();
+</script>

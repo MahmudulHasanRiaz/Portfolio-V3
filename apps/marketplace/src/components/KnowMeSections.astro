@@ -1,0 +1,288 @@
+---
+// Know Me sections — the whole person (all identities, one detailed
+// page). Shared by /know-me, /bn/know-me AND the homepage when the
+// admin-configured primary identity is "know-me" (Wave 2 A1): in that
+// case / renders this content directly (no redirect — / keeps its own
+// canonical URL and the SEO already built on it), while /know-me stays
+// the permanent canonical URL for this content.
+// FAN-FIRST order: Hero → Stats → "The whole person" → Releases →
+// Ventures → Services + Selected projects → Clients → Latest posts →
+// Footer. (MARKETPLACE COPY: the "Public figure & community"
+// follow/connect section and the Contact section are removed — no
+// social/music platform links and no contact form on this copy.
+// See docs/MARKETPLACE.md.)
+// NO Testimonials section — no real testimonial quotes exist; never invent one.
+// All copy below is built ONLY from established facts — no invented
+// biography, timeline, or claims. Fixed strings from the dictionary,
+// with the admin site-copy overlay applied (A4, same as every page);
+// content rows are localised per-item (bn overlay, English fallback)
+// via localizeData — a no-op for lang "en", so one component serves
+// both languages with byte-identical markup to the old pages.
+import Hero from "./Hero.astro";
+import Stats from "./Stats.astro";
+import Services from "./Services.astro";
+import ClientsWall from "./ClientsWall.astro";
+import Releases from "./Releases.astro";
+import Ventures from "./Ventures.astro";
+import { formatDate, getPosts, getProjects, getReleases, getServices, readingTimeFromText, truncateShort } from "../lib/content";
+import { applySiteCopy, getDict, langUrl, localizeData, readingTimeLabel, type Lang } from "../lib/i18n";
+import { getSiteSettings } from "../lib/settings";
+import { HOMEPAGE_POSTS_LIMIT, KNOW_ME_PROJECTS_LIMIT } from "../lib/homepage-limits";
+import ThumbImage from "./ThumbImage.astro";
+
+interface Props {
+	/** Page language. English at /<page>, Bangla at /bn/<page>. */
+	lang?: Lang;
+}
+
+const { lang = "en" } = Astro.props;
+// Admin site-copy overlay (A4): same as every page/component — the
+// admin-managed copy wins per key over the dictionary. Settings are
+// memoised, so this costs no extra fetch.
+const t = applySiteCopy(getDict(lang), lang, await getSiteSettings());
+
+// Unsplash card thumbs ship at w=1200 in content/API rows but render at
+// ~360px wide (2x retina ≈ 720px) — request w=800/q=75 instead: measured
+// 124KB → 67KB per image (~46% less). Non-Unsplash URLs pass through.
+const sizedThumb = (url: string | null | undefined, w = 800) =>
+	url?.includes("images.unsplash.com")
+		? url.replace(/w=\d+/, `w=${w}`).replace(/q=\d+/, "q=75")
+		: url;
+
+const releases = (await getReleases()).map((r) => {
+	const d = localizeData(r.data, lang);
+	return {
+		slug: d.slug,
+		title: d.title,
+		description: d.description,
+		releaseType: d.releaseType,
+		publishedAt: d.publishedAt,
+		youtubeId: d.youtubeId,
+		platforms: d.platforms ?? [],
+	};
+});
+const projects = (await getProjects()).slice(0, KNOW_ME_PROJECTS_LIMIT).map((p) => ({
+	...p,
+	data: localizeData(p.data, lang),
+}));
+const posts = (await getPosts()).slice(0, HOMEPAGE_POSTS_LIMIT).map((p) => ({
+	...p,
+	data: localizeData(p.data, lang),
+}));
+const services = await getServices();
+
+// MARKETPLACE COPY: the live platforms fetch (getPlatforms) and the
+// social/music platform chip lists are removed — the follow/connect
+// section does not exist on this copy.
+
+// Identity cells: titles from the designation list, texts from the dict.
+const identityCells = [
+	{ title: t.designationKnowMe[0] ?? t.profileSe, text: t.identitySeText },
+	{ title: t.designationKnowMe[1] ?? "", text: t.identityEntrepreneurText },
+	{ title: t.designationKnowMe[2] ?? "", text: t.identityArtistText },
+	{ title: t.designationKnowMe[3] ?? "", text: t.identityHafizText },
+	{ title: t.designationKnowMe[4] ?? "", text: t.identityPublicText },
+];
+const identityIcons = [
+	"code",
+	"rocket",
+	"mic",
+	"book",
+	"megaphone",
+] as const;
+// MARKETPLACE COPY: publicFigureTexts (the follow/connect section's
+// texts) removed with that section.
+---
+	{/* Know Me hero wrapper: page-scoped clearance so the rotating-designation
+	    badge (which hangs 16px below the photo) is never clipped or crowded,
+	    and the desktop floating stat chips sit fully inside the photo with
+	    padding instead of hanging off its edges. The badge component itself
+	    (Hero.astro / HeroDesignation.tsx) is owned by another worker. */}
+	<div class="knowme-hero">
+		<Hero profile="knowme" lang={lang} />
+	</div>
+	<style>
+		.knowme-hero :global(.hero) {
+			padding-bottom: 40px;
+		}
+		@media (min-width: 1024px) {
+			.knowme-hero :global(.hero-photo-float-card:first-child) {
+				right: 12px;
+			}
+			.knowme-hero :global(.hero-photo-float-card:last-child) {
+				left: 12px;
+				right: auto;
+			}
+		}
+	</style>
+
+	<Stats lang={lang} />
+
+	<section class="glass section">
+		<div class="section-head">
+			<h2>{t.wholePersonTitle}</h2>
+		</div>
+		<div class="about-text">
+			<p>{t.aboutP1}</p>
+			<p>{t.aboutP2}</p>
+			<p>{t.aboutP3}</p>
+		</div>
+		<div class="identity-grid">
+			{identityCells.map((cell, i) => (
+				<div class="identity-cell">
+					<h3>
+						<span class="id-icon">
+							{identityIcons[i] === "code" ? (
+								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" /></svg>
+							) : identityIcons[i] === "rocket" ? (
+								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" /><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" /><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" /><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /></svg>
+							) : identityIcons[i] === "mic" ? (
+								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" x2="12" y1="19" y2="22" /></svg>
+							) : identityIcons[i] === "book" ? (
+								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></svg>
+							) : (
+								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 11 18-5v12L3 14v-3z" /><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" /></svg>
+							)}
+						</span>
+						{cell.title}
+					</h3>
+					<p>{cell.text}</p>
+				</div>
+			))}
+		</div>
+		<div class="contact-info">
+			<div class="info-row">
+				<span>{t.heroLocation}</span>
+			</div>
+			{/* MARKETPLACE COPY: the email row (mailto link) is removed —
+			    no contact info on this copy. Location only. */}
+		</div>
+	</section>
+
+	<Releases releases={releases} lang={lang} />
+
+	{/* MARKETPLACE COPY: the "Public figure & community" follow/connect section (public-figure points + social and music platform links) is removed — no social/music links on this copy. */}
+
+	<Ventures lang={lang} />
+
+	<Services services={services} lang={lang} />
+
+	<section class="glass section">
+		<div class="section-head">
+			<h2>{t.selectedProjects}</h2>
+			<a class="view-all" href={langUrl("/projects", lang)}>{t.viewAllProjects}</a>
+		</div>
+		{
+			projects.length > 0 ? (
+				<div class="card-grid">
+					{projects.map((project) => (
+						<a class="grid-card" data-astro-prefetch="hover" href={langUrl(`/projects/${project.data.slug}`, lang)}>
+							<div class="grid-thumb">
+								{project.data.thumbnailType === "video" && project.data.thumbnail ? (
+									<video
+										src={project.data.thumbnail}
+										aria-label={project.data.title}
+										muted
+										loop
+										playsinline
+										autoplay={project.data.thumbnailAutoplay !== false}
+										preload="metadata"
+									/>
+								) : project.data.thumbnail ? (
+									<ThumbImage
+										src={project.data.thumbnail}
+										alt={project.data.title}
+										widths={[360, 720, 1080]}
+										sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 360px"
+										width={800}
+										height={500}
+									/>
+								) : (
+									<div class="thumb-fallback">
+										{project.data.title.charAt(0)}
+									</div>
+								)}
+							</div>
+							<div class="grid-body">
+								<h3>{project.data.title}</h3>
+								{project.data.description && <p>{truncateShort(project.data.description)}</p>}
+							</div>
+						</a>
+					))}
+				</div>
+			) : (
+				<p class="empty-state">{t.emptyProjects}</p>
+			)
+		}
+	</section>
+
+	<ClientsWall lang={lang} />
+
+	<section class="glass section">
+		<div class="section-head">
+			<h2>{t.latestPostsTitle}</h2>
+			<a class="view-all" href={langUrl("/posts", lang)}>{t.viewAllPosts}</a>
+		</div>
+		{
+			posts.length > 0 ? (
+				<div class="card-grid">
+					{posts.map((post) => {
+						// No excerpt on post cards (preview: title + tag +
+						// date · reading time only). Reading time computed
+						// from the actual post text, same as the homepage.
+						const postText =
+							post.body ?? (post.data as { content?: string }).content ?? "";
+						const readingTime =
+							readingTimeFromText(postText) ?? post.data.readingTime ?? undefined;
+						return (
+							<a class="grid-card" data-astro-prefetch="hover" href={langUrl(`/posts/${post.data.slug}`, lang)}>
+								<div class="grid-thumb">
+									{post.data.thumbnailType === "video" && post.data.thumbnail ? (
+										<video
+											src={post.data.thumbnail}
+											aria-label={post.data.title}
+											muted
+											loop
+											playsinline
+											autoplay={post.data.thumbnailAutoplay !== false}
+											preload="metadata"
+										/>
+									) : post.data.thumbnail ? (
+										<ThumbImage
+											src={post.data.thumbnail}
+											alt={post.data.title}
+											widths={[360, 720, 1080]}
+											sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 360px"
+											width={800}
+											height={500}
+										/>
+									) : (
+										<div class="thumb-fallback">{post.data.title.charAt(0)}</div>
+									)}
+								</div>
+								<div class="grid-body">
+									{post.data.tags?.[0] ? (
+										<div class="tag-row">
+											<span class="tag">{post.data.tags[0]}</span>
+										</div>
+									) : null}
+									<h3>{post.data.title}</h3>
+									{post.data.publishedAt && (
+										<p class="post-meta">
+											{formatDate(post.data.publishedAt, lang)}
+											{readingTime ? ` · ${readingTimeLabel(readingTime, lang)}` : ""}
+										</p>
+									)}
+								</div>
+							</a>
+						);
+					})}
+				</div>
+			) : (
+				<p class="empty-state">{t.emptyPosts}</p>
+			)
+		}
+	</section>
+
+	{/* MARKETPLACE COPY: the Contact section (ContactForm) is removed —
+	    no contact form on this copy. The page ends with Latest posts. */}

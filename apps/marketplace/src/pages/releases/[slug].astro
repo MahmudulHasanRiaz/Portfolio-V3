@@ -1,0 +1,325 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import DetailMedia from "../../components/DetailMedia.astro";
+import DetailVideoFacade from "../../components/DetailVideoFacade.astro";
+import PrevNext from "../../components/PrevNext.astro";
+import ReleasePlayer from "../../components/ReleasePlayer";
+import { getEntry, getLiveEntry } from "astro:content";
+import {
+	liveCollectionReachable,
+} from "../../loaders/public-content";
+import { getReleases } from "../../lib/content";
+import { youtubeEmbed, youtubeIdFromUrl, youtubeThumb } from "../../lib/youtube";
+import {
+	resolveCanonicalBase,
+	absUrl,
+	mergeDetail,
+	yearOf,
+} from "../../lib/detail";
+import { optimizedImageUrl, optimizedSrcset } from "../../lib/images";
+import { PROFILE } from "../../data/site";
+import { applySiteCopy, getDict, langUrl, pickDict, RELEASE_PLAYER_DICT_KEYS } from "../../lib/i18n";
+import { getSiteSettings } from "../../lib/settings";
+
+// Live detail route — on-demand SSR (2026-11-12, output "server"):
+// every request renders this page in the Worker from the Public
+// Content API. When the API is reachable the live entry is
+// authoritative (a missing live entry 404s); the build-time row is
+// only the outage fallback when the API is unreachable (fix plan §1b).
+// A slug published after a deploy shows instantly — no rebuild.
+// Route caching is in astro.config.mjs + src/middleware.ts.
+const lang = "en" as const;
+const settings = await getSiteSettings();
+const t = applySiteCopy(getDict(lang), lang, settings);
+
+const { slug } = Astro.params;
+if (!slug) Astro.response.status = 404;
+
+const liveResult = slug
+	? await getLiveEntry("liveReleases", slug).catch(() => undefined)
+	: undefined;
+const liveEntry = liveResult?.entry;
+if (liveEntry) Astro.cache.set(liveEntry);
+// When the live API is reachable, the live entry is authoritative:
+	// a missing live entry 404s and the build-time row is never read,
+	// so an archived/draft item cannot render from its static file.
+	// When unreachable, the build-time row is the outage fallback and
+	// mergeDetail() below still fills gaps in the live row.
+	const liveReachable = await liveCollectionReachable("releases");
+	const buildEntry =
+		liveReachable || !slug
+			? undefined
+			: await getEntry("releases", slug);
+const entry = liveEntry ?? buildEntry;
+if (!entry) Astro.response.status = 404;
+
+interface ReleaseData {
+	title?: string;
+	description?: string;
+	content?: string;
+	releaseType?: string;
+	publishedAt?: string;
+	youtubeId?: string;
+	platforms?: Array<{ name: string; url: string }>;
+	tune?: string;
+	lyricist?: string;
+	lyrics?: string;
+	thumbnail?: string;
+	thumbnailType?: "image" | "video";
+	thumbnailVideoUrl?: string;
+	videos?: Array<{ url: string; title?: string }>;
+}
+
+const liveData = liveEntry?.data as unknown as
+	| Record<string, unknown>
+	| undefined;
+const buildData = buildEntry?.data as unknown as
+	| Record<string, unknown>
+	| undefined;
+const data = mergeDetail(buildData, liveData) as unknown as
+	| ReleaseData
+	| undefined;
+
+const releases = await getReleases();
+const idx = slug ? releases.findIndex((r) => r.data.slug === slug) : -1;
+const prev = idx > 0 ? releases[idx - 1] : undefined;
+const next =
+	idx >= 0 && idx < releases.length - 1 ? releases[idx + 1] : undefined;
+const thumbOf = (r: (typeof releases)[number] | undefined) =>
+	r?.data.youtubeId ? youtubeThumb(r.data.youtubeId) : null;
+
+const title = data?.title ?? t.notFoundRelease;
+// Real description only — never the generic "A release by…" fallback.
+const description = data?.description?.trim()
+	? data.description
+	: (data?.content?.trim() ? data.content : undefined);
+const platforms = data?.platforms ?? [];
+const youtubeId =
+	data?.youtubeId ??
+	youtubeIdFromUrl(
+		platforms.find((p) => p.name === "YouTube")?.url,
+	);
+const hasYouTube = Boolean(youtubeId) || platforms.some((p) => p.name === "YouTube");
+const isVideo = Boolean(youtubeId) && hasYouTube;
+// Canonical base: explicit admin site_url wins; else the request
+// host (Astro.url), else the SITE_URL fallback — see detail.ts.
+const siteBase = resolveCanonicalBase(settings.siteUrl, Astro.url);
+const coverImage = isVideo
+	? youtubeThumb(youtubeId)
+	: data?.thumbnail
+		? absUrl(data.thumbnail, siteBase)
+		: null;
+const year = yearOf(data?.publishedAt);
+
+const releaseTypeLabel = (() => {
+	const key = (data?.releaseType ?? "").toLowerCase();
+	if (key === "nasheed") return t.releaseTypeNasheed;
+	if (key === "tilawat") return t.releaseTypeTilawat;
+	if (key === "podcast") return t.releaseTypePodcast;
+	if (key === "lecture") return t.releaseTypeLecture;
+	if (key === "other") return t.releaseTypeOther;
+	return data?.releaseType ?? "";
+})();
+
+
+const pageUrl = `${siteBase}/releases/${slug}`;
+const jsonLd = data
+	? {
+			"@context": "https://schema.org",
+			"@graph": [
+				isVideo && youtubeId
+					? {
+							"@type": "VideoObject",
+							name: title,
+							...(description ? { description } : {}),
+							inLanguage: "en",
+							thumbnailUrl: youtubeThumb(youtubeId),
+							...(data.publishedAt
+								? { uploadDate: data.publishedAt }
+								: {}),
+							embedUrl: youtubeEmbed(youtubeId),
+						}
+					: {
+							"@type": "AudioObject",
+							name: title,
+							...(description ? { description } : {}),
+							inLanguage: "en",
+							...(data.publishedAt
+								? { datePublished: data.publishedAt }
+								: {}),
+							...(coverImage ? { thumbnailUrl: absUrl(optimizedImageUrl(coverImage, 1200), siteBase) } : {}),
+						},
+				{
+					"@type": "BreadcrumbList",
+					itemListElement: [
+						{
+							"@type": "ListItem",
+							position: 1,
+							name: "Home",
+							item: siteBase,
+						},
+						{
+							"@type": "ListItem",
+							position: 2,
+							name: t.allReleases,
+							item: `${siteBase}/releases`,
+						},
+						{
+							"@type": "ListItem",
+							position: 3,
+							name: title,
+							item: pageUrl,
+						},
+					],
+				},
+			],
+		}
+	: null;
+---
+
+<Layout
+	title={`${title} — Mahmudul Hasan Riaz`}
+	description={description}
+	ogType="website"
+	ogImage={coverImage ? (absUrl(optimizedImageUrl(coverImage, 1200), siteBase) ?? null) : null}
+	canonical={pageUrl}
+	lang={lang}
+>
+	{!entry || !data ? (
+		<section class="glass">
+			<a href={langUrl("/releases", lang)} class="back-link">
+				{t.backAllReleases}
+			</a>
+			<h1 class="detail-title">{t.notFoundRelease}</h1>
+			<p class="empty-state">{t.notPublishedRelease}</p>
+		</section>
+	) : (
+		<section class="glass">
+			{jsonLd ? (
+				<script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+			) : null}
+
+			<a href={langUrl("/releases", lang)} class="back-link">
+				{t.backAllReleases}
+			</a>
+
+			{isVideo && youtubeId ? (
+				<ReleasePlayer client:visible youtubeId={youtubeId} title={title} lang={lang} dict={pickDict(t, RELEASE_PLAYER_DICT_KEYS)} />
+			) : data.thumbnailType === "video" && data.thumbnail ? (
+				<div class="detail-hero">
+					<DetailVideoFacade
+						src={data.thumbnail}
+						poster={null}
+						title={title}
+						lang={lang}
+						dict={t}
+					/>
+				</div>
+			) : data.thumbnail ? (
+				<div class="detail-hero">
+					<img
+						src={optimizedImageUrl(data.thumbnail, 1200)}
+						alt={title}
+						fetchpriority="high"
+						decoding="async"
+						srcset={data.thumbnail?.includes("images.unsplash.com") ? `${data.thumbnail.replace(/w=\d+/, "w=800").replace(/q=\d+/, "q=75")} 800w, ${data.thumbnail.replace(/q=\d+/, "q=75")} 1200w` : optimizedSrcset(data.thumbnail, [800, 1200])}
+						sizes="(max-width: 640px) 100vw, 1088px"
+					/>
+				</div>
+			) : (
+				<div class="audio-tile" aria-label={t.audioRelease}>
+					{/* MARKETPLACE COPY: generic mic icon — platform brand icon removed. */}
+					<svg
+							width="64"
+							height="64"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.5"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+							<path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+							<line x1="12" x2="12" y1="19" y2="22" />
+						</svg>
+				</div>
+			)}
+			<p class="detail-meta">
+				{releaseTypeLabel ? (
+					<span class="type-tag">{releaseTypeLabel}</span>
+				) : null}
+				{year ? ` · ${year}` : ""}
+				{` · ${isVideo ? t.videoLabel : t.audioLabel}`}
+			</p>
+			<h1 class="detail-title">{title}</h1>
+			<p class="detail-meta">{t.authorBy} {PROFILE.name}</p>
+			{!isVideo ? (
+				<p style="margin:12px 0 0;">
+					<span class="audio-badge">{t.audioOnly}</span>
+				</p>
+			) : null}
+
+			{description ? (
+				<section class="detail-section" aria-label={t.aboutRelease}>
+					<h2 class="detail-h2">{t.aboutRelease}</h2>
+					<div class="detail-body">
+						<p>{description}</p>
+					</div>
+				</section>
+			) : null}
+
+			{data.tune || data.lyricist ? (
+				<div class="credits-grid">
+					{data.tune ? (
+						<div class="credit">
+							<div class="credit-label">{t.tune}</div>
+							<div class="credit-value">{data.tune}</div>
+						</div>
+					) : null}
+					{data.lyricist ? (
+						<div class="credit">
+							<div class="credit-label">{t.lyricist}</div>
+							<div class="credit-value">{data.lyricist}</div>
+						</div>
+					) : null}
+				</div>
+			) : null}
+
+			{data.lyrics ? (
+				<section class="detail-section" aria-label={t.lyrics}>
+					<h2 class="detail-h2">{t.lyrics}</h2>
+					<p class="lyrics">{data.lyrics}</p>
+				</section>
+			) : null}
+
+						{/* MARKETPLACE COPY: the "Listen / Watch" platform link list was removed — no outbound platform links on this copy. */}
+
+<DetailMedia lang={lang} dict={t} videos={data.videos ?? []} altBase={`${title} video`} />
+
+			<PrevNext
+				prev={
+					prev
+						? {
+								href: langUrl(`/releases/${prev.data.slug}`, lang),
+								title: prev.data.title,
+								thumb: thumbOf(prev),
+							}
+						: null
+				}
+				next={
+					next
+						? {
+								href: langUrl(`/releases/${next.data.slug}`, lang),
+								title: next.data.title,
+								thumb: thumbOf(next),
+							}
+						: null
+				}
+				lang={lang}
+				dict={t}
+			/>
+		</section>
+	)}
+</Layout>

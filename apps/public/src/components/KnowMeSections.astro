@@ -28,6 +28,10 @@ import { formatDate, getPlatforms, getPosts, getProjects, getReleases, getServic
 import { applySiteCopy, getDict, langUrl, localizeData, pickDict, CONTACT_FORM_DICT_KEYS, readingTimeLabel, type Lang } from "../lib/i18n";
 import { getSiteSettings } from "../lib/settings";
 import ThumbImage from "./ThumbImage.astro";
+import {
+	HOMEPAGE_POSTS_LIMIT,
+	KNOW_ME_PROJECTS_LIMIT,
+} from "../lib/homepage-limits";
 
 interface Props {
 	/** Page language. English at /<page>, Bangla at /bn/<page>. */
@@ -60,14 +64,18 @@ const releases = (await getReleases()).map((r) => {
 		platforms: d.platforms ?? [],
 	};
 });
-const projects = (await getProjects()).slice(0, 3).map((p) => ({
-	...p,
-	data: localizeData(p.data, lang),
-}));
-const posts = (await getPosts()).map((p) => ({
-	...p,
-	data: localizeData(p.data, lang),
-}));
+const projects = (await getProjects())
+	.slice(0, KNOW_ME_PROJECTS_LIMIT)
+	.map((p) => ({
+		...p,
+		data: localizeData(p.data, lang),
+	}));
+const posts = (await getPosts())
+	.slice(0, HOMEPAGE_POSTS_LIMIT)
+	.map((p) => ({
+		...p,
+		data: localizeData(p.data, lang),
+	}));
 const services = await getServices();
 
 // Live platforms (A3): admin-managed rows over the build-time

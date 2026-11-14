@@ -1,0 +1,49 @@
+---
+// Body text from a plain-text `content` string, rendered as the
+// preview's content blocks: '## ' lines become <h2> section headings,
+// standalone `![alt](url)` lines become <figure><img></figure>,
+// everything else paragraphs. (Build-time entries render their
+// markdown natively via <Content/>; this is for live entries only.
+// NOTE: build-time markdown has no image-rewrite hook in Astro 7 —
+// the Sätteri processor takes no rehype plugins, and switching the
+// whole site to the legacy unified processor just for this would
+// change all markdown rendering. No build-time entry has an inline
+// image today, so nothing is unoptimized there; see
+// docs/IMAGE_OPTIMIZATION_GUIDE.md for the future path.)
+import { parseBodyBlocks, type BodyBlock } from "../lib/detail";
+import { optimizedImageUrl, remoteSrcset } from "../lib/images";
+
+interface Props {
+	/** Raw body text to parse, or pre-parsed blocks (already deduped). */
+	text?: string | null;
+	blocks?: BodyBlock[];
+}
+
+const { text, blocks } = Astro.props;
+const rendered = blocks ?? parseBodyBlocks(text);
+---
+
+{
+	rendered.length > 0 && (
+		<div class="detail-body">
+			{rendered.map((block) =>
+				block.kind === "h2" ? (
+					<h2>{block.text}</h2>
+				) : block.kind === "img" && block.src ? (
+					<figure class="body-image">
+						<img
+							src={optimizedImageUrl(block.src, 1024)}
+							srcset={remoteSrcset(block.src, [360, 720, 1024])}
+							sizes="(max-width: 640px) 100vw, 720px"
+							alt={block.alt ?? ""}
+							loading="lazy"
+							decoding="async"
+						/>
+					</figure>
+				) : (
+					<p>{block.text}</p>
+				),
+			)}
+		</div>
+	)
+}

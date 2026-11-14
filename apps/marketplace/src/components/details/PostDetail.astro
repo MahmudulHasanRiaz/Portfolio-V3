@@ -1,0 +1,168 @@
+---
+// Twin SSR fallback — post detail template.
+//
+// The SAME markup as the static post detail page
+// (src/pages/posts/[slug].astro), driven by the view model built in
+// src/lib/twin-detail.ts from the LIVE row only (a twin slug is never
+// in the build-time collections, so there is no markdown `Content` —
+// the body comes from the live `content` string, parsed into blocks so
+// '## ' lines become real <h2> headings). The static page is the
+// source of truth — keep this in sync with it.
+import DetailMedia from "../DetailMedia.astro";
+import DetailVideoFacade from "../DetailVideoFacade.astro";
+import PrevNext from "../PrevNext.astro";
+import { formatDate } from "../../lib/content";
+import { PROFILE } from "../../data/site";
+import { langUrl, displayName, readingTimeLabel, type Dict, type Lang } from "../../lib/i18n";
+import {
+	optimizedImageUrl,
+	optimizedSrcset,
+	remoteSrcset,
+} from "../../lib/images";
+import type { PostView } from "../../lib/twin-detail";
+
+interface Props {
+	view: PostView;
+	lang: Lang;
+	t: Dict;
+}
+
+const { view, lang, t } = Astro.props;
+const data = view.data;
+---
+
+{!view.found || !data ? (
+	<section class="glass">
+		<a href={langUrl("/posts", lang)} class="back-link">
+			{t.backAllPosts}
+		</a>
+		<h1 class="detail-title">{t.notFoundPost}</h1>
+		<p class="empty-state">{t.notPublishedPost}</p>
+	</section>
+) : (
+	<section class="glass">
+		{view.jsonLd ? (
+			<script type="application/ld+json" set:html={JSON.stringify(view.jsonLd)} />
+		) : null}
+
+		<a href={langUrl("/posts", lang)} class="back-link">
+			{t.backAllPosts}
+		</a>
+
+		{view.thumb &&
+			(view.isVideoThumb && view.videoSrc ? (
+				<div class="detail-hero">
+					<DetailVideoFacade
+						src={view.videoSrc}
+						poster={view.videoPoster}
+						title={view.title}
+						lang={lang}
+						dict={t}
+					/>
+				</div>
+			) : (
+				<div class="detail-hero">
+					<img
+						src={optimizedImageUrl(view.thumb, 1200)}
+						alt={view.title}
+						fetchpriority="high"
+						decoding="async"
+						srcset={view.thumb?.includes("images.unsplash.com") ? `${view.thumb.replace(/w=\d+/, "w=800").replace(/q=\d+/, "q=75")} 800w, ${view.thumb.replace(/q=\d+/, "q=75")} 1200w` : optimizedSrcset(view.thumb, [800, 1200])}
+						sizes="(max-width: 640px) 100vw, 1088px"
+					/>
+				</div>
+			))}
+		<h1 class="detail-title">{view.title}</h1>
+		<p class="detail-meta">
+			{t.authorBy} {displayName(lang)}
+			{formatDate(data.publishedAt, lang)
+				? ` · ${formatDate(data.publishedAt, lang)}`
+				: ""}
+			{view.readingTime ? ` · ${readingTimeLabel(view.readingTime, lang)}` : ""}
+		</p>
+		{view.tags.length ? (
+			<div class="tag-row" style="margin-top:12px;">
+				{view.tags.map((tag) => (
+					<span class="tag">{tag}</span>
+				))}
+			</div>
+		) : null}
+		{view.description ? <p class="detail-lede">{view.description}</p> : null}
+
+		{view.storyBlocks.length > 0 ? (
+			<div class="detail-body">
+				{view.storyBlocks.map((block) =>
+					block.kind === "h2" ? (
+						<h2>{block.text}</h2>
+					) : block.kind === "img" && block.src ? (
+						<figure class="body-image">
+							<img
+								src={optimizedImageUrl(block.src, 1024)}
+								srcset={remoteSrcset(block.src, [360, 720, 1024])}
+								sizes="(max-width: 640px) 100vw, 720px"
+								alt={block.alt ?? ""}
+								loading="lazy"
+								decoding="async"
+							/>
+						</figure>
+					) : (
+						<p>{block.text}</p>
+					),
+				)}
+			</div>
+		) : view.description ? (
+			<div class="detail-body">
+				<p>{view.description}</p>
+			</div>
+		) : null}
+
+		<DetailMedia
+				lang={lang}
+				dict={t}
+			gallery={data.gallery ?? []}
+			videos={data.videos ?? []}
+			exclude={view.thumb}
+			altBase={`${view.title} ${t.galleryImage}`}
+		/>
+
+		<div class="author-card">
+			<img
+				class="author-photo"
+				src={PROFILE.photo}
+				alt={displayName(lang)}
+				width="56"
+				height="56"
+				loading="lazy"
+			/>
+			<div class="author-info">
+				<strong>{displayName(lang)}</strong>
+				<span>
+					{t.authorLine}
+				</span>
+				{/* MARKETPLACE COPY: the mailto email link is removed —
+				    no contact info on this copy. */}
+			</div>
+		</div>
+
+		{view.related.length > 0 ? (
+			<section class="section">
+				<h2 class="detail-h2">{t.morePosts}</h2>
+				<div class="card-grid">
+					{view.related.map((r) => (
+						<a class="grid-card" href={r.href}>
+							<div class="grid-body">
+								<h3>{r.title}</h3>
+								<p class="grid-meta">
+									{r.date}
+									{r.reading ? ` · ${r.reading}` : ""}
+								</p>
+							</div>
+						</a>
+					))}
+				</div>
+			</section>
+		) : null}
+
+		<PrevNext prev={view.prev} next={view.next} lang={lang} dict={t} />
+	</section>
+)}

@@ -1,0 +1,89 @@
+# Deploy — auto-deploy all four Cloudflare Workers on push to main.
+#
+# Trigger: a merge to main (push to main) deploys everything live, in
+# order: api first (the others read from it), then admin, then public
+# and marketplace. Manual dispatch is available for a redeploy without
+# a code change.
+#
+# This replaces the old manual flow (wrangler deploy from a local
+# machine). After this file lands in main, no manual deploy is needed:
+# merge a PR to main and GitHub Actions deploys all four workers.
+#
+# Secrets (repo Settings → Secrets and variables → Actions):
+#   CLOUDFLARE_API_TOKEN — a Cloudflare API token with Workers deploy
+#   permissions (the "Edit Cloudflare Workers" template). The account ID
+#   is hardcoded below (it is not a secret).
+#
+# The build uses a placeholder DATABASE_URL (same as CI): the build only
+# validates the format; no real database is needed. Each worker reads
+# the real DATABASE_URL from its own Worker secrets at runtime.
+#
+# NOTE: workflow files cannot be pushed via the GitHub API (the App lacks
+# the workflows permission) — this file is uploaded through the GitHub web
+# UI (browser). Do not expect it to arrive via a snapshot push.
+name: Deploy — Workers
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Deploys must not overlap: if two pushes to main land in quick
+# succession, the second waits for the first to finish.
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build + deploy all workers
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_ACCOUNT_ID: b5c9281cd6a0b13348413d683a2bcc31
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      # Placeholder, same as CI (see the header note).
+      DATABASE_URL: postgresql://user:pass@localhost:5432/ci
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Full build
+        # --concurrency=1: the full build OOM-kills at --concurrency=2.
+        # Same command as the local build-guard (docs/BUILD_GUARD.md).
+        run: npx turbo run build --concurrency=1
+
+      - name: Deploy API (portfolio-v3-api)
+        # First: public, marketplace and admin all read from the API.
+        working-directory: apps/api
+        run: npx wrangler deploy
+
+      - name: Deploy admin (portfolio-v3-admin)
+        working-directory: apps/admin
+        env:
+          # Bypasses the opennextjs-cloudflare ensureR2Bucket failure
+          # (the cache bucket already exists).
+          OPEN_NEXT_DEPLOY: "true"
+        run: |
+          npx opennextjs-cloudflare build
+          npx wrangler deploy
+
+      - name: Deploy public (portfolio-v3-public)
+        working-directory: apps/public
+        run: npx wrangler deploy
+
+      - name: Deploy marketplace (portfolio-v3-marketplace)
+        working-directory: apps/marketplace
+        run: npx wrangler deploy

@@ -330,6 +330,17 @@ export default function StackGlobe({
 	const frontIdxRef = useRef(0);
 	const frontNameRef = useRef(techs[0]?.name ?? "");
 	const lastNowRef = useRef<number | null>(null);
+	// Off-screen pause (fix 2026-11-13): the rAF loop below repositions
+	// 44 tech nodes + all constellation lines via DOM writes EVERY
+	// frame. With no off-screen pause it ran forever once hydrated
+	// (client:visible), saturating the mobile main thread so service
+	// taps (click -> "open-service" -> Preact setState) got delayed or
+	// dropped. An IntersectionObserver on the stage flips this flag;
+	// the loop then skips all DOM work while off-screen (and while the
+	// tab is hidden) but keeps scheduling rAF, so it resumes instantly
+	// on return. Default true: the island only hydrates when visible
+	// (client:visible), so it starts visible.
+	const visibleRef = useRef(true);
 	const filterRef = useRef("All");
 	const selectedRef = useRef<StackTech | null>(null);
 	const reducedRef = useRef(false);
@@ -347,9 +358,33 @@ export default function StackGlobe({
 	}, []);
 
 	useEffect(() => {
+		const stage = stageRef.current;
+		if (!stage || typeof IntersectionObserver === "undefined") return;
+		const observer = new IntersectionObserver(
+			([entry]) => {
+				visibleRef.current = entry.isIntersecting;
+			},
+			{ threshold: 0 },
+		);
+		observer.observe(stage);
+		return () => observer.disconnect();
+	}, []);
+
+	useEffect(() => {
 		let raf = 0;
 
 		const loop = (now: number) => {
+			// Off-screen / hidden-tab pause: skip ALL positioning and
+			// DOM work, but keep the rAF chain alive and refresh the
+			// timestamp so no huge dt accumulates (the existing
+			// Math.min(0.05, ...) clamp already guards resume too).
+			// All existing pause conditions (card open, dragging,
+			// fly-to, tween) are untouched below.
+			if (!visibleRef.current || document.hidden) {
+				lastNowRef.current = now;
+				raf = requestAnimationFrame(loop);
+				return;
+			}
 			// Delta time (seconds since the previous frame, clamped to
 			// 50ms so a tab-switch never causes a jump). dt60 is the
 			// same span expressed in 60fps frames — every per-frame

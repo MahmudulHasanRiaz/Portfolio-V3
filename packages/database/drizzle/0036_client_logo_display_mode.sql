@@ -1,0 +1,13 @@
+-- Clients: logo display mode (0036).
+--
+-- A logo alone does not say how it should render: a square/1:1
+-- icon-style logo (favicon-like) belongs BESIDE the client name,
+-- while a wide logo that already contains the name should render
+-- on its own. `logo_display_mode` records that choice per client:
+--   "logo"      — logo image only (the default; also what NULL means)
+--   "name_logo" — square icon beside the client name
+-- The column is nullable with no default: existing rows keep NULL
+-- and render exactly as before (logo only when a logo exists, name
+-- otherwise). No seed values, no backfill, no other table touched.
+-- Re-runnable (IF NOT EXISTS) and additive only.
+ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "logo_display_mode" text;

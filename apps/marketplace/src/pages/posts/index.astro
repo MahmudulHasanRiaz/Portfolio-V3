@@ -1,0 +1,135 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import {
+	getPosts,
+	formatDate,
+	readingTimeFromText,
+} from "../../lib/content";
+import { applySiteCopy, getDict, langUrl, readingTimeLabel, showingLabel } from "../../lib/i18n";
+import { getSiteSettings } from "../../lib/settings";
+import ThumbImage from "../../components/ThumbImage.astro";
+import ArchiveFilter from "../../components/ArchiveFilter.astro";
+
+// Posts archive — fixed strings from the dictionary (same keys as the
+// /bn/ archive). Reading time is computed from the actual post text.
+const lang = "en" as const;
+const t = applySiteCopy(getDict(lang), lang, await getSiteSettings());
+
+const posts = await getPosts();
+// Per-tag counts for the shared archive filter (ArchiveFilter.astro).
+const tagCounts = new Map<string, number>();
+for (const p of posts)
+	for (const tag of p.data.tags ?? [])
+		tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+const filterItems = [...tagCounts.entries()].map(([value, count]) => ({
+	value,
+	label: value,
+	count,
+}));
+
+// Unsplash card thumbs ship at w=1200 in content/API rows but render at
+// ~360px wide (2x retina ≈ 720px) — request w=800/q=75 instead: measured
+// 124KB → 67KB per image (~46% less). Non-Unsplash URLs pass through.
+const sizedThumb = (url: string | null | undefined, w = 800) =>
+	url?.includes("images.unsplash.com")
+		? url.replace(/w=\d+/, `w=${w}`).replace(/q=\d+/, "q=75")
+		: url;
+---
+
+<Layout
+	title={t.postsPageTitle}
+	description={t.postsPageDescription}
+	lang={lang}
+>
+	<p>
+		<a href={langUrl("/", lang)} class="back-link">{t.backHome}</a>
+	</p>
+	<h1 style="margin:0 0 8px;font-size:26px;line-height:1.25;">{t.allPosts}</h1>
+
+	{
+		posts.length === 0 ? (
+			<section class="glass section">
+				<p class="empty-state">{t.emptyPosts}</p>
+			</section>
+		) : (
+			<>
+				{filterItems.length > 0 ? (
+					<ArchiveFilter
+						id="post-filters"
+						style="margin-top:16px;"
+						items={filterItems}
+						allLabel={t.allChip}
+						mode="card-data-tags"
+						gridSelector="#post-grid"
+						countSelector="#post-count"
+						cardSelector=".grid-card"
+					/>
+				) : null}
+				<p class="count-line" id="post-count" data-count-template={t.showingPosts}>
+					{showingLabel(t.showingPosts, posts.length, posts.length)}
+				</p>
+				<section class="card-grid section" id="post-grid">
+					{posts.map((post) => {
+						// Reading time is COMPUTED from the actual post text —
+						// same as the homepage cards — never the stored value
+						// on its own (the API ships readingTime: 1 for every
+						// post). Stored value is only a fallback.
+						const postText =
+							post.body ?? (post.data as { content?: string }).content ?? "";
+						const readingTime =
+							readingTimeFromText(postText) ?? post.data.readingTime ?? undefined;
+						return (
+							<a
+								class="grid-card"
+								href={langUrl(`/posts/${post.data.slug}`, lang)}
+								data-astro-prefetch="hover"
+								data-tags={(post.data.tags ?? []).join(",")}
+							>
+								<div class="grid-thumb">
+									{post.data.thumbnailType === "video" &&
+									post.data.thumbnail ? (
+										<video
+											src={post.data.thumbnail}
+											aria-label={post.data.title}
+											muted
+											loop
+											playsinline
+											autoplay={post.data.thumbnailAutoplay !== false}
+											preload="metadata"
+										/>
+									) : post.data.thumbnail ? (
+										<ThumbImage
+											src={post.data.thumbnail}
+											alt={post.data.title}
+											widths={[360, 720, 1080]}
+											sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 360px"
+											width={800}
+											height={500}
+										/>
+									) : (
+										<div class="thumb-fallback">
+											{post.data.title.charAt(0)}
+										</div>
+									)}
+								</div>
+								<div class="grid-body">
+									{post.data.tags?.[0] ? (
+										<div class="tag-row">
+											<span class="tag">{post.data.tags[0]}</span>
+										</div>
+									) : null}
+									<h3>{post.data.title}</h3>
+									<p class="grid-meta">
+										{formatDate(post.data.publishedAt, lang)}
+										{readingTime ? ` · ${readingTimeLabel(readingTime, lang)}` : ""}
+									</p>
+								</div>
+							</a>
+						);
+					})}
+				</section>
+			</>
+		)
+	}
+</Layout>
+

@@ -14,6 +14,11 @@ import { getProjects, getCaseStudies, getPosts, getServices, getTechnologies, fo
 import { applySiteCopy, getDict, langUrl, localizeData, pickDict, CONTACT_FORM_DICT_KEYS, PROJECTS_CAROUSEL_DICT_KEYS, STACK_GLOBE_DICT_KEYS, readingTimeLabel } from "../../lib/i18n";
 import { getSiteSettings } from "../../lib/settings";
 import { resolveCanonicalBase } from "../../lib/detail";
+import {
+	HOMEPAGE_CASE_STUDIES_LIMIT,
+	HOMEPAGE_POSTS_LIMIT,
+	HOMEPAGE_PROJECTS_LIMIT,
+} from "../../lib/homepage-limits";
 import { PROFILE } from "../../data/site";
 
 // Bangla homepage — same sections as the English homepage, in Bangla.
@@ -74,7 +79,9 @@ const technologies = (await getTechnologies()).map((tech) =>
 	localizeData({ ...tech }, lang),
 );
 
-const carouselProjects = projects.map((p) => ({
+const carouselProjects = projects
+	.slice(0, HOMEPAGE_PROJECTS_LIMIT)
+	.map((p) => ({
 	slug: p.data.slug,
 	title: p.data.title,
 	description: p.data.description ?? "",
@@ -150,7 +157,7 @@ const personJsonLd = {
 					</a>
 				</div>
 				<div class="card-grid">
-					{caseStudies.map((cs) => (
+					{caseStudies.slice(0, HOMEPAGE_CASE_STUDIES_LIMIT).map((cs) => (
 						<a class="grid-card" data-astro-prefetch="hover" href={langUrl(`/case-studies/${cs.data.slug}`, lang)}>
 							<div class="grid-thumb">
 								{cs.data.thumbnailType === "video" && cs.data.thumbnail ? (
@@ -223,7 +230,7 @@ const personJsonLd = {
 			<p class="empty-state">{t.emptyPosts}</p>
 		) : (
 			<div class="card-grid">
-				{posts.slice(0, 3).map((post) => {
+				{posts.slice(0, HOMEPAGE_POSTS_LIMIT).map((post) => {
 					// Reading time is COMPUTED from the actual post text —
 					// build-time markdown body first, live API `content`
 					// second — never the stored value on its own.

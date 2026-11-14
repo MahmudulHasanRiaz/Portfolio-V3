@@ -450,6 +450,12 @@ function asPlatformGroup(v: unknown): Platform["group"] | undefined {
 		: undefined;
 }
 
+/** Client logo display mode from a live row: only the two known
+ *  values survive; anything else (incl. NULL) means "logo". */
+function asDisplayMode(v: unknown): "logo" | "name_logo" | undefined {
+	return v === "logo" || v === "name_logo" ? v : undefined;
+}
+
 /** Build-time slug candidates for a platform (slug is secondary). */
 function platformSlugs(p: Platform): string[] {
 	const slugs = [slugify(p.name)];
@@ -705,6 +711,10 @@ export async function getClients(): Promise<Client[]> {
 				liveField(d, "logo_url", "logoUrl", "logo", "thumbnail"),
 			);
 			if (logo) c.logo_url = logo;
+			const mode = asDisplayMode(
+				liveField(d, "logo_display_mode", "logoDisplayMode"),
+			);
+			if (mode) c.logo_display_mode = mode;
 			const website = asString(liveField(d, "website", "url"));
 			if (website) c.website = website;
 			const liveSort = asNumber(liveField(d, "sort_order", "sortOrder"));
@@ -718,6 +728,10 @@ export async function getClients(): Promise<Client[]> {
 				liveField(d, "logo_url", "logoUrl", "logo", "thumbnail"),
 			);
 			if (logo) c.logo_url = logo;
+			const mode = asDisplayMode(
+				liveField(d, "logo_display_mode", "logoDisplayMode"),
+			);
+			if (mode) c.logo_display_mode = mode;
 			const website = asString(liveField(d, "website", "url"));
 			if (website) c.website = website;
 			const liveSort = asNumber(liveField(d, "sort_order", "sortOrder"));

@@ -1,0 +1,52 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"assets": { "directory": "./dist" },
+	"compatibility_date": "2026-11-08",
+	"compatibility_flags": ["nodejs_compat"],
+	// Workers Cache (Cloudflare, July 2026 — all plans): a tiered cache
+	// IN FRONT of the Worker. On a HIT the Worker does not run at all
+	// (zero CPU), so repeat-visit TTFB drops from ~0.57s (PageSpeed
+	// 2026-11-10, cold Worker / cache MISS) toward ~0.05–0.15s. It
+	// honours the Cache-Control / Cloudflare-CDN-Cache-Control headers
+	// the Worker and the Astro cache provider emit; responses without
+	// a cacheable directive are not cached. cross_version_cache stays
+	// OFF (default): every deploy resets the hit rate, so a deploy can
+	// never serve stale HTML — the cache re-warms in minutes.
+	"cache": { "enabled": true },
+	"name": "portfolio-v3-marketplace",
+	"observability": { "enabled": true },
+	// Images binding (Cloudflare Images) — the /api/image route
+	// transforms admin remote images on demand through env.IMAGES.
+	// The Astro adapter also auto-provisions this binding under its
+	// default `cloudflare-binding` image service; declaring it here
+	// keeps the intent explicit and the local `wrangler dev`
+	// simulation available. No paid add-on: the first 5,000 unique
+	// transformations/month are free, and the route 302s to the
+	// original image if the quota is ever hit.
+	"images": { "binding": "IMAGES" },
+	// Service binding to the Hono API worker (2026-11-13, Hono
+	// cutover). A Worker CANNOT fetch another Worker's
+	// `*.workers.dev` URL from inside the Worker — every such
+	// subrequest fails with Cloudflare "error code: 1042" (the
+	// `workers.dev` hostname does not resolve in the Worker's
+	// subrequest context; verified by probing Hono + admin from the
+	// public Worker). The loader (src/loaders/public-content.ts)
+	// therefore calls Hono through this binding
+	// (`env.HONO_API.fetch(...)`) instead of over HTTPS; it is the
+	// only free-tier path that works without a custom domain (which
+	// the user deferred). The PUBLIC_CONTENT_API_URL var above is
+	// still kept (and still used as the path source + the local-dev /
+	// build fallback); the binding only changes HOW the request
+	// reaches Hono, not what is requested or the Bearer token.
+	"services": [{ "binding": "HONO_API", "service": "portfolio-v3-api" }],
+	// Runtime env for the live loader (src/loaders/public-content.ts).
+	// Mirrors the Worker Variable set in the Cloudflare dashboard so Git
+	// deploys and dashboard settings stay in sync. Both values are
+	// public, not secrets (a URL and the "1" build flag). NOTE: dashboard
+	// Runtime Variables do NOT reach the build — the build reads this
+	// file, so LIVE_BUILD must be set here.
+	// 2026-11-13 (Hono cutover): the API is now the Hono worker, not
+	// the Next.js admin — this var MUST stay the Hono URL, or a deploy
+	// from this file reverts the cutover.
+	"vars": { "PUBLIC_CONTENT_API_URL": "https://portfolio-v3-api.riaaz.workers.dev", "PUBLIC_CONTENT_LIVE_BUILD": "1" }
+}

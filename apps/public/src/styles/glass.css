@@ -2080,117 +2080,104 @@ html[lang="bn"] .hero-name {
 }
 
 /* ---------- Archive filter (shared ArchiveFilter.astro) ---------- */
-/* The filter row caps the visible chips ("All" + top 5 by count) and
-   puts every option behind a "More" dropdown, so the row never grows
-   into a jungle as categories are added. The menu reuses the nav
-   dropdown's glass tokens (background, border, radius, shadow) so it
-   reads as the same component family. */
-.filter-more-wrap {
-	position: relative;
-	display: inline-flex;
+/* Mobile-first: ONE horizontally scrollable chip row holding EVERY
+   category — no "More" button, no dropdown. The old "More +" menu
+   hid categories behind an extra tap, and its absolutely-positioned
+   dropdown overflowed off the left edge and overlapped the cards
+   below on mobile. The row scrolls (swipe on touch, wheel/drag on
+   desktop), the scrollbar is hidden, and edge fades (mask) hint
+   that there is more. Categories can grow without breaking anything:
+   chips just extend the row. Scoped to [data-archive-filter] so the
+   generic .chip-row (used by StackGlobe's .globe-filters) keeps its
+   wrapping behaviour. */
+.chip-row[data-archive-filter] {
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	overflow-y: hidden;
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+	overscroll-behavior-x: contain;
+	scroll-behavior: smooth;
+	/* Fade the right edge by default (the row starts at the left, so
+	   there is more to the right when it overflows). The inline
+	   script toggles .scrolled / .at-end / .no-scroll so the fades
+	   stay truthful as the user swipes. */
+	-webkit-mask-image: linear-gradient(
+		to right,
+		#000 calc(100% - 28px),
+		transparent 100%
+	);
+	mask-image: linear-gradient(
+		to right,
+		#000 calc(100% - 28px),
+		transparent 100%
+	);
 }
 
-.filter-more .filter-caret {
-	display: inline-block;
-	margin-left: 2px;
-	font-size: 11px;
-	transition: transform 200ms ease;
+.chip-row[data-archive-filter]::-webkit-scrollbar {
+	display: none;
 }
 
-.filter-more-wrap.open .filter-more .filter-caret {
-	transform: rotate(180deg);
+/* Mid-scroll: more on both sides — fade both edges. */
+.chip-row[data-archive-filter].scrolled {
+	-webkit-mask-image: linear-gradient(
+		to right,
+		transparent 0,
+		#000 28px,
+		#000 calc(100% - 28px),
+		transparent 100%
+	);
+	mask-image: linear-gradient(
+		to right,
+		transparent 0,
+		#000 28px,
+		#000 calc(100% - 28px),
+		transparent 100%
+	);
 }
 
-.filter-more-n {
-	opacity: 0.65;
-	font-weight: 500;
+/* At the far right: only the left edge has more — fade it. */
+.chip-row[data-archive-filter].at-end {
+	-webkit-mask-image: linear-gradient(
+		to right,
+		transparent 0,
+		#000 28px,
+		#000 100%
+	);
+	mask-image: linear-gradient(
+		to right,
+		transparent 0,
+		#000 28px,
+		#000 100%
+	);
 }
 
-.filter-menu {
-	position: absolute;
-	top: calc(100% + 8px);
-	right: 0;
-	min-width: 210px;
-	max-width: calc(100vw - 32px);
-	max-height: 320px;
-	overflow-y: auto;
-	padding: 6px;
-	border: 1px solid var(--card-border);
-	border-radius: var(--radius-sm);
-	background: var(--bg);
-	box-shadow: var(--shadow);
-	z-index: 60;
-	opacity: 0;
-	visibility: hidden;
-	pointer-events: none;
-	transform: translateY(-4px);
-	transition:
-		opacity 200ms ease-out,
-		transform 200ms ease-out,
-		visibility 200ms;
+/* Everything fits: no fade at all. */
+.chip-row[data-archive-filter].no-scroll {
+	-webkit-mask-image: none;
+	mask-image: none;
 }
 
-.filter-more-wrap.open .filter-menu {
-	opacity: 1;
-	visibility: visible;
-	transform: translateY(0);
-	pointer-events: auto;
-}
-
-.filter-menu-item {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	width: 100%;
-	min-height: 36px;
-	padding: 6px 10px;
-	border: 0;
-	border-radius: var(--radius-xs);
-	background: transparent;
-	color: var(--ink);
-	font-size: 13px;
-	font-weight: 500;
-	text-align: left;
-	white-space: nowrap;
-	cursor: pointer;
-}
-
-@media (hover: hover) and (pointer: fine) {
-	.filter-menu-item:hover {
-		background: var(--accent-wash);
-	}
-}
-
-.filter-menu-item[aria-checked="true"] {
-	background: var(--accent-wash);
-	font-weight: 700;
-}
-
-.filter-menu-check {
-	width: 14px;
+/* Chips in the scrollable row keep their natural width (never
+   squish) and never wrap their label. */
+.chip-row[data-archive-filter] .chip {
 	flex: none;
-	visibility: hidden;
+	white-space: nowrap;
 }
 
-.filter-menu-item[aria-checked="true"] .filter-menu-check {
-	visibility: visible;
-}
-
-.filter-menu-label {
-	flex: 1;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-.filter-menu-count {
-	color: var(--ink-dim);
-	font-size: 12px;
+/* Per-category item count on each chip (the counts used to live in
+   the dropdown menu). Small and dim so the label stays dominant;
+   on the active (accent) chip it reads as white at reduced opacity. */
+.chip-count {
+	margin-left: 5px;
+	font-size: 11px;
+	font-weight: 500;
+	opacity: 0.65;
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.filter-menu,
-	.filter-more .filter-caret {
-		transition: none;
+	.chip-row[data-archive-filter] {
+		scroll-behavior: auto;
 	}
 }
 
@@ -4385,6 +4372,9 @@ html[lang="bn"] .hero-name {
 	border-radius: 24px;
 	border: 1px solid var(--card-border);
 	background: var(--card);
+	/* A linked client name must look like plain text, never an
+	   underlined link — the cell is clickable, not a text link. */
+	text-decoration: none;
 	transition:
 		transform 200ms ease,
 		box-shadow 200ms ease;
@@ -4408,6 +4398,20 @@ html[lang="bn"] .hero-name {
 	max-height: 36px;
 	max-width: 100%;
 	object-fit: contain;
+}
+
+/* "Name + Logo" mode: the icon sits beside the wordmark with a gap. */
+.client-cell--name-logo {
+	gap: 12px;
+}
+
+/* Square icon for "Name + Logo" logos (favicon-like, 1:1): a fixed
+   36px square beside the name — never stretched, never cropped. */
+.client-logo-icon {
+	width: 36px;
+	height: 36px;
+	object-fit: contain;
+	flex: none;
 }
 
 /* Logo fallback: hidden until its img 404s (JS adds .is-broken),

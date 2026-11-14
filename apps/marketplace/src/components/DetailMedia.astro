@@ -1,0 +1,236 @@
+---
+// Detail-page media — gallery + videos, count-adaptive tiers (preview spec).
+// Gallery: 0 = nothing · 1 = one large figure (max-w-3xl) · 2 = side-by-side
+// · 3–6 = grid (2 across mobile, 3 at sm+) · 7–12 = slider, up to 3 per
+// view · 13+ = slider, up to 4 per view.
+// Videos: 0 = nothing · 1 = one large player · 2–3 = side-by-side grid
+// · 4+ = slider (1 per view mobile, 2 wider).
+// Sliders are scroll-snap tracks with glass prev/next arrows, a progress
+// bar and an "N of M" page counter — wired by the shared
+// public/js/detail.js (delegated, no inline script in <main>). Without
+// JS the track still scrolls natively, so nothing is ever trapped.
+// The hero/cover image is excluded from the gallery (it already shows
+// at the top of the page) — a repeated hero slide was a live bug.
+// A video caption shows the video's own title when one exists — never a
+// hardcoded "Demo video" label; there is no demo flag in the data.
+// Slider chrome (aria-labels, prev/next, "N of M" counter, gallery alt
+// text) comes from the dictionary — the counter template + language ride
+// on data attributes so public/js/detail.js can re-render them in the
+// page language on scroll.
+import { getDict, type Dict, type Lang } from "../lib/i18n";
+import {
+	optimizedImageUrl,
+	optimizedSrcset,
+	unsplashSrcset,
+} from "../lib/images";
+
+interface VideoItem {
+	url: string;
+	title?: string;
+}
+
+interface Props {
+	gallery?: string[];
+	videos?: VideoItem[];
+	/** Hero/cover image URL — never repeated as a gallery slide. */
+	exclude?: string | null;
+	/** Alt-text base for gallery images. */
+	altBase?: string;
+	lang?: Lang;
+	dict?: Dict;
+}
+
+const {
+	gallery = [],
+	videos = [],
+	exclude,
+	altBase,
+	lang = "en",
+	dict,
+} = Astro.props;
+const t = dict ?? getDict(lang);
+const base = altBase ?? t.galleryImage;
+
+// Counter text in the page language ("1 of 3" / "১ / ৩") — the same
+// template the client script re-renders from data-counter-template.
+const fmtNum = (n: number) =>
+	lang === "bn" ? n.toLocaleString("bn-BD") : String(n);
+const counterText = (current: number, total: number) =>
+	t.mediaCounter
+		.replace("{current}", fmtNum(current))
+		.replace("{total}", fmtNum(total));
+
+// Same image with different query params (?w=…&q=…) is still the same
+// image — compare without the query string.
+function stripQuery(url: string): string {
+	return url.split("?")[0];
+}
+
+// Unsplash gallery images ship at w=1200 in content/API rows but render
+// at most ~720px wide (2x retina) — request w=800/q=75 instead: measured
+// 124KB → 67KB per image (~46% less). A files.riaz.com.bd image goes
+// through /api/image at the same width; any other URL passes through.
+const sizedThumb = (url: string, w = 800) =>
+	url.includes("images.unsplash.com")
+		? url.replace(/w=\d+/, `w=${w}`).replace(/q=\d+/, "q=75")
+		: (optimizedImageUrl(url, w) ?? url);
+// Gallery srcset: Unsplash w= rewrite, else the /api/image srcset
+// (widths clamped to the whitelist), else none.
+const gallerySrcset = (url: string) =>
+	unsplashSrcset(url, [360, 720, 1080]) ??
+	optimizedSrcset(url, [360, 720, 1024]);
+const excluded = exclude ? stripQuery(exclude) : null;
+const seen = new Set<string>();
+const cleanGallery = gallery.filter((src) => {
+	const key = stripQuery(src);
+	if (excluded && key === excluded) return false;
+	if (seen.has(key)) return false;
+	seen.add(key);
+	return true;
+});
+
+const gallerySlider = cleanGallery.length >= 7;
+const galleryPerView = cleanGallery.length >= 13 ? 4 : 3;
+const videoSlider = videos.length >= 4;
+const galleryGridClass =
+	cleanGallery.length === 1
+		? "cols-1"
+		: cleanGallery.length === 2
+			? "cols-2"
+			: "cols-3";
+const videoGridClass =
+	videos.length === 1 ? "cols-1" : videos.length === 2 ? "cols-2" : "cols-3";
+---
+
+{
+	(cleanGallery.length > 0 || videos.length > 0) && (
+		<div class="detail-media">
+			{cleanGallery.length > 0 &&
+				(gallerySlider ? (
+					<section class="media-slider" data-media-slider data-per-view={galleryPerView} aria-label={t.galleryLabel} data-counter-template={t.mediaCounter} data-counter-lang={lang}>
+						<div class="media-track">
+							{cleanGallery.map((src, i) => (
+								<figure class="media-slide">
+									<img
+										src={sizedThumb(src)}
+										srcset={gallerySrcset(src)}
+										sizes="(max-width: 640px) 100vw, (max-width: 1023px) 50vw, 720px"
+										alt={`${base} ${counterText(i + 1, cleanGallery.length)}`}
+										loading="lazy"
+										decoding="async"
+									/>
+								</figure>
+							))}
+						</div>
+						<div class="slider-controls">
+							<button
+								type="button"
+								class="chev-btn"
+								data-slider-prev
+								aria-label={t.prevImages}
+							>
+								‹
+							</button>
+							<div
+								class="slider-progress"
+								aria-hidden="true"
+							>
+								<div
+									data-slider-progress
+									style={`width:${100 / Math.ceil(cleanGallery.length / galleryPerView)}%;`}
+								/>
+							</div>
+							<button
+								type="button"
+								class="chev-btn"
+								data-slider-next
+								aria-label={t.nextImages}
+							>
+								›
+							</button>
+							<span data-slider-counter class="slider-counter">
+								{counterText(1, Math.ceil(cleanGallery.length / galleryPerView))}
+							</span>
+						</div>
+					</section>
+				) : (
+					<div class={`media-grid ${galleryGridClass}`}>
+						{cleanGallery.map((src, i) => (
+							<figure>
+								<img
+									src={sizedThumb(src)}
+									srcset={gallerySrcset(src)}
+									sizes="(max-width: 640px) 100vw, (max-width: 1023px) 50vw, 720px"
+									alt={`${base} ${counterText(i + 1, cleanGallery.length)}`}
+									loading="lazy"
+									decoding="async"
+								/>
+							</figure>
+						))}
+					</div>
+				))}
+
+			{videos.length > 0 &&
+				(videoSlider ? (
+					<section class="media-slider" data-media-slider data-per-view="2" aria-label={t.videosLabel} data-counter-template={t.mediaCounter} data-counter-lang={lang}>
+						<div class="media-track">
+							{videos.map((video) => (
+								<figure class="media-slide">
+									<video
+										src={video.url}
+										controls
+										controlslist="nodownload"
+										preload="metadata"
+									/>
+									{video.title && (
+										<figcaption>{video.title}</figcaption>
+									)}
+								</figure>
+							))}
+						</div>
+						<div class="slider-controls">
+							<button
+								type="button"
+								class="chev-btn"
+								data-slider-prev
+								aria-label={t.prevVideos}
+							>
+								‹
+							</button>
+							<div
+								class="slider-progress"
+								aria-hidden="true"
+							>
+								<div
+									data-slider-progress
+									style={`width:${100 / Math.ceil(videos.length / 2)}%;`}
+								/>
+							</div>
+							<button
+								type="button"
+								class="chev-btn"
+								data-slider-next
+								aria-label={t.nextVideos}
+							>
+								›
+							</button>
+							<span data-slider-counter class="slider-counter">
+								{counterText(1, Math.ceil(videos.length / 2))}
+							</span>
+						</div>
+					</section>
+				) : (
+					<div class={`media-grid ${videoGridClass}`}>
+						{videos.map((video) => (
+							<figure>
+								<video src={video.url} controls controlslist="nodownload" preload="metadata" />
+								{video.title && (
+									<figcaption>{video.title}</figcaption>
+								)}
+							</figure>
+						))}
+					</div>
+				))}
+		</div>
+	)
+}
