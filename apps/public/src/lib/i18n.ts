@@ -228,7 +228,6 @@ export type ReleasePlayerDict = Pick<
 /** StackGlobe: heading, filter UI, Now/Spin labels, detail-card close. */
 export const STACK_GLOBE_DICT_KEYS = [
 	"stackTitle",
-	"stackSub",
 	"stackFilter",
 	"allChip",
 	"nowLabel",

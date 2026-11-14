@@ -95,6 +95,24 @@ export default function ProjectsCarousel({ projects, lang = "en", dict }: Props)
 	const current = projects[index];
 	const flipping = leaving !== null || entering;
 
+	// Dots are CAPPED: at most MAX_DOTS dots ever render, no matter how
+	// many projects the carousel receives. The homepage caps at 6 today,
+	// but this component must hold everywhere — even if that limit is
+	// ever raised or the carousel is reused elsewhere. At or below the
+	// cap every dot shows (6 dots at the current homepage size, exactly
+	// as today). Above the cap a sliding window of MAX_DOTS dots follows
+	// the current slide; the counter ("1 of N") always carries the exact
+	// position, and each shown dot navigates to its real project index.
+	const MAX_DOTS = 6;
+	const dotStart =
+		count <= MAX_DOTS
+			? 0
+			: Math.min(Math.max(index - 2, 0), count - MAX_DOTS);
+	const dotIndices = Array.from(
+		{ length: Math.min(count, MAX_DOTS) },
+		(_, i) => dotStart + i,
+	);
+
 	useEffect(() => {
 		setReady(true);
 		const motionMq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -351,11 +369,12 @@ export default function ProjectsCarousel({ projects, lang = "en", dict }: Props)
 				aria-label={t.projectsTitle}
 				style={{
 					touchAction: "pan-y",
-					// glass.css reserves 60px RIGHT / 52px below for the old
-					// right-fanning stack; the tighter left-fanning stack
-					// needs its reserve on the LEFT instead (deepest peek
-					// overhangs ~24px left, ~18px below).
-					margin: "4px 4px 26px 30px",
+					// Reserve for the left-fanning peek stack (deepest peek
+					// overhangs ~18px left after the 0.94 scale pull-in, a
+					// few px below): 20px left / 18px below is enough, so
+					// the main card is wider and the deck eats less height
+					// than the old 30px / 26px reserves.
+					margin: "4px 4px 18px 20px",
 				}}
 				onPointerDown={onPointerDown}
 				onPointerUp={onPointerUp}
@@ -505,21 +524,25 @@ export default function ProjectsCarousel({ projects, lang = "en", dict }: Props)
 				</button>
 				<div className="deck-indicator-center">
 					<div className="deck-dots">
-						{projects.map((project, i) => (
-							<button
-								key={project.slug}
-								type="button"
-								className={`deck-dot${i === index ? " active" : ""}`}
-								onClick={() => goTo(i)}
-								disabled={flipping}
-								aria-label={
-									lang === "bn"
-										? `${project.title} দেখান`
-										: `Show ${project.title}`
-								}
-								aria-current={i === index}
-							/>
-						))}
+						{dotIndices.map((realIndex) => {
+							const project = projects[realIndex];
+							if (!project) return null;
+							return (
+								<button
+									key={project.slug}
+									type="button"
+									className={`deck-dot${realIndex === index ? " active" : ""}`}
+									onClick={() => goTo(realIndex)}
+									disabled={flipping}
+									aria-label={
+										lang === "bn"
+											? `${project.title} দেখান`
+											: `Show ${project.title}`
+									}
+									aria-current={realIndex === index}
+								/>
+							);
+						})}
 					</div>
 					<span className="deck-counter">
 						{lang === "bn"

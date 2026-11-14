@@ -1059,9 +1059,6 @@ export default function StackGlobe({
 			<div className="section-head">
 				<div>
 					<h2>{t.stackTitle}</h2>
-					<p>
-						{t.stackSub}
-					</p>
 				</div>
 			</div>
 			<div className="globe-wrap">
