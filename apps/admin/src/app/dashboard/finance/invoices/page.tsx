@@ -99,6 +99,7 @@ export default function FinanceInvoicesPage() {
     dueDate: "",
     notes: "",
   });
+  const [leads, setLeads] = useState<{ id: string; fullName: string | null; email: string | null }[]>([]);
 
   const fetchInvoices = useCallback(() => {
     setLoading(true);
@@ -122,6 +123,16 @@ export default function FinanceInvoicesPage() {
   }, [status, page]);
 
   useEffect(() => { fetchInvoices(); }, [fetchInvoices]);
+
+  useEffect(() => {
+    // Picker options for the Client field — leads instead of a raw UUID
+    // text input. (Source ID stays a text input: it is type-dependent —
+    // a freelance project or an artist event — with no single list.)
+    fetch("/api/leads?pageSize=200")
+      .then((r) => r.json())
+      .then((res) => setLeads(Array.isArray(res.leads) ? res.leads : []))
+      .catch(() => setLeads([]));
+  }, []);
 
   const set = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
   const needsRate = form.currency.trim().toUpperCase() !== "BDT";
@@ -310,8 +321,15 @@ export default function FinanceInvoicesPage() {
                 <Input value={form.sourceId} onChange={(e) => set("sourceId", e.target.value)} required placeholder="xxxxxxxx-xxxx-…" />
               </div>
               <div>
-                <label style={labelStyle}>Client ID (lead UUID)</label>
-                <Input value={form.clientId} onChange={(e) => set("clientId", e.target.value)} required placeholder="xxxxxxxx-xxxx-…" />
+                <label style={labelStyle}>Client (lead)</label>
+                <select value={form.clientId} onChange={(e) => set("clientId", e.target.value)} style={selectStyle} required>
+                  <option value="">Select lead…</option>
+                  {leads.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.fullName || l.email || l.id}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label style={labelStyle}>Currency</label>

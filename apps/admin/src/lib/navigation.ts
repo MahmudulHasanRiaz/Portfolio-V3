@@ -30,6 +30,8 @@ import {
   Cpu,
   Building2,
   User,
+  Clock,
+  Bell,
 } from "lucide-react";
 
 export interface NavItem {
@@ -168,7 +170,8 @@ export const navigation: NavItem[] = [
         href: "/dashboard/settings",
         icon: Settings,
         children: [
-          { title: "General", href: "/dashboard/settings", icon: Settings },
+          { title: "General", href: "/dashboard/settings/general", icon: Settings },
+          { title: "Notifications", href: "/dashboard/settings/notifications", icon: Bell },
           { title: "Profile", href: "/dashboard/settings/profile", icon: User },
           { title: "Payment Methods", href: "/dashboard/settings/payment-methods", icon: Landmark },
           { title: "Brand / Identity", href: "/dashboard/settings/brand-identity", icon: UserCog },
@@ -178,6 +181,8 @@ export const navigation: NavItem[] = [
       { title: "Search", href: "/dashboard/system/search", icon: Search, children: [
         { title: "Statistics", href: "/dashboard/system/search/statistics", icon: BarChart3 },
       ] },
+      { title: "Cron", href: "/dashboard/cron", icon: Clock },
+      { title: "Users", href: "/dashboard/users", icon: Users },
     ],
   },
 ];

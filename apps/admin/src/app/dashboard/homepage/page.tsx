@@ -195,7 +195,7 @@ export default function HomepagePage() {
                     <Badge variant={section.isVisible ? "default" : "outline"}>
                       {section.isVisible ? "visible" : "hidden"}
                     </Badge>
-                    <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Order: {section.sortOrder}</span>
+                    <span style={{ fontSize: 13, color: "var(--text-muted)" }}>Order: {section.sortOrder ?? "—"}</span>
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 4 }}>

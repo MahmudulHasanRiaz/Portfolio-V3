@@ -59,8 +59,8 @@ export default function SettingsPage() {
 }
 
 const sections: { title: string; description: string; href?: string }[] = [
-  { title: "General", description: "Site name, description, timezone, locale — no settings page exists for this yet; it needs a product decision before it is built." },
-  { title: "Notifications", description: "Configure notification channels and preferences — no settings page exists for this yet; it needs a product decision before it is built." },
+  { title: "General", description: "Site name, tagline, timezone and default language — the site-level basics.", href: "/dashboard/settings/general" },
+  { title: "Notifications", description: "Email notification preferences for new leads and abandoned leads.", href: "/dashboard/settings/notifications" },
   { title: "Payment Methods", description: "Manage payment methods for client billing", href: "/dashboard/settings/payment-methods" },
   { title: "Categories", description: "Manage project and event categories", href: "/dashboard/categories" },
   { title: "Brand / Identity", description: "Choose the focused public profile shown on the homepage (Developer, Entrepreneur, Artist)", href: "/dashboard/settings/brand-identity" },

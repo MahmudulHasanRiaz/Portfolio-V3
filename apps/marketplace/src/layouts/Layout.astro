@@ -36,6 +36,9 @@ interface Props {
 	ogType?: string;
 	/** Canonical URL. Detail pages pass the live-base URL explicitly. */
 	canonical?: string;
+	/** SEO keywords (admin seo_meta row, via the detail page). Rendered
+	    as a keywords meta tag only when non-empty. */
+	keywords?: string;
 	/** Live-merged services (getServices()). MARKETPLACE COPY: unused —
 	    it fed the contact modal's service select, which is removed
 	    here. Kept in the interface so pages that pass services={services}
@@ -44,13 +47,14 @@ interface Props {
 }
 
 const {
-	title = "Mahmudul Hasan Riaz",
-	description = "Software Engineer, Entrepreneur and Nasheed Artist — Dhaka, Bangladesh.",
+	title,
+	description,
 	profile,
 	lang = "en",
 	ogImage,
 	ogType = "website",
 	canonical,
+	keywords,
 	services,
 } = Astro.props;
 
@@ -58,6 +62,17 @@ const {
 // the repo speaker photo. A relative admin URL is resolved against the
 // page origin (OG images must be absolute).
 const settings = await getSiteSettings();
+
+// Site name + tagline (admin settings, Settings → General): the admin
+// values win; the built-in strings stay as fail-safe defaults when the
+// API is unset or unreachable. Pages that pass their own title /
+// description are unaffected — these only fill the defaults.
+const pageTitle = title ?? settings.siteName ?? "Mahmudul Hasan Riaz";
+const pageDescription =
+	description ??
+	settings.siteTagline ??
+	"Software Engineer, Entrepreneur and Nasheed Artist — Dhaka, Bangladesh.";
+const siteName = settings.siteName ?? "Mahmudul Hasan Riaz";
 
 // Primary identity default (admin setting, Wave 2 A1): the resolved
 // default profile — "knowme" when settings.primaryIdentity is
@@ -140,7 +155,8 @@ const isHome =
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="description" content={description} />
+		<meta name="description" content={pageDescription} />
+		{keywords ? <meta name="keywords" content={keywords} /> : null}
 		<link rel="icon" type="image/svg+xml" href={faviconUrl} />
 		<link rel="canonical" href={canonicalUrl} />
 		<link rel="alternate" hreflang="en" href={urlEn} />
@@ -152,17 +168,17 @@ const isHome =
 		     copy must never be indexed, ever. Do not add an override.
 		     (See docs/MARKETPLACE.md.) -->
 		<meta name="robots" content="noindex, nofollow" />
-		<meta property="og:title" content={title} />
-		<meta property="og:description" content={description} />
+		<meta property="og:title" content={pageTitle} />
+		<meta property="og:description" content={pageDescription} />
 		<meta property="og:type" content={ogType} />
 		<meta property="og:url" content={canonicalUrl} />
-		<meta property="og:site_name" content="Mahmudul Hasan Riaz" />
+		<meta property="og:site_name" content={siteName} />
 		<meta property="og:locale" content={ogLocale} />
 		<meta property="og:locale:alternate" content={ogLocaleAlt} />
 		{ogImageUrl ? <meta property="og:image" content={ogImageUrl} /> : null}
 		<meta name="twitter:card" content="summary_large_image" />
-		<meta name="twitter:title" content={title} />
-		<meta name="twitter:description" content={description} />
+		<meta name="twitter:title" content={pageTitle} />
+		<meta name="twitter:description" content={pageDescription} />
 		{ogImageUrl ? <meta name="twitter:image" content={ogImageUrl} /> : null}
 		<meta name="generator" content={Astro.generator} />
 		{/* Self-hosted font preload (see imports above): exactly ONE
@@ -178,7 +194,7 @@ const isHome =
 			type="font/woff2"
 			crossorigin
 		/>
-		<title>{title}</title>
+		<title>{pageTitle}</title>
 		{/* ISSUE 7A: View Transitions — same-origin navigations swap pages
 		    without a full reload (no more blank full-page load on every
 		    click). Also switches on Astro prefetch: hover-prefetch for all
