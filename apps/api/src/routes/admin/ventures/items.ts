@@ -61,6 +61,7 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../../db";
 import { requireAuth, unauthorized } from "../../../lib/admin-auth";
+import { ensureVentureCategories } from "../../../lib/ensure-schema";
 import {
   invalidParam,
   isRecord,
@@ -146,6 +147,9 @@ app.get("/", async (c) => {
     const offset = (page - 1) * pageSize;
 
     const db = getApiDb();
+    // The categoryId filter joins venture_category_assignments, so the
+    // tables must exist before that query runs (see ensure-schema.ts).
+    if (categoryId) await ensureVentureCategories(db);
     const where = and(
       search
         ? or(

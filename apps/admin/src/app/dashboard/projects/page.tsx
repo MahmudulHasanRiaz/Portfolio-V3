@@ -2,6 +2,7 @@ import { listContent } from "@/actions/content";
 import { Card, CardContent, Badge, Button, Input } from "@repo/ui";
 import Link from "next/link";
 import { Plus, Edit } from "lucide-react";
+import { ListThumb } from "@/components/list-thumb";
 
 interface Props {
   searchParams: Promise<{ page?: string; search?: string; status?: string }>;
@@ -52,8 +53,7 @@ export default async function ProjectsListPage({ searchParams }: Props) {
             <Card key={project.id as string}>
               <CardContent style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", gap: 12 }}>
                 {((project.thumbnailUrl || project.thumbnail) as string) ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={(project.thumbnailUrl || project.thumbnail) as string} alt="" style={{ width: 56, height: 40, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} />
+                  <ListThumb src={(project.thumbnailUrl || project.thumbnail) as string} alt={(project.title as string) || ""} />
                 ) : null}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>{(project.title as string) || "Untitled"}</div>

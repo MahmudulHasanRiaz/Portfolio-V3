@@ -169,9 +169,13 @@ export default function MetadataPage() {
         records feed the SEO validation report.
       </p>
       <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 24 }}>
-        Note: no public page renders these rows yet — Ventures and Releases
-        keep their own meta fields in their editors. Wiring the public site
-        to this table needs a product decision.
+        Note: these rows take effect on the public site — a row&apos;s
+        title, description, OG image, canonical URL and keywords override
+        the item&apos;s own values on its detail page (projects, posts,
+        ventures, releases, services). Leave a field empty to keep the
+        item&apos;s own value. The indexable / follow / no-archive flags
+        are not applied yet — the global search-indexing switch still
+        governs indexing.
       </p>
 
       {loadError && (

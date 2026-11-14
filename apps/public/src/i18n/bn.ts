@@ -43,25 +43,20 @@ export interface Dict {
 	statProjects: string;
 	statClients: string;
 	statReleases: string;
-	releasesSub: string;
 	servicesTitle: string;
-	servicesSub: string;
 	learnMoreAbout: string;
 	contactAboutService: string;
 	openingContact: string;
 	close: string;
 	projectsTitle: string;
-	projectsSub: string;
 	viewAllProjects: string;
 	viewAllCaseStudies: string;
 	viewAllPosts: string;
 	viewAllReleases: string;
 	viewAllVentures: string;
 	caseStudiesTitle: string;
-	caseStudiesSub: string;
 	readCaseStudy: string;
 	stackTitle: string;
-	stackSub: string;
 	stackFilter: string;
 	nowLabel: string;
 	spin: string;
@@ -75,7 +70,6 @@ export interface Dict {
 	catConcepts: string;
 	catAuth: string;
 	beyondTitle: string;
-	beyondSub: string;
 	entrepreneurTitle: string;
 	entrepreneurText: string;
 	venturesEmptyShort: string;
@@ -86,7 +80,6 @@ export interface Dict {
 	knowMeCta: string;
 	clientsTitle: string;
 	latestPostsTitle: string;
-	latestPostsSub: string;
 	contactTitle: string;
 	contactSub: string;
 	wholePersonTitle: string;
@@ -313,28 +306,20 @@ export const bn: Dict = {
 	statProjects: "প্রজেক্ট",
 	statClients: "ক্লায়েন্ট",
 	statReleases: "রিলিজ",
-	releasesSub:
-		"নাশিদ, তিলাওয়াত, পডকাস্ট ও লেকচার — প্রতিটি রিলিজ, যে প্ল্যাটফর্মে আছে সেইসহ।",
 	servicesTitle: "সার্ভিস",
-	servicesSub: "আপনার বিজনেসের জন্য আমি যা বানাতে আর ইমপ্রুভ করতে পারি।",
 	learnMoreAbout: "সম্পর্কে আরও জানুন",
 	contactAboutService: "এই সার্ভিসটা নিয়ে কথা বলুন",
 	openingContact: "কন্ট্যাক্ট ফর্ম খুলছে…",
 	close: "বন্ধ করুন",
 	projectsTitle: "প্রজেক্ট",
-	projectsSub: "সিলেক্টেড কাজ — আসল বিজনেস চালানো আসল সিস্টেম।",
 	viewAllProjects: "সব প্রজেক্ট দেখুন →",
 	viewAllCaseStudies: "সব কেস স্টাডি দেখুন →",
 	viewAllPosts: "সব পোস্ট দেখুন →",
 	viewAllReleases: "সব রিলিজ দেখুন →",
 	viewAllVentures: "সব উদ্যোগ দেখুন →",
 	caseStudiesTitle: "কেস স্টাডি",
-	caseStudiesSub:
-		"সমস্যা, সমাধান, ফলাফল — প্রতিটি এক লাইনে। পুরো গল্প পড়তে কেস স্টাডিতে ট্যাপ করুন।",
 	readCaseStudy: "কেস স্টাডিটা পড়ুন",
 	stackTitle: "আমি যে স্ট্যাকে কাজ করি",
-	stackSub:
-		"উপরের প্রোডাক্টগুলোর পেছনের টুলস — সবগুলো দেখতে গ্লোবটা টেনে ঘোরান।",
 	stackFilter: "ক্যাটাগরি অনুযায়ী স্ট্যাক ছাঁকুন",
 	nowLabel: "এখন:",
 	spin: "ঘোরান",
@@ -349,8 +334,6 @@ export const bn: Dict = {
 	catConcepts: "কনসেপ্ট",
 	catAuth: "অথেন্টিকেশন",
 	beyondTitle: "কোডের বাইরে",
-	beyondSub:
-		"এক মানুষ, আরও দুটি পরিচয় — কোম্পানি গড়া, আর নাশিদ রেকর্ড করা।",
 	entrepreneurTitle: "উদ্যোক্তা ও পাবলিক ফিগার",
 	entrepreneurText:
 		"তিনটা উদ্যোগের ফাউন্ডার — পাশাপাশি ঢাকায় কমিউনিটি আর চ্যারিটি উদ্যোগ, আর ঈমান, কাজ আর টেকনোলজি নিয়ে কথা।",
@@ -367,7 +350,6 @@ export const bn: Dict = {
 	knowMeCta: "আমাকে জানুন →",
 	clientsTitle: "ক্লায়েন্ট",
 	latestPostsTitle: "লেটেস্ট পোস্ট",
-	latestPostsSub: "বানানো নিয়ে নোট, আর নাশিদের কাজ নিয়ে।",
 	contactTitle: "কোনো প্রজেক্টের কথা ভাবছেন?",
 	contactSub:
 		"কী বানাচ্ছেন, জানান — আমি নিজে উত্তর দিই, সাধারণত এক দিনের মধ্যে।",

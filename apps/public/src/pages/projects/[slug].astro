@@ -23,6 +23,7 @@ import {
 	absUrl,
 	isRealUrl,
 	mergeDetail,
+	seoString,
 	parseBodyBlocks,
 	serviceForTags,
 } from "../../lib/detail";
@@ -96,6 +97,16 @@ const buildData = buildEntry?.data as unknown as
 const d = mergeDetail(buildData, liveData) as unknown as
 	| ProjectData
 	| undefined;
+
+// Admin SEO overrides (Dashboard → SEO → Metadata): the API emits the
+// row's own meta columns overlaid with the seo_meta row. These feed the
+// Layout head tags ONLY — visible page content keeps using the plain
+// title/description below.
+const seoTitle = seoString(d, "metaTitle");
+const seoDescription = seoString(d, "metaDescription");
+const seoOgImage = seoString(d, "ogImage");
+const seoCanonical = seoString(d, "canonicalUrl");
+const seoKeywords = seoString(d, "keywords");
 
 // Full story, in priority order: the backend's longDescription when it
 // exists, then the build-time markdown body, then the live content
@@ -200,12 +211,14 @@ const jsonLd = d
 
 <Layout
 	title={
-		d ? `${d.title} — Mahmudul Hasan Riaz` : `${t.notFoundProject} — Mahmudul Hasan Riaz`
+		seoTitle ??
+		(d ? `${d.title} — Mahmudul Hasan Riaz` : `${t.notFoundProject} — Mahmudul Hasan Riaz`)
 	}
-	description={d?.description}
+	description={seoDescription ?? d?.description}
 	ogType="website"
-	ogImage={coverImage ? absUrl(optimizedImageUrl(coverImage, 1200), siteBase) : null}
-	canonical={pageUrl}
+	ogImage={seoOgImage ?? (coverImage ? absUrl(optimizedImageUrl(coverImage, 1200), siteBase) : null)}
+	canonical={seoCanonical ?? pageUrl}
+	keywords={seoKeywords}
 	lang={lang}
 >
 	{

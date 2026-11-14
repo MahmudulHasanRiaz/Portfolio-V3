@@ -14,6 +14,7 @@ import {
 	resolveCanonicalBase,
 	absUrl,
 	mergeDetail,
+	seoString,
 	yearOf,
 } from "../../lib/detail";
 import { optimizedImageUrl, optimizedSrcset } from "../../lib/images";
@@ -79,6 +80,16 @@ const buildData = buildEntry?.data as unknown as
 const data = mergeDetail(buildData, liveData) as unknown as
 	| ReleaseData
 	| undefined;
+
+// Admin SEO overrides (Dashboard → SEO → Metadata): the API emits the
+// row's own meta columns overlaid with the seo_meta row. These feed the
+// Layout head tags ONLY — visible page content keeps using the plain
+// title/description below.
+const seoTitle = seoString(data, "metaTitle");
+const seoDescription = seoString(data, "metaDescription");
+const seoOgImage = seoString(data, "ogImage");
+const seoCanonical = seoString(data, "canonicalUrl");
+const seoKeywords = seoString(data, "keywords");
 
 const releases = await getReleases();
 const idx = slug ? releases.findIndex((r) => r.data.slug === slug) : -1;
@@ -178,11 +189,12 @@ const jsonLd = data
 ---
 
 <Layout
-	title={`${title} — Mahmudul Hasan Riaz`}
-	description={description}
+	title={seoTitle ?? `${title} — Mahmudul Hasan Riaz`}
+	description={seoDescription ?? description}
 	ogType="website"
-	ogImage={coverImage ? (absUrl(optimizedImageUrl(coverImage, 1200), siteBase) ?? null) : null}
-	canonical={pageUrl}
+	ogImage={seoOgImage ?? (coverImage ? (absUrl(optimizedImageUrl(coverImage, 1200), siteBase) ?? null) : null)}
+	canonical={seoCanonical ?? pageUrl}
+	keywords={seoKeywords}
 	lang={lang}
 >
 	{!entry || !data ? (

@@ -1,4 +1,5 @@
 import { listContent } from "@/actions/content";
+import { ListThumb } from "@/components/list-thumb";
 import { Card, CardContent, Badge, Button, Input } from "@repo/ui";
 import Link from "next/link";
 import { Plus, Edit } from "lucide-react";
@@ -46,8 +47,7 @@ export default async function CaseStudiesListPage({ searchParams }: Props) {
             <Card key={cs.id as string}>
               <CardContent style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", gap: 12 }}>
                 {(cs.thumbnailUrl as string) ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={cs.thumbnailUrl as string} alt="" style={{ width: 56, height: 40, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} />
+                  <ListThumb src={cs.thumbnailUrl as string} alt={(cs.title as string) || ""} />
                 ) : null}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>{(cs.title as string) || "Untitled"}</div>

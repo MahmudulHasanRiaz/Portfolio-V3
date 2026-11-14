@@ -14,6 +14,7 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../../db";
 import { requireAuth, unauthorized } from "../../../lib/admin-auth";
+import { ensureVentureCategories } from "../../../lib/ensure-schema";
 import {
   invalidParam,
   isRecord,
@@ -48,6 +49,7 @@ app.get("/categories", async (c) => {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
     const db = getApiDb();
+    await ensureVentureCategories(db);
     const rows = await db
       .select()
       .from(ventureCategories)
@@ -73,6 +75,7 @@ app.post("/categories", async (c) => {
       return c.json({ error: "Category name is required" }, 400);
     }
     const db = getApiDb();
+    await ensureVentureCategories(db);
     const [row] = await db
       .insert(ventureCategories)
       .values({
@@ -101,6 +104,7 @@ app.patch("/categories/:id", async (c) => {
     const data = { ...(v.data as Record<string, unknown>) };
     stripServerManaged(data);
     const db = getApiDb();
+    await ensureVentureCategories(db);
     const sets: Partial<typeof ventureCategories.$inferInsert> = {};
     if (data.name !== undefined) sets.name = data.name as string | null;
     if (data.slug !== undefined) sets.slug = data.slug as string;
@@ -136,6 +140,7 @@ app.delete("/categories/:id", async (c) => {
     const id = uuidParam(c, "id");
     if (!id) return invalidParam(c, "id");
     const db = getApiDb();
+    await ensureVentureCategories(db);
     const [deleted] = await db
       .delete(ventureCategories)
       .where(eq(ventureCategories.id, id))
@@ -172,6 +177,7 @@ app.get("/:id/categories", async (c) => {
     const id = uuidParam(c, "id");
     if (!id) return invalidParam(c, "id");
     const db = getApiDb();
+    await ensureVentureCategories(db);
     const categories = await getVentureCategories(db, id);
     return c.json(categories);
   } catch (err) {
@@ -191,6 +197,7 @@ app.post("/:id/categories", async (c) => {
     if ("error" in v) return c.json({ error: v.error }, 400);
     const categoryIds = v.data.categoryIds;
     const db = getApiDb();
+    await ensureVentureCategories(db);
     // NOTE: the source ran this in one postgres.js transaction. The
     // neon-http driver has no transaction support (db.transaction()
     // throws), so this runs as sequential statements instead — a failure

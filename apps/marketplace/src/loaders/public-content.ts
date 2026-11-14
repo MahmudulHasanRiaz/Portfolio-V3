@@ -596,6 +596,19 @@ export interface PublicSettings {
 	 */
 	siteDescription?: string;
 	/**
+	 * Site name (settings key `site_name`, edited at Settings →
+	 * General). Layout.astro uses it for og:site_name and as the
+	 * default page title. Absent = the built-in name.
+	 */
+	siteName?: string;
+	/**
+	 * Site tagline (settings key `site_tagline`, edited at Settings →
+	 * General). Layout.astro uses it as the default meta description
+	 * on pages without their own description. Absent = the built-in
+	 * description.
+	 */
+	siteTagline?: string;
+	/**
 	 * Founder summary (settings key `founder_summary`, fix plan
 	 * §3 Break 2): the multi-sentence bio from the homepage
 	 * founder section. Combined.astro renders it as its own

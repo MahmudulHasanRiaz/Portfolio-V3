@@ -328,6 +328,18 @@ export function mergeDetail<T extends Record<string, unknown>>(
 	return out as T;
 }
 
+/** Non-empty string from a merged detail record, or undefined. Reads
+ *  the admin SEO override fields (metaTitle / metaDescription /
+ *  ogImage / canonicalUrl / keywords) that the API emits on every
+ *  public item — the row's own meta columns overlaid with the admin
+ *  seo_meta row (Dashboard → SEO → Metadata). Detail pages prefer
+ *  these over their built titles/descriptions. */
+export function seoString(data: unknown, key: string): string | undefined {
+	if (!data || typeof data !== "object") return undefined;
+	const v = (data as Record<string, unknown>)[key];
+	return typeof v === "string" && v.trim() !== "" ? v : undefined;
+}
+
 /** "2023" from an ISO date, or "" when there is none. */
 export function yearOf(iso: string | null | undefined): string {
 	if (!iso) return "";

@@ -75,6 +75,8 @@ export default function ProposalDocumentsPage() {
   const router = useRouter();
   const [data, setData] = useState<DocumentListResponse | null>(null);
   const [templates, setTemplates] = useState<ProposalTemplate[]>([]);
+  const [leads, setLeads] = useState<{ id: string; fullName: string | null; email: string | null }[]>([]);
+  const [projects, setProjects] = useState<{ id: string; title: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
   const [latestOnly, setLatestOnly] = useState(true);
@@ -107,6 +109,19 @@ export default function ProposalDocumentsPage() {
       .then((r) => r.json())
       .then((res) => setTemplates(res.templates ?? []))
       .catch(() => setTemplates([]));
+  }, []);
+
+  useEffect(() => {
+    // Picker options for the Generate dialog — leads (Client) and
+    // projects (Project) instead of raw UUID text inputs.
+    fetch("/api/leads?pageSize=200")
+      .then((r) => r.json())
+      .then((res) => setLeads(Array.isArray(res.leads) ? res.leads : []))
+      .catch(() => setLeads([]));
+    fetch("/api/content/projects?pageSize=100")
+      .then((r) => r.json())
+      .then((res) => setProjects(Array.isArray(res.items) ? res.items : []))
+      .catch(() => setProjects([]));
   }, []);
 
   const templateOf = (id: string | null) => (id ? templates.find((t) => t.id === id) : undefined);
@@ -267,12 +282,26 @@ export default function ProposalDocumentsPage() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 <div>
-                  <label style={labelStyle}>Client ID (lead UUID, optional)</label>
-                  <Input value={form.clientId} onChange={(e) => setForm((f) => ({ ...f, clientId: e.target.value }))} placeholder="xxxxxxxx-xxxx-…" />
+                  <label style={labelStyle}>Client (lead, optional)</label>
+                  <select value={form.clientId} onChange={(e) => setForm((f) => ({ ...f, clientId: e.target.value }))} style={selectStyle}>
+                    <option value="">No client</option>
+                    {leads.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.fullName || l.email || l.id}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
-                  <label style={labelStyle}>Project ID (UUID, optional)</label>
-                  <Input value={form.projectId} onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))} placeholder="xxxxxxxx-xxxx-…" />
+                  <label style={labelStyle}>Project (optional)</label>
+                  <select value={form.projectId} onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))} style={selectStyle}>
+                    <option value="">No project</option>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.title || p.id}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div>

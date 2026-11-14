@@ -81,7 +81,7 @@ export default function FAQsPage() {
               <CardContent style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px" }}>
                 <div>
                   <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>{faq.question}</div>
-                  <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>Order: {faq.sortOrder}</div>
+                  <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>Order: {faq.sortOrder ?? "—"}</div>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <Button variant="outline" size="sm" onClick={() => { setEditing(faq); setShowDialog(true); }}><Edit size={14} /></Button>

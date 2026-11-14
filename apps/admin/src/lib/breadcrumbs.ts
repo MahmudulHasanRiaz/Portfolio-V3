@@ -49,7 +49,10 @@ export const breadcrumbLabels: Record<string, string> = {
   "/dashboard/analytics/search": "Search",
   "/dashboard/users": "Users",
   "/dashboard/users/new": "New User",
+  "/dashboard/cron": "Cron",
   "/dashboard/settings": "Settings",
+  "/dashboard/settings/general": "General",
+  "/dashboard/settings/notifications": "Notifications",
   "/dashboard/settings/profile": "Profile",
   "/dashboard/settings/payment-methods": "Payment Methods",
   "/dashboard/settings/brand-identity": "Brand / Identity",
@@ -68,16 +71,36 @@ export const breadcrumbLabels: Record<string, string> = {
   "/dashboard/workflows/runs": "Runs",
 };
 
+/** Singular "Edit …" label per collection, for [id] routes whose last
+ *  segment is a UUID. An id is never a readable crumb — before this,
+ *  the fallback title-cased the raw UUID ("31c7b2e6 E079 …"). */
+const editLabels: Record<string, string> = {
+  "/dashboard/projects": "Edit Project",
+  "/dashboard/blog": "Edit Post",
+  "/dashboard/services": "Edit Service",
+  "/dashboard/releases": "Edit Release",
+  "/dashboard/ventures": "Edit Venture",
+  "/dashboard/platforms": "Edit Platform",
+  "/dashboard/technologies": "Edit Technology",
+  "/dashboard/clients": "Edit Client",
+  "/dashboard/content/case-studies": "Edit Case Study",
+};
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function getBreadcrumbs(pathname: string): { label: string; href: string }[] {
   const segments = pathname.split("/").filter(Boolean);
   const crumbs: { label: string; href: string }[] = [];
   let current = "";
 
   for (const segment of segments) {
+    const parent = current;
     current += "/" + segment;
-    const label =
-      breadcrumbLabels[current] ||
-      segment.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    const label = UUID_RE.test(segment)
+      ? (editLabels[parent] ?? "Edit")
+      : breadcrumbLabels[current] ||
+        segment.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     crumbs.push({ label, href: current });
   }
 

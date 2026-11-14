@@ -2224,7 +2224,11 @@ html[lang="bn"] .hero-name {
 .deck {
 	position: relative;
 	perspective: 1200px;
-	margin: 4px 60px 52px 4px;
+	/* Tight reserves for the left-fanning peek stack (deepest peek
+	   overhangs ~18px left after the scale pull-in, a few px below).
+	   The inline margin in ProjectsCarousel.tsx carries these same
+	   values and wins at runtime — keep the two in sync. */
+	margin: 4px 4px 18px 20px;
 	/* Animation isolation: `layout` only + stacking isolation. NEVER
 	   `paint`/`strict` or overflow clipping here — the peek pages fan
 	   OUTSIDE the deck (up to ~36px left, ~15px down) by design. The
@@ -2277,6 +2281,16 @@ html[lang="bn"] .hero-name {
 
 .deck-card .deck-body {
 	padding: 16px;
+	/* Solid panel (2026-11-14): the card itself is glass (var(--card)
+	   is 0.72 white in light mode, 0.06 in dark), so the peek pages
+	   behind it showed through the title/description/tags and garbled
+	   the text. The body is now the solid page background in both
+	   themes, so the text reads exactly like page text — the glass
+	   look survives on the card border/shadow and the thumb. Scoped to
+	   .deck-body on purpose: --card itself is shared and must not
+	   change. */
+	background: var(--bg);
+	border-top: 1px solid var(--card-border);
 }
 
 .deck-card h3 {
@@ -2453,6 +2467,28 @@ html[lang="bn"] .hero-name {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	max-width: 44vw;
+}
+
+/* Mobile deck tightening (2026-11-14, < 640px only): the carousel was
+   eating too much screen height and the side reserves squeezed the
+   main card narrow. Shorter thumb (16/9 instead of 16/10 — this also
+   matches the pre-hydration skeleton, which already renders 16/9),
+   tighter body padding and a closer indicator row. The flip
+   animation, the peek stack and the dots are untouched. The deck only
+   renders below 640px (the grid takes over from 640px), so this query
+   only restates that boundary explicitly. */
+@media (max-width: 639px) {
+	.deck-card .deck-thumb {
+		aspect-ratio: 16 / 9;
+	}
+
+	.deck-card .deck-body {
+		padding: 12px 14px;
+	}
+
+	.deck-indicator {
+		margin-top: 10px;
+	}
 }
 
 /* ---------- Projects grid (desktop, >= 1024px) ---------- */

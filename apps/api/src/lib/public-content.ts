@@ -42,6 +42,7 @@ import {
   normalizeDefaultLanguage,
   type DefaultLanguage,
 } from "./default-language";
+import { SITE_NAME_KEY, SITE_TAGLINE_KEY } from "./general-settings";
 import {
   findActiveIntegrationByToken,
   hasActiveIntegration,
@@ -71,6 +72,7 @@ import {
   clients,
   personProfiles,
   settings,
+  seoMeta,
 } from "@repo/database/schema";
 
 export type PublicContentType =
@@ -197,6 +199,71 @@ function seoFields(r: {
     canonicalUrl: r.canonicalUrl ?? undefined,
     keywords: r.keywords ?? undefined,
   };
+}
+
+/** Admin SEO rows (seo_meta) keyed `${entityType}:${entityId}`. The
+ *  table is tiny (one row per overridden item), so one select per list
+ *  call is cheap. Rows are the explicit per-item override edited at
+ *  Dashboard → SEO → Metadata; the entityType strings are the editor's
+ *  (post / project / service / venture / release). A row with no usable
+ *  field is skipped. DB failure → empty map (the site keeps working
+ *  on the rows' own columns). */
+async function seoMetaByEntity(
+  db: Db,
+): Promise<Map<string, typeof seoMeta.$inferSelect>> {
+  try {
+    const rows = await db.select().from(seoMeta);
+    const map = new Map<string, typeof seoMeta.$inferSelect>();
+    for (const row of rows) {
+      if (!row.entityType || !row.entityId) continue;
+      if (
+        !row.metaTitle?.trim() &&
+        !row.metaDescription?.trim() &&
+        !row.ogImage?.trim() &&
+        !row.canonicalUrl?.trim() &&
+        !row.keywords?.trim()
+      ) {
+        continue;
+      }
+      map.set(`${row.entityType}:${row.entityId}`, row);
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
+/** Overlay one admin seo_meta row onto an item's SEO fields. Only
+ *  non-empty row fields are returned, so the spread can never blank a
+ *  value the content row itself set — and the admin row wins where it
+ *  has a value, because it is the explicit per-item override. Returns
+ *  {} when there is no row. Deliberately covers only the five content
+ *  fields; indexable / followLinks / noArchive are NOT overlaid (the
+ *  robots flags stay under the global indexing switch). */
+function seoMetaOverlay(
+  row: typeof seoMeta.$inferSelect | undefined,
+): {
+  metaTitle?: string;
+  metaDescription?: string;
+  ogImage?: string;
+  canonicalUrl?: string;
+  keywords?: string;
+} {
+  if (!row) return {};
+  const out: {
+    metaTitle?: string;
+    metaDescription?: string;
+    ogImage?: string;
+    canonicalUrl?: string;
+    keywords?: string;
+  } = {};
+  if (row.metaTitle?.trim()) out.metaTitle = row.metaTitle;
+  if (row.metaDescription?.trim())
+    out.metaDescription = row.metaDescription;
+  if (row.ogImage?.trim()) out.ogImage = row.ogImage;
+  if (row.canonicalUrl?.trim()) out.canonicalUrl = row.canonicalUrl;
+  if (row.keywords?.trim()) out.keywords = row.keywords;
+  return out;
 }
 
 /** The year of a date (project key info: Astro reads `year`). */
@@ -561,6 +628,7 @@ async function listPosts(db: Db): Promise<PublicContentItem[]> {
     .where(eq(posts.status, "published"))
     .orderBy(desc(posts.publishAt), desc(posts.createdAt));
   const tagsById = await postTagsByPostId(db);
+  const seo = await seoMetaByEntity(db);
   return rows
     .filter((r) => r.slug && r.title)
     .map((r) => {
@@ -586,6 +654,7 @@ async function listPosts(db: Db): Promise<PublicContentItem[]> {
         publishedAt: toISO(r.publishAt ?? r.createdAt),
         updatedAt: toISO(r.updatedAt),
         ...seoFields(r),
+        ...seoMetaOverlay(seo.get(`post:${r.id}`)),
         thumbnail,
         thumbnailType:
           r.thumbnailType === "video" ? "video" : ("image" as const),
@@ -607,6 +676,7 @@ async function listProjects(db: Db): Promise<PublicContentItem[]> {
     .orderBy(desc(projects.createdAt));
   const techsById = await techsByProjectId(db);
   const projectTagsById = await projectTagsByProjectId(db);
+  const seo = await seoMetaByEntity(db);
   return rows
     .filter((r) => r.slug && r.title)
     .map((r) => {
@@ -636,6 +706,7 @@ async function listProjects(db: Db): Promise<PublicContentItem[]> {
         publishedAt: toISO(r.startDate ?? r.createdAt),
         updatedAt: toISO(r.updatedAt),
         ...seoFields(r),
+        ...seoMetaOverlay(seo.get(`project:${r.id}`)),
         thumbnail,
         thumbnailType:
           r.thumbnailType === "video" ? "video" : ("image" as const),
@@ -736,6 +807,7 @@ async function listVentures(db: Db): Promise<PublicContentItem[]> {
     .from(ventures)
     .where(eq(ventures.contentStatus, "published"))
     .orderBy(desc(ventures.createdAt));
+  const seo = await seoMetaByEntity(db);
   return rows
     .filter((r) => r.slug && r.name)
     .map((r) => {
@@ -771,6 +843,7 @@ async function listVentures(db: Db): Promise<PublicContentItem[]> {
         ),
         updatedAt: toISO(r.updatedAt),
         ...seoFields(r),
+        ...seoMetaOverlay(seo.get(`venture:${r.id}`)),
         thumbnail,
         thumbnailType:
           r.thumbnailType === "video" ? "video" : ("image" as const),
@@ -806,6 +879,7 @@ async function listReleases(db: Db): Promise<PublicContentItem[]> {
   const lyricsById = await lyricsByReleaseId(db);
   const lyricsTranslationsById = await lyricsTranslationsByReleaseId(db);
   const videosById = await videosByReleaseId(db);
+  const seo = await seoMetaByEntity(db);
   return rows
     // NOTE: no Ya Nabi exclusion here — the LIST route filters it out
     // (see api/public/content/[type]/route.ts); the single-item endpoint
@@ -852,6 +926,7 @@ async function listReleases(db: Db): Promise<PublicContentItem[]> {
         publishedAt: toISO(r.releaseDate ?? r.createdAt),
         updatedAt: toISO(r.updatedAt),
         ...seoFields(r),
+        ...seoMetaOverlay(seo.get(`release:${r.id}`)),
         thumbnail: r.coverImage ?? undefined,
         thumbnailType: "image" as const,
         releaseType: r.type ?? undefined,
@@ -874,6 +949,7 @@ async function listServices(db: Db): Promise<PublicContentItem[]> {
     .from(services)
     .where(eq(services.status, "published"))
     .orderBy(asc(services.sortOrder), desc(services.createdAt));
+  const seo = await seoMetaByEntity(db);
   return rows
     .filter((r) => r.slug && r.title)
     .map((r) => {
@@ -899,6 +975,7 @@ async function listServices(db: Db): Promise<PublicContentItem[]> {
         publishedAt: toISO(r.createdAt),
         updatedAt: toISO(r.updatedAt),
         ...seoFields(r),
+        ...seoMetaOverlay(seo.get(`service:${r.id}`)),
         thumbnail,
         thumbnailType:
           r.thumbnailType === "video" ? "video" : ("image" as const),
@@ -1103,6 +1180,15 @@ export interface PublicSettings {
   /** Homepage SEO description (settings key `site_description`,
    * edited at Settings → Site Copy). Omitted when empty. */
   siteDescription?: string;
+  /** Site name (settings key `site_name`, edited at Settings →
+   * General). The Astro site uses it for og:site_name and as the
+   * default page title. Omitted when empty; the Astro site falls back
+   * to its built-in name. */
+  siteName?: string;
+  /** Site tagline (settings key `site_tagline`, edited at Settings →
+   * General). The Astro site uses it as the default meta description
+   * on pages without their own description. Omitted when empty. */
+  siteTagline?: string;
   /** Profile (person_profiles, first row). Undefined until the admin
    * profile UI (D1b) fills the row — today only full_name is seeded. */
   name?: string;
@@ -1414,6 +1500,8 @@ export async function getPublicSettings(): Promise<PublicSettings> {
       founderSummaryBnRow,
       siteTitleRow,
       siteDescriptionRow,
+      siteNameRow,
+      siteTaglineRow,
     ] = await Promise.all([
       findSetting(HERO_PORTRAIT_KEY),
       findSetting(FAVICON_KEY),
@@ -1439,6 +1527,8 @@ export async function getPublicSettings(): Promise<PublicSettings> {
       findSetting(FOUNDER_SUMMARY_BN_KEY),
       findSetting(SITE_TITLE_KEY),
       findSetting(SITE_DESCRIPTION_KEY),
+      findSetting(SITE_NAME_KEY),
+      findSetting(SITE_TAGLINE_KEY),
     ]);
     const statsEntries = await statsRow(getApiDb());
     // English stats: the valid row items, in row order. Bangla labels:
@@ -1471,6 +1561,8 @@ export async function getPublicSettings(): Promise<PublicSettings> {
       asNonEmptyString(founderSummaryBnRow?.value) ?? founder.summaryBn;
     const siteTitle = asNonEmptyString(siteTitleRow?.value);
     const siteDescription = asNonEmptyString(siteDescriptionRow?.value);
+    const siteName = asNonEmptyString(siteNameRow?.value);
+    const siteTagline = asNonEmptyString(siteTaglineRow?.value);
     const designations = asDesignationList(designationsRow?.value);
     const designationsBn = overlayDesignationsBn(
       designations,
@@ -1515,6 +1607,8 @@ export async function getPublicSettings(): Promise<PublicSettings> {
       ...(founderSummary ? { founderSummary } : {}),
       ...(siteTitle ? { siteTitle } : {}),
       ...(siteDescription ? { siteDescription } : {}),
+      ...(siteName ? { siteName } : {}),
+      ...(siteTagline ? { siteTagline } : {}),
       ...(profile.name ? { name: profile.name } : {}),
       ...(profile.email ? { email: profile.email } : {}),
       ...(profile.location ? { location: profile.location } : {}),

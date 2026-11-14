@@ -49,6 +49,19 @@ import {
   DEFAULT_LANGUAGE_KEY,
   normalizeDefaultLanguage,
 } from "../../../lib/default-language";
+import {
+  SITE_NAME_KEY,
+  SITE_TAGLINE_KEY,
+  TIMEZONE_KEY,
+  TIMEZONES,
+  normalizeSiteName,
+  normalizeSiteTagline,
+  normalizeTimezone,
+} from "../../../lib/general-settings";
+import {
+  NOTIFICATIONS_KEY,
+  normalizeNotifications,
+} from "../../../lib/notifications-settings";
 import { z } from "zod";
 import {
   isRecord,
@@ -574,6 +587,162 @@ app.put("/site-copy", async (c) => {
       void purgePublicCache(c.env, ["home"], waitUntilOf(c));
     }
     return c.json(saved);
+  } catch (err) {
+    return c.json({ error: errorMessage(err) }, 500);
+  }
+});
+
+// ─── General (site-level basics) ───────────────────────────────────────────
+// One combined endpoint for the four Settings → General fields, following
+// the site-copy precedent (one endpoint, several settings-table keys):
+// site_name, site_tagline, timezone (new keys, created on first save)
+// + default_language (existing key, also edited from Brand / Identity).
+// Site name + tagline are public-facing (Layout title / og:site_name /
+// default meta description), so a save purges the public cache like the
+// other public-facing settings. Timezone + default language ride along
+// because the page saves all four in one click.
+
+const generalSchema = z.object({
+  siteName: z.string().max(255).optional(),
+  siteTagline: z.string().max(500).nullable().optional(),
+  timezone: z.enum(TIMEZONES).optional(),
+  defaultLanguage: z.enum(["en", "bn", "system"]).optional(),
+});
+
+app.get("/general", async (c) => {
+  try {
+    const user = await requireAuth(c);
+    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const db = getApiDb();
+    const [siteNameRow, siteTaglineRow, timezoneRow, languageRow] =
+      await Promise.all([
+        findSetting(db, SITE_NAME_KEY),
+        findSetting(db, SITE_TAGLINE_KEY),
+        findSetting(db, TIMEZONE_KEY),
+        findSetting(db, DEFAULT_LANGUAGE_KEY),
+      ]);
+    return c.json({
+      siteName: normalizeSiteName(siteNameRow?.value),
+      siteTagline: normalizeSiteTagline(siteTaglineRow?.value),
+      timezone: normalizeTimezone(timezoneRow?.value),
+      defaultLanguage: languageRow
+        ? normalizeDefaultLanguage(languageRow.value)
+        : DEFAULT_LANGUAGE_DEFAULT,
+    });
+  } catch (err) {
+    return c.json({ error: errorMessage(err) }, 500);
+  }
+});
+
+app.put("/general", async (c) => {
+  try {
+    const user = await requireAuth(c);
+    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, generalSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const data = v.data;
+    const db = getApiDb();
+    const saved: Record<string, unknown> = {};
+    if ("siteName" in data && data.siteName !== undefined) {
+      const value = normalizeSiteName(data.siteName);
+      await upsertSetting(
+        db,
+        SITE_NAME_KEY,
+        value,
+        "general",
+        "The name of the site as displayed in the browser tab and header",
+      );
+      saved.siteName = value;
+    }
+    if ("siteTagline" in data && data.siteTagline !== undefined) {
+      const value = asText(data.siteTagline);
+      if (value === undefined) {
+        return c.json({ error: "siteTagline must be a string" }, 400);
+      }
+      await upsertSettingIfNotNull(
+        db,
+        SITE_TAGLINE_KEY,
+        value,
+        "general",
+        "Short tagline for the site — default meta description on public pages without their own description",
+      );
+      saved.siteTagline = value;
+    }
+    if ("timezone" in data && data.timezone !== undefined) {
+      const value = normalizeTimezone(data.timezone);
+      await upsertSetting(
+        db,
+        TIMEZONE_KEY,
+        value,
+        "general",
+        "Default timezone for the site",
+      );
+      saved.timezone = value;
+    }
+    if ("defaultLanguage" in data && data.defaultLanguage !== undefined) {
+      const value = normalizeDefaultLanguage(data.defaultLanguage);
+      await upsertSetting(
+        db,
+        DEFAULT_LANGUAGE_KEY,
+        value,
+        "brand",
+        "Default language of the public site: en (English), bn (Bangla), or system (auto-detect from the visitor's device language). A visitor's manual switch always wins.",
+      );
+      saved.defaultLanguage = value;
+    }
+    if (Object.keys(saved).length > 0) {
+      void purgePublicCache(c.env, ["home"], waitUntilOf(c));
+    }
+    return c.json(saved);
+  } catch (err) {
+    return c.json({ error: errorMessage(err) }, 500);
+  }
+});
+
+// ─── Notifications ───────────────────────────────────────────────────────────
+// One JSONB row (key "notifications"): { emailEnabled, newLead,
+// abandonedLead }. Preferences only — there is NO email sender in the
+// codebase today, so nothing is actually sent; the admin page says so
+// plainly. No cache purge: these preferences never reach a public page.
+
+const notificationsSchema = z.object({
+  emailEnabled: z.boolean(),
+  newLead: z.boolean(),
+  abandonedLead: z.boolean(),
+});
+
+app.get("/notifications", async (c) => {
+  try {
+    const user = await requireAuth(c);
+    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const db = getApiDb();
+    const row = await findSetting(db, NOTIFICATIONS_KEY);
+    return c.json(normalizeNotifications(row?.value));
+  } catch (err) {
+    return c.json({ error: errorMessage(err) }, 500);
+  }
+});
+
+app.put("/notifications", async (c) => {
+  try {
+    const user = await requireAuth(c);
+    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, notificationsSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const value = normalizeNotifications(v.data);
+    const db = getApiDb();
+    await upsertSetting(
+      db,
+      NOTIFICATIONS_KEY,
+      value,
+      "notifications",
+      "Email notification preferences: master switch + per-event toggles for new leads and abandoned leads",
+    );
+    return c.json(value);
   } catch (err) {
     return c.json({ error: errorMessage(err) }, 500);
   }

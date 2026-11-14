@@ -56,30 +56,22 @@ export const en: Dict = {
 	statProjects: "Projects",
 	statClients: "Clients",
 	statReleases: "Releases",
-	releasesSub:
-		"Nasheed, tilawat, podcast and lecture — every release with the platforms it lives on.",
 	// Services
 	servicesTitle: "Services",
-	servicesSub: "What I can build and improve for your business.",
 	learnMoreAbout: "Learn more about",
 	contactAboutService: "Contact about this service",
 	openingContact: "Opening contact…",
 	close: "Close",
 	// Home sections
 	projectsTitle: "Projects",
-	projectsSub: "Selected work — real systems running real businesses.",
 	viewAllProjects: "View all projects →",
 	viewAllCaseStudies: "View all case studies →",
 	viewAllPosts: "View all posts →",
 	viewAllReleases: "View all releases →",
 	viewAllVentures: "View all ventures →",
 	caseStudiesTitle: "Case studies",
-	caseStudiesSub:
-		"The problem, the fix, the result — in one line each. Tap a case study to read the full story.",
 	readCaseStudy: "Read the case study",
 	stackTitle: "The stack I work in",
-	stackSub:
-		"The tools behind the products above — drag the globe to explore them all.",
 	stackFilter: "Filter stack by category",
 	nowLabel: "Now:",
 	spin: "Spin",
@@ -94,8 +86,6 @@ export const en: Dict = {
 	catConcepts: "Concepts",
 	catAuth: "Auth",
 	beyondTitle: "Beyond the code",
-	beyondSub:
-		"One person, two more callings — building companies, and recording nasheeds.",
 	entrepreneurTitle: "Entrepreneur & Public Figure",
 	entrepreneurText:
 		"Founder of three ventures — and alongside them, community and charitable initiatives in Dhaka, and talks on faith, work and technology.",
@@ -112,7 +102,6 @@ export const en: Dict = {
 	knowMeCta: "Know Me →",
 	clientsTitle: "Clients",
 	latestPostsTitle: "Latest posts",
-	latestPostsSub: "Notes on building, and on the nasheed work.",
 	contactTitle: "Have a project in mind?",
 	contactSub:
 		"Tell me what you are building — I reply personally, usually within a day.",

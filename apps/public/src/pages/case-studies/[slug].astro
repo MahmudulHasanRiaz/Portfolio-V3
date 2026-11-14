@@ -17,6 +17,7 @@ import {
 	absUrl,
 	dedupeBlocks,
 	mergeDetail,
+	seoString,
 	parseBodyBlocks,
 } from "../../lib/detail";
 import { optimizedImageUrl, optimizedSrcset } from "../../lib/images";
@@ -88,6 +89,16 @@ const buildData = buildEntry?.data as unknown as
 const d = mergeDetail(buildData, liveData) as unknown as
 	| CaseStudyData
 	| undefined;
+
+// Admin SEO overrides (Dashboard → SEO → Metadata): the API emits the
+// row's own meta columns overlaid with the seo_meta row. These feed the
+// Layout head tags ONLY — visible page content keeps using the plain
+// title/description below.
+const seoTitle = seoString(d, "metaTitle");
+const seoDescription = seoString(d, "metaDescription");
+const seoOgImage = seoString(d, "ogImage");
+const seoCanonical = seoString(d, "canonicalUrl");
+const seoKeywords = seoString(d, "keywords");
 
 // The story body, rendered ONCE: the live content string, else the
 // build-time markdown body. Any paragraph that merely restates the
@@ -186,14 +197,16 @@ const jsonLd = d
 
 <Layout
 	title={
-		d
+		seoTitle ??
+		(d
 			? `${d.title} — Mahmudul Hasan Riaz`
-			: `${t.notFoundCaseStudy} — Mahmudul Hasan Riaz`
+			: `${t.notFoundCaseStudy} — Mahmudul Hasan Riaz`)
 	}
-	description={d?.description}
+	description={seoDescription ?? d?.description}
 	ogType="article"
-	ogImage={coverImage ? absUrl(optimizedImageUrl(coverImage, 1200), siteBase) : null}
-	canonical={pageUrl}
+	ogImage={seoOgImage ?? (coverImage ? absUrl(optimizedImageUrl(coverImage, 1200), siteBase) : null)}
+	canonical={seoCanonical ?? pageUrl}
+	keywords={seoKeywords}
 	lang={lang}
 >
 	{

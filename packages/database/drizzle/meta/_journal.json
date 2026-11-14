@@ -260,6 +260,13 @@
       "when": 1794576005406,
       "tag": "0036_client_logo_display_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1794635372196,
+      "tag": "0037_venture_categories",
+      "breakpoints": true
     }
   ]
 }
