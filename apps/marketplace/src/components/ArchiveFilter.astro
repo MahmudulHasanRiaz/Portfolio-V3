@@ -25,7 +25,12 @@
 // shareable/bookmarkable, and card tag pills can link to it. The
 // filter reads the param on load and applies it; "all" leaves the
 // URL clean (no param). An unknown value falls back to "all" and the
-// param is dropped.
+// param is dropped. A page may opt into `normalize="slug"`: the
+// initial URL value is then slugified before matching (ventures
+// pages only — their chip values are slugs, so a legacy URL like
+// ?filter=Active%2C+ongoing maps to "active-ongoing"; the address
+// bar is canonicalized to the slug via replaceState). Other pages
+// must NOT opt in — their values are tag names that match exactly.
 //
 // Filtering is still client-side, no framework, one tiny inline
 // script: cards are matched per `mode` — "card-tag-text" (projects:
@@ -55,6 +60,14 @@ interface Props {
 	cardSelector: string;
 	id?: string;
 	style?: string;
+	// Opt-in URL normalization: when "slug", the initial ?filter=
+	// value is slugified before matching (ventures pages only — their
+	// chip values are slugs, so a legacy URL like
+	// ?filter=Active%2C+ongoing maps to "active-ongoing" instead of
+	// showing 0 results; 2026-11-24, PR #19). Other archive pages
+	// must NOT set this — their values are tag names ("E-commerce")
+	// that have to match exactly.
+	normalize?: "slug";
 }
 
 const {
@@ -66,6 +79,7 @@ const {
 	cardSelector,
 	id,
 	style,
+	normalize,
 } = Astro.props;
 
 // Biggest categories first (ties: alphabetical), so the row opens on
@@ -85,6 +99,7 @@ const sorted = [...items].sort(
 	data-grid={gridSelector}
 	data-count={countSelector}
 	data-card={cardSelector}
+	data-normalize={normalize}
 >
 	<button
 		type="button"
@@ -128,6 +143,18 @@ const sorted = [...items].sort(
 			} catch (e) {
 				return "all";
 			}
+		}
+
+		// Mirror of slugify() in src/lib/content.ts: lowercase, runs
+		// of non-alphanumerics become one "-", leading/trailing "-"
+		// trimmed. Used only when the filter root opts in via
+		// data-normalize="slug".
+		function slugify(value) {
+			return String(value || "")
+				.toLowerCase()
+				.trim()
+				.replace(/[^a-z0-9]+/g, "-")
+				.replace(/^-+|-+$/g, "");
 		}
 
 		function writeFilterToUrl(value) {
@@ -270,19 +297,35 @@ const sorted = [...items].sort(
 			// Initial state from the URL (?filter=). An unknown value
 			// falls back to "all" and the bad param is dropped.
 			var initial = readFilterFromUrl();
+			// Ventures pages opt into slug normalization
+			// (data-normalize="slug"): a legacy URL like
+			// ?filter=Active%2C+ongoing is slugified to the chip value
+			// "active-ongoing" before matching, so an old shared link
+			// still filters instead of showing 0 results
+			// (2026-11-24, PR #19). Other archive pages do NOT
+			// normalize — their filter values are tag names
+			// ("E-commerce") that must match exactly.
+			var normalize =
+				root.getAttribute("data-normalize") === "slug";
+			var normalized = normalize ? slugify(initial) : initial;
 			var known =
-				initial === "all" ||
+				normalized === "all" ||
 				Array.prototype.some.call(
 					root.querySelectorAll(".chip[data-filter]"),
 					function (chip) {
 						return (
-							chip.getAttribute("data-filter") === initial
+							chip.getAttribute("data-filter") ===
+							normalized
 						);
 					},
 				);
-			applyFilter(root, known ? initial : "all", {
+			applyFilter(root, known ? normalized : "all", {
 				scroll: false,
-				syncUrl: !known,
+				// Sync the URL when the value was unknown (drop the
+				// bad param, as before) or when normalization changed
+				// it — a legacy URL is canonicalized to its slug via
+				// replaceState, so the address bar ends up clean.
+				syncUrl: !known || normalized !== initial,
 			});
 		}
 
