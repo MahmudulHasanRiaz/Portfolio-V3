@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button, Input, Textarea, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@repo/ui";
 import { createContent } from "@/actions/content";
+import { toErrorMessage } from "@/lib/error-message";
 import { useRouter } from "next/navigation";
 import { ContentMediaFields, parseUrlList } from "@/components/content-media-fields";
 import { ContentTechnologiesField, type TechnologyOption } from "@/components/content-technologies-field";
@@ -59,7 +60,7 @@ export default function NewProjectPage() {
       }
       router.push(`/dashboard/projects/${result.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create project");
+      setError(toErrorMessage(err, "Failed to create project"));
     } finally {
       setLoading(false);
     }

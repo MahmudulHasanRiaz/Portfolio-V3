@@ -336,7 +336,10 @@ const POST_STATUS_SCHEMA = z.enum([
 
 // ─── Helpers (items-only) ────────────────────────────────────────────────────
 
-/** RevisionService.create, re-implemented with direct Drizzle calls. */
+/** RevisionService.create, re-implemented with direct Drizzle calls.
+ * Best-effort: a revision is an audit trail, never a reason to fail a
+ * content save — if the snapshot insert fails (e.g. a jsonb shape the
+ * driver dislikes), log it and let the save proceed. */
 async function createRevision(
   db: ReturnType<typeof getApiDb>,
   entityType: string,
@@ -344,23 +347,27 @@ async function createRevision(
   snapshot: Record<string, unknown>,
   userId: string,
 ): Promise<void> {
-  const [latest] = await db
-    .select({ maxRev: count() })
-    .from(contentRevisions)
-    .where(
-      and(
-        eq(contentRevisions.entityType, entityType),
-        eq(contentRevisions.entityId, entityId),
-      ),
-    );
-  const revisionNumber = (Number(latest?.maxRev) || 0) + 1;
-  await db.insert(contentRevisions).values({
-    entityType,
-    entityId,
-    revisionNumber,
-    contentSnapshot: snapshot,
-    createdBy: userId,
-  });
+  try {
+    const [latest] = await db
+      .select({ maxRev: count() })
+      .from(contentRevisions)
+      .where(
+        and(
+          eq(contentRevisions.entityType, entityType),
+          eq(contentRevisions.entityId, entityId),
+        ),
+      );
+    const revisionNumber = (Number(latest?.maxRev) || 0) + 1;
+    await db.insert(contentRevisions).values({
+      entityType,
+      entityId,
+      revisionNumber,
+      contentSnapshot: snapshot,
+      createdBy: userId,
+    });
+  } catch (err) {
+    console.error(`[Content] Failed to snapshot revision for ${entityType}/${entityId}:`, err);
+  }
 }
 
 async function getContentRow(
