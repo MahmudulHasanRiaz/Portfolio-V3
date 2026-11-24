@@ -760,7 +760,8 @@ export async function listFolders(
   const folders = await db.select().from(mediaFolders).where(where);
   const nodes: FolderNode[] = [];
   for (const f of folders) {
-    const [assetCount] = await db
+    const children = await listFolders(db, f.id);
+    const [direct] = await db
       .select({ count: count() })
       .from(mediaAssets)
       .where(
@@ -769,14 +770,20 @@ export async function listFolders(
           isNull(mediaAssets.deletedAt),
         ),
       );
-    const children = await listFolders(db, f.id);
+    const directCount = Number(direct?.count || 0);
+    // Subtree total, not just this folder's own files: a parent whose
+    // files all live in subfolders showed "0" before, which read as
+    // broken. Children already carry their own subtree totals, so the
+    // sum is the whole subtree.
+    const assetCount =
+      directCount + children.reduce((sum, c) => sum + (c.assetCount || 0), 0);
     nodes.push({
       id: f.id,
       name: f.name || "",
       path: f.path || "",
       parentId: f.parentId,
       children,
-      assetCount: Number(assetCount?.count || 0),
+      assetCount,
     });
   }
   return nodes;

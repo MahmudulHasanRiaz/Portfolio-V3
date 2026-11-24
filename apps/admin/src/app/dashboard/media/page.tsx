@@ -5,11 +5,12 @@ import { Button, Select, SelectTrigger, SelectValue, SelectContent, SelectItem }
 import { Upload, FolderPlus } from "lucide-react";
 import { MediaGrid } from "./components/media-grid";
 import { FolderTree } from "./components/folder-tree";
+import { NewFolderDialog } from "./components/new-folder-dialog";
 import { UploadDialog } from "./components/upload-dialog";
 import { MetadataPanel, type MediaUpdateData } from "./components/metadata-panel";
 import { MediaSearch } from "./components/media-search";
 import { SelectionToolbar } from "./components/selection-toolbar";
-import { flattenFolders } from "./components/media-types";
+import { findFolderPath, flattenFolders } from "./components/media-types";
 import type { MediaItem, FolderNode } from "./components/media-types";
 import { ConfirmDialog, PromptDialog } from "../../../components/confirm-dialog";
 
@@ -161,6 +162,9 @@ export default function MediaLibraryPage() {
     });
     if (res.ok) {
       fetchItems();
+      // A move changes folder counts — refresh the tree too, or the
+      // sidebar badges go stale (the "0" that looked broken).
+      fetchFolders();
       return { ok: true as const };
     }
     let error = "Could not save changes.";
@@ -178,15 +182,17 @@ export default function MediaLibraryPage() {
     if (res.ok) {
       setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
       fetchItems();
+      fetchFolders();
     }
-  }, [fetchItems]);
+  }, [fetchItems, fetchFolders]);
 
   const handleRestore = useCallback(async (id: string) => {
     const res = await fetch(`/api/media/${id}/restore`, { method: "POST" });
     if (res.ok) {
       fetchItems();
+      fetchFolders();
     }
-  }, [fetchItems]);
+  }, [fetchItems, fetchFolders]);
 
   const handleBulkDelete = useCallback(async () => {
     setBulkDeleting(true);
@@ -196,7 +202,14 @@ export default function MediaLibraryPage() {
     setBulkDeleting(false);
     setSelectedIds(new Set());
     fetchItems();
-  }, [selectedIds, fetchItems]);
+    fetchFolders();
+  }, [selectedIds, fetchItems, fetchFolders]);
+
+  // Uploads change folder counts as well — refresh the tree with the grid.
+  const handleUploadComplete = useCallback(() => {
+    fetchItems();
+    fetchFolders();
+  }, [fetchItems, fetchFolders]);
 
   const handleCreateFolder = useCallback(async (name: string, parentId?: string) => {
     setFolderError("");
@@ -206,20 +219,30 @@ export default function MediaLibraryPage() {
       body: JSON.stringify({ name, parentId }),
     });
     if (res.ok) {
-      fetchFolders();
-    } else {
-      // Surface the real API error (e.g. "Invalid id") instead of only
-      // the generic text — a silent/generic failure hid the routing bug
-      // that broke folder creation entirely.
-      let message = "Could not create folder.";
+      // Return the new id so the dialog's caller can select it (the tree
+      // auto-expands its ancestors, so the new folder is visible at once).
+      let id: string | undefined;
       try {
         const body = await res.json();
-        if (body.error) message = body.error;
+        if (body?.data?.id) id = body.data.id as string;
       } catch {
-        // Keep the default message.
+        // The folder was created; the id is only a convenience.
       }
-      setFolderError(message);
+      await fetchFolders();
+      return { ok: true as const, id };
     }
+    // Surface the real API error (e.g. "Invalid id") instead of only
+    // the generic text — a silent/generic failure hid the routing bug
+    // that broke folder creation entirely.
+    let message = "Could not create folder.";
+    try {
+      const body = await res.json();
+      if (body.error) message = body.error;
+    } catch {
+      // Keep the default message.
+    }
+    setFolderError(message);
+    return { ok: false as const, error: message };
   }, [fetchFolders]);
 
   const handleRenameFolder = useCallback(async (name: string) => {
@@ -273,15 +296,30 @@ export default function MediaLibraryPage() {
 
       <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
         {!isMobile && (
-          <div style={{ width: 220, flexShrink: 0, background: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: 14, padding: "4px 8px 8px" }}>
-            <FolderTree
-              folders={folders}
-              selectedFolderId={selectedFolderId}
-              onSelectFolder={setSelectedFolderId}
-              onCreateFolder={(parentId) => { setNewFolderParentId(parentId); setNewFolderOpen(true); }}
-              onRenameFolder={setRenameFolder}
-              onDeleteFolder={setDeleteFolder}
-            />
+          <div style={{
+            width: 260,
+            flexShrink: 0,
+            position: "sticky",
+            top: 16,
+            maxHeight: "calc(100vh - 32px)",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            background: "var(--bg-card)",
+            border: "1px solid var(--border-color)",
+            borderRadius: 14,
+            padding: "4px 8px 8px",
+          }}>
+            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+              <FolderTree
+                folders={folders}
+                selectedFolderId={selectedFolderId}
+                onSelectFolder={setSelectedFolderId}
+                onCreateFolder={(parentId) => { setNewFolderParentId(parentId); setNewFolderOpen(true); }}
+                onRenameFolder={setRenameFolder}
+                onDeleteFolder={setDeleteFolder}
+              />
+            </div>
             {folderError && (
               <p style={{ fontSize: 12, color: "var(--accent-danger)", padding: "4px 8px", margin: 0 }}>{folderError}</p>
             )}
@@ -289,18 +327,49 @@ export default function MediaLibraryPage() {
         )}
 
         <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Breadcrumb — the current folder's full path, so a deep nest
+              never leaves you guessing where you are. Segments jump. */}
+          <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", marginBottom: 12, fontSize: 13 }}>
+            <button
+              onClick={() => setSelectedFolderId(null)}
+              style={{
+                background: "none", border: "none", cursor: "pointer", padding: 0,
+                fontSize: 13, fontWeight: selectedFolderId === null ? 700 : 400,
+                color: selectedFolderId === null ? "var(--text-primary)" : "var(--accent-primary)",
+              }}
+            >
+              All Media
+            </button>
+            {(selectedFolderId ? findFolderPath(folders, selectedFolderId) || [] : []).map((f, i, arr) => (
+              <span key={f.id} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ color: "var(--text-muted)" }}>/</span>
+                <button
+                  onClick={() => setSelectedFolderId(f.id)}
+                  title={arr.slice(0, i + 1).map((x) => x.name).join(" / ")}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer", padding: 0,
+                    fontSize: 13, fontWeight: i === arr.length - 1 ? 700 : 400,
+                    color: i === arr.length - 1 ? "var(--text-primary)" : "var(--accent-primary)",
+                  }}
+                >
+                  {f.name}
+                </button>
+              </span>
+            ))}
+          </div>
+
           <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center", flexWrap: "wrap" }}>
             <MediaSearch value={searchQuery} onChange={setSearchQuery} />
             {isMobile && (
               <Select value={selectedFolderId || "all"} onValueChange={(v) => setSelectedFolderId(v === "all" ? null : v)}>
-                <SelectTrigger style={{ width: 150 }}>
+                <SelectTrigger style={{ width: 200 }}>
                   <SelectValue placeholder="All folders" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All folders</SelectItem>
                   {flatFolders.map((f) => (
-                    <SelectItem key={f.id} value={f.id}>
-                      {"\u00A0\u00A0".repeat(f.depth)}{f.name}
+                    <SelectItem key={f.id} value={f.id} title={f.displayPath}>
+                      {f.displayPath}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -351,7 +420,7 @@ export default function MediaLibraryPage() {
               </SelectContent>
             </Select>
             {isMobile && (
-              <Button variant="outline" size="sm" onClick={() => { setNewFolderParentId(undefined); setNewFolderOpen(true); }}>
+              <Button variant="outline" size="sm" onClick={() => { setNewFolderParentId(selectedFolderId ?? undefined); setNewFolderOpen(true); }}>
                 <FolderPlus size={14} style={{ marginRight: 4 }} />New folder
               </Button>
             )}
@@ -403,7 +472,7 @@ export default function MediaLibraryPage() {
         open={uploadOpen}
         onOpenChange={setUploadOpen}
         folderId={selectedFolderId || undefined}
-        onUploadComplete={fetchItems}
+        onUploadComplete={handleUploadComplete}
       />
 
       <MetadataPanel
@@ -415,15 +484,13 @@ export default function MediaLibraryPage() {
         onRestore={handleRestore}
       />
 
-      <PromptDialog
+      <NewFolderDialog
         open={newFolderOpen}
         onOpenChange={setNewFolderOpen}
-        title="New folder"
-        message={newFolderParentId ? "Create a subfolder inside the selected folder." : "Create a folder to organise your media."}
-        label="Folder name"
-        placeholder="e.g. Projects"
-        confirmLabel="Create"
-        onConfirm={(name) => handleCreateFolder(name, newFolderParentId)}
+        folders={folders}
+        defaultParentId={newFolderParentId}
+        onConfirm={handleCreateFolder}
+        onCreated={(id) => setSelectedFolderId(id)}
       />
 
       <PromptDialog
