@@ -23,6 +23,7 @@ import {
 	optimizedSrcset,
 	unsplashSrcset,
 } from "../lib/images";
+import GalleryFigure from "./GalleryFigure.astro";
 
 interface VideoItem {
 	url: string;
@@ -110,16 +111,14 @@ const videoGridClass =
 					<section class="media-slider" data-media-slider data-per-view={galleryPerView} aria-label={t.galleryLabel} data-counter-template={t.mediaCounter} data-counter-lang={lang}>
 						<div class="media-track">
 							{cleanGallery.map((src, i) => (
-								<figure class="media-slide">
-									<img
-										src={sizedThumb(src)}
-										srcset={gallerySrcset(src)}
-										sizes="(max-width: 640px) 100vw, (max-width: 1023px) 50vw, 720px"
-										alt={`${base} ${counterText(i + 1, cleanGallery.length)}`}
-										loading="lazy"
-										decoding="async"
-									/>
-								</figure>
+								<GalleryFigure
+									src={src}
+									thumb={sizedThumb(src)}
+									srcset={gallerySrcset(src)}
+									alt={`${base} ${counterText(i + 1, cleanGallery.length)}`}
+									index={i}
+									slide
+								/>
 							))}
 						</div>
 						<div class="slider-controls">
@@ -156,16 +155,13 @@ const videoGridClass =
 				) : (
 					<div class={`media-grid ${galleryGridClass}`}>
 						{cleanGallery.map((src, i) => (
-							<figure>
-								<img
-									src={sizedThumb(src)}
-									srcset={gallerySrcset(src)}
-									sizes="(max-width: 640px) 100vw, (max-width: 1023px) 50vw, 720px"
-									alt={`${base} ${counterText(i + 1, cleanGallery.length)}`}
-									loading="lazy"
-									decoding="async"
-								/>
-							</figure>
+							<GalleryFigure
+								src={src}
+								thumb={sizedThumb(src)}
+								srcset={gallerySrcset(src)}
+								alt={`${base} ${counterText(i + 1, cleanGallery.length)}`}
+								index={i}
+							/>
 						))}
 					</div>
 				))}
@@ -231,6 +227,47 @@ const videoGridClass =
 						))}
 					</div>
 				))}
+			{cleanGallery.length > 0 && (
+				<div
+					class="lightbox"
+					data-lightbox
+					data-counter-template={t.mediaCounter}
+					data-counter-lang={lang}
+					hidden
+					role="dialog"
+					aria-modal="true"
+					aria-label={t.galleryLabel}
+				>
+					<button
+						type="button"
+						class="lightbox-close"
+						data-lightbox-close
+						aria-label={t.close}
+					>
+						×
+					</button>
+					<button
+						type="button"
+						class="lightbox-nav lightbox-prev"
+						data-lightbox-prev
+						aria-label={t.prevImages}
+					>
+						‹
+					</button>
+					<figure class="lightbox-figure">
+						<img data-lightbox-img alt="" />
+						<figcaption class="lightbox-counter" data-lightbox-counter />
+					</figure>
+					<button
+						type="button"
+						class="lightbox-nav lightbox-next"
+						data-lightbox-next
+						aria-label={t.nextImages}
+					>
+						›
+					</button>
+				</div>
+			)}
 		</div>
 	)
 }
