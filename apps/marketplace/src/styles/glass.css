@@ -3183,7 +3183,16 @@ html[lang="bn"] .hero-name {
    16/10 frame over the uncropped image — detail page only. The frame
    auto-scrolls slowly (detail.js); without JS, or with
    prefers-reduced-motion, it stays manually scrollable. The frame is
-   a button, so it opens the lightbox like any other tile. */
+   a button, so it opens the lightbox like any other tile.
+   ROOT CAUSE (PR #12, 2026-11-24): the viewport used `height: 100%`
+   inside the <button>, but percentage heights do not constrain inside
+   a button in Chrome — the viewport grew to its content height, so
+   scrollHeight === clientHeight, detail.js computed max = 0, and the
+   frame never scrolled (it looked like a normal static tile). The
+   viewport MUST be absolutely positioned (inset: 0) against the
+   relatively-positioned button — that gives it a definite height by
+   construction, independent of button percentage-height behaviour.
+   Do not revert this to height: 100%. */
 .media-scroll-frame {
 	aspect-ratio: 16 / 10;
 	overflow: hidden;
@@ -3194,7 +3203,8 @@ html[lang="bn"] .hero-name {
 
 .scroll-frame-viewport {
 	display: block;
-	height: 100%;
+	position: absolute;
+	inset: 0;
 	overflow-y: auto;
 	scrollbar-width: none;
 	-webkit-overflow-scrolling: touch;
@@ -3205,10 +3215,13 @@ html[lang="bn"] .hero-name {
 }
 
 /* Un-crop the image inside a scroll frame: the inherited 16/10 +
-   object-fit: cover would cut the tall screenshot down to a tile. */
+   object-fit: cover would cut the tall screenshot down to a tile.
+   height: auto + aspect-ratio: auto + width: 100% render the image at
+   its natural (tall) height, so the viewport has something to scroll. */
 .media-grid .scroll-frame-viewport img,
 .media-slide .scroll-frame-viewport img {
 	aspect-ratio: auto;
+	height: auto;
 }
 
 /* Bottom fade hints that the frame scrolls. */
