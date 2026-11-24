@@ -5,7 +5,7 @@
 //   future domain) while the live site is on workers.dev.
 // - Body rendering: live entries carry their body as a plain `content`
 //   string. `parseBodyBlocks` turns it into the preview's content
-//   blocks ('## ' lines become h2 section headings, the rest
+//   blocks ('## ' lines become h3 sub-headings, the rest
 //   paragraphs). Build-time entries render markdown natively.
 // - `isNearDuplicate` / `dedupeBlocks` stop the same story rendering
 //   twice (case-study body vs problem/fix/result; venture body vs
@@ -181,7 +181,7 @@ export function splitParagraphs(text: string | null | undefined): string[] {
 }
 
 export interface BodyBlock {
-	kind: "h2" | "p" | "img";
+	kind: "h3" | "p" | "img";
 	text: string;
 	/** Image URL — img blocks only. */
 	src?: string;
@@ -190,7 +190,7 @@ export interface BodyBlock {
 }
 
 /**
- * The preview's content blocks: a '## ' line is an h2 section heading,
+ * The preview's content blocks: a '## ' line is an h3 sub-heading,
  * a line that is exactly a markdown image `![alt](url)` is an img
  * block, every other block is a paragraph. Single newlines inside a
  * block are line wraps, not new blocks.
@@ -215,7 +215,7 @@ export function parseBodyBlocks(
 			if (!trimmed) continue;
 			if (/^#{1,2}\s+/.test(trimmed)) {
 				blocks.push({
-					kind: "h2",
+					kind: "h3",
 					text: trimmed.replace(/^#{1,2}\s+/, "").trim(),
 				});
 			} else if (
