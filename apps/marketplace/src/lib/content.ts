@@ -25,6 +25,7 @@ import {
 	type StackTech,
 } from "../data/site";
 import { getSiteSettings } from "./settings";
+import { markLiveFallback } from "./live-fallback";
 import {
 	liveCollectionReachable,
 	warnLiveFallbackOnce,
@@ -137,7 +138,17 @@ async function mergeWithLive<
 		}
 		live = [];
 	}
-	if (!reachable) warnLiveFallbackOnce(liveType);
+	// PR #21: unreachable (probe failed, or the load threw after the
+	// probe passed) means this list renders the static rows only — a
+	// stale snapshot that must never be cached. Mark the request; the
+	// middleware serves it no-store so the next request retries live.
+	// (liveCollectionReachable already marks on a failed probe; this
+	// also covers the load-threw-after-probe-passed path. Double marks
+	// are harmless — the flag is a boolean.)
+	if (!reachable) {
+		warnLiveFallbackOnce(liveType);
+		markLiveFallback();
+	}
 	const liveSlugs = new Set(live.map((item) => item.data.slug));
 	const bySlug = new Map<string, T>();
 	for (const item of buildTime) {

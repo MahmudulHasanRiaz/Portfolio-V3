@@ -22,6 +22,11 @@
 // so the loader is typed structurally here; defineLiveCollection() in
 // src/live.config.ts validates the shape against Astro's LiveLoader.
 
+// PR #21: when a live load falls back to static rows / default
+// settings, the request is marked (markLiveFallback) so the middleware
+// serves it no-store instead of caching the stale snapshot for 1 h.
+import { markLiveFallback } from "../lib/live-fallback";
+
 export type PublicContentType =
 	| "posts"
 	| "projects"
@@ -716,17 +721,27 @@ async function fetchPublicSettingsUncached(
 	// Build-prerender skip (see isLiveFetchAllowed): the build machine
 	// cannot reach the API, so return the fail-safe defaults at once
 	// instead of waiting out the 8s timeout on every page.
-	if (!(await isLiveFetchAllowed())) return { ...DEFAULT_PUBLIC_SETTINGS };
+	// PR #21: mark the fallback (no-op at build time — no ALS store
+	// there; at request time a closed gate means the page renders on
+	// default settings, e.g. the default favicon, so it must not cache).
+	if (!(await isLiveFetchAllowed())) {
+		markLiveFallback();
+		return { ...DEFAULT_PUBLIC_SETTINGS };
+	}
 	try {
 		const cached: ResolvedBase = { done: false };
 		const apiBase = await resolveApiBase({ apiUrl: base }, cached);
-		if (!apiBase) return { ...DEFAULT_PUBLIC_SETTINGS };
+		if (!apiBase) {
+			markLiveFallback();
+			return { ...DEFAULT_PUBLIC_SETTINGS };
+		}
 		const resolvedToken = token ?? (await resolvePublicContentToken());
 		const raw = await fetchJson(
 			`${apiBase}/api/public/settings`,
 			resolvedToken,
 		);
 		if (typeof raw !== "object" || raw === null) {
+			markLiveFallback();
 			return { ...DEFAULT_PUBLIC_SETTINGS };
 		}
 		const record = raw as Record<string, unknown>;
@@ -911,6 +926,10 @@ async function fetchPublicSettingsUncached(
 			bn,
 		};
 	} catch {
+		// PR #21: the settings fetch failed — the page renders on the
+		// fail-safe defaults (default favicon etc.), so mark the
+		// fallback; the middleware serves it no-store.
+		markLiveFallback();
 		return { ...DEFAULT_PUBLIC_SETTINGS };
 	}
 }
@@ -935,24 +954,33 @@ async function fetchPublicSettingsUncached(
 export async function liveCollectionReachable(
 	type: PublicContentType,
 ): Promise<boolean> {
+	// PR #21: every caller falls back to the static rows when this
+	// returns false (mergeWithLive + all 10 detail pages), so a false
+	// result marks the request — the middleware then serves it no-store
+	// instead of caching the stale fallback for 1 h. Single exit so no
+	// failure path can skip the mark.
+	let ok = false;
 	try {
-		if (!(await isLiveFetchAllowed())) return false;
-		const cached: ResolvedBase = { done: false };
-		const base = await resolveApiBase({}, cached);
-		if (!base) return false;
-		const token = await resolvePublicContentToken();
-		const raw = await fetchJson(
-			`${base}/api/public/content/${type}`,
-			token,
-		);
-		if (Array.isArray(raw)) return true;
-		if (typeof raw === "object" && raw !== null) {
-			return Array.isArray((raw as { items?: unknown }).items);
+		if (await isLiveFetchAllowed()) {
+			const cached: ResolvedBase = { done: false };
+			const base = await resolveApiBase({}, cached);
+			if (base) {
+				const token = await resolvePublicContentToken();
+				const raw = await fetchJson(
+					`${base}/api/public/content/${type}`,
+					token,
+				);
+				if (Array.isArray(raw)) ok = true;
+				else if (typeof raw === "object" && raw !== null) {
+					ok = Array.isArray((raw as { items?: unknown }).items);
+				}
+			}
 		}
-		return false;
 	} catch {
-		return false;
+		ok = false;
 	}
+	if (!ok) markLiveFallback();
+	return ok;
 }
 
 /**

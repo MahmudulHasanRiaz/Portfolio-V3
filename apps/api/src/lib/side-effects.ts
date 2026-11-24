@@ -91,6 +91,16 @@ function publicSiteUrl(env: unknown): string {
   return raw.replace(/\/+$/, "");
 }
 
+/** Default marketplace Worker origin; MARKETPLACE_SITE_URL overrides it. */
+export const DEFAULT_MARKETPLACE_SITE_URL =
+  "https://portfolio-v3-marketplace.riaaz.workers.dev";
+
+function marketplaceSiteUrl(env: unknown): string {
+  const raw =
+    readEnv(env, "MARKETPLACE_SITE_URL") ?? DEFAULT_MARKETPLACE_SITE_URL;
+  return raw.replace(/\/+$/, "");
+}
+
 // ─── 1. Public-site cache purge ──────────────────────────────────────────────
 
 const PURGE_TIMEOUT_MS = 5000;
@@ -98,6 +108,77 @@ const PURGE_TIMEOUT_MS = 5000;
 // Warn once per process when the purge is unconfigured, so a missing
 // secret is visible in the API log without spamming it on every save.
 let warnedMissingConfig = false;
+
+/**
+ * Purge ONE public-facing site (public or marketplace) by tag.
+ * Best-effort, never throws: a failed purge is logged, never fatal.
+ *
+ * Service binding first (2026-11-13): a Worker CANNOT fetch another
+ * Worker's `*.workers.dev` URL from inside the Worker (Cloudflare
+ * "error code: 1042" — the `workers.dev` hostname does not resolve
+ * in the Worker's subrequest context). The plain-HTTPS purge below
+ * therefore 1042s in production and the cache is never purged (edits
+ * take up to the 1 h TTL to appear). The service binding
+ * (wrangler.jsonc `services`) calls the target Worker directly with
+ * no DNS, so the purge actually lands. The binding routes by service,
+ * not hostname, so the Request uses a placeholder origin; only the
+ * path + headers + body reach the target worker. Without a binding
+ * (local dev) the HTTPS fetch is used — it resolves fine from Node.
+ */
+async function purgeOneSite(
+  env: unknown,
+  opts: {
+    bindingName: string;
+    siteUrl: string;
+    label: string;
+    placeholderOrigin: string;
+  },
+  secret: string,
+  tags: string[],
+): Promise<void> {
+  const { bindingName, siteUrl, label, placeholderOrigin } = opts;
+  try {
+    const binding = (env as Record<string, unknown> | null)?.[
+      bindingName
+    ] as { fetch?: (req: Request) => Promise<Response> } | undefined;
+    let res: Response;
+    if (binding && typeof binding.fetch === "function") {
+      res = await binding.fetch(
+        new Request(`${placeholderOrigin}/api/cache/invalidate`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${secret}`,
+          },
+          body: JSON.stringify({ tags }),
+          signal: AbortSignal.timeout(PURGE_TIMEOUT_MS),
+        }),
+      );
+    } else {
+      res = await fetch(`${siteUrl}/api/cache/invalidate`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${secret}`,
+        },
+        body: JSON.stringify({ tags }),
+        signal: AbortSignal.timeout(PURGE_TIMEOUT_MS),
+      });
+    }
+    if (!res.ok) {
+      console.warn(
+        `[public-cache] purge failed (${res.status}) for ${label} tags ${tags.join(", ")} — ` +
+          "pages stay cached up to the 1 h TTL.",
+      );
+    }
+  } catch (err) {
+    console.warn(
+      `[public-cache] purge request failed for ${label} tags ${tags.join(", ")}: ` +
+        `${err instanceof Error ? err.message : String(err)} — ` +
+        "pages stay cached up to the 1 h TTL.",
+    );
+  }
+}
 
 export async function purgePublicCache(
   env: unknown,
@@ -110,7 +191,6 @@ export async function purgePublicCache(
     ];
     if (clean.length === 0) return;
 
-    const siteUrl = publicSiteUrl(env);
     const secret = readEnv(env, "CACHE_INVALIDATE_SECRET");
     if (!secret) {
       if (!warnedMissingConfig) {
@@ -123,61 +203,38 @@ export async function purgePublicCache(
       return;
     }
 
-    // Service binding first (2026-11-13): a Worker CANNOT fetch another
-    // Worker's `*.workers.dev` URL from inside the Worker (Cloudflare
-    // "error code: 1042" — the `workers.dev` hostname does not resolve
-    // in the Worker's subrequest context). The plain-HTTPS purge below
-    // therefore 1042s in production and the public cache is never
-    // purged (edits take up to the 1 h TTL to appear). The PUBLIC_SITE
-    // service binding (wrangler.jsonc `services`) calls the public
-    // Worker directly with no DNS, so the purge actually lands. The
-    // binding routes by service, not hostname, so the Request uses a
-    // placeholder origin; only the path + headers + body reach the
-    // public worker. Without a binding (local dev) the HTTPS fetch is
-    // used — it resolves fine from Node.
-    try {
-      const binding = (
-        env as Record<string, unknown> | null
-      )?.PUBLIC_SITE as
-        | { fetch?: (req: Request) => Promise<Response> }
-        | undefined;
-      let res: Response;
-      if (binding && typeof binding.fetch === "function") {
-        res = await binding.fetch(
-          new Request("https://public-site/api/cache/invalidate", {
-            method: "POST",
-            headers: {
-              "content-type": "application/json",
-              authorization: `Bearer ${secret}`,
-            },
-            body: JSON.stringify({ tags: clean }),
-            signal: AbortSignal.timeout(PURGE_TIMEOUT_MS),
-          }),
-        );
-      } else {
-        res = await fetch(`${siteUrl}/api/cache/invalidate`, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            authorization: `Bearer ${secret}`,
-          },
-          body: JSON.stringify({ tags: clean }),
-          signal: AbortSignal.timeout(PURGE_TIMEOUT_MS),
-        });
-      }
-      if (!res.ok) {
-        console.warn(
-          `[public-cache] purge failed (${res.status}) for tags ${clean.join(", ")} — ` +
-            "pages stay cached up to the 1 h TTL.",
-        );
-      }
-    } catch (err) {
-      console.warn(
-        `[public-cache] purge request failed for tags ${clean.join(", ")}: ` +
-          `${err instanceof Error ? err.message : String(err)} — ` +
-          "pages stay cached up to the 1 h TTL.",
-      );
-    }
+    // Purge BOTH public-facing sites (PR #21): the marketplace has
+    // the same tag-cached pages and the same stale-fallback risk, but
+    // it was never purged — its worker has no CACHE_INVALIDATE_SECRET
+    // set (its /api/cache/invalidate answers 503), so until that
+    // secret is set on the marketplace worker (Cloudflare dashboard,
+    // same value as the public worker) its purge 503s and warns here.
+    // Both purges are best-effort and independent: one failing never
+    // blocks the other (purgeOneSite never throws).
+    await Promise.all([
+      purgeOneSite(
+        env,
+        {
+          bindingName: "PUBLIC_SITE",
+          siteUrl: publicSiteUrl(env),
+          label: "public",
+          placeholderOrigin: "https://public-site",
+        },
+        secret,
+        clean,
+      ),
+      purgeOneSite(
+        env,
+        {
+          bindingName: "MARKETPLACE_SITE",
+          siteUrl: marketplaceSiteUrl(env),
+          label: "marketplace",
+          placeholderOrigin: "https://marketplace-site",
+        },
+        secret,
+        clean,
+      ),
+    ]);
   })();
   if (waitUntil) waitUntil(promise);
   return promise;
