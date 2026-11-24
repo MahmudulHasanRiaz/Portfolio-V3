@@ -5,16 +5,21 @@
   "compatibility_date": "2026-11-12",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
-  // Service binding to the public site worker (2026-11-13). The
-  // purgePublicCache side effect (lib/side-effects.ts) calls the
-  // public worker's /api/cache/invalidate to purge the edge cache on
+  // Service bindings to the public-facing site workers (2026-11-13).
+  // The purgePublicCache side effect (lib/side-effects.ts) calls each
+  // site worker's /api/cache/invalidate to purge the edge cache on
   // admin saves. A Worker CANNOT fetch another Worker's
   // `*.workers.dev` URL from inside the Worker (Cloudflare "error
-  // code: 1042"), so the purge goes through this binding instead of
+  // code: 1042"), so the purge goes through these bindings instead of
   // over HTTPS — the only free-tier path that works without a custom
   // domain. The PUBLIC_SITE_URL var is still kept as the local-dev /
-  // no-binding fallback.
-  "services": [{ "binding": "PUBLIC_SITE", "service": "portfolio-v3-public" }],
+  // no-binding fallback. PR #21 added MARKETPLACE_SITE: the
+  // marketplace has the same tag-cached pages and the same
+  // stale-fallback risk, but it was never purged.
+  "services": [
+    { "binding": "PUBLIC_SITE", "service": "portfolio-v3-public" },
+    { "binding": "MARKETPLACE_SITE", "service": "portfolio-v3-marketplace" }
+  ],
   // Workers Cron Trigger (2026-11-13): the V2 stack ran its scheduler
   // sidecar every 5 minutes, calling both cron routes (publish +
   // workflows). This trigger replaces it — one `*/5 * * * *` tick,
