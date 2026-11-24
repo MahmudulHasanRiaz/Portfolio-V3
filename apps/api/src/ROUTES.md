@@ -9,7 +9,7 @@ Generated from the route definitions in `apps/api/src/routes/`. Every entry belo
 - Shared logic lives in `src/lib/` (`admin-auth`, `errors`, `rate-limit`, `side-effects`, `validate`, `public-content`, `integrations`, `default-language`, `shared`).
 - Auth: every `/api/admin/*` route calls `requireAuth` (a valid Better Auth session) unless marked "Public (no auth)" below. `/api/public/*` uses the content token (env token or per-integration token). `/api/auth/*` is the Better Auth handler.
 
-**Total: 258 routes.**
+**Total: 259 routes.**
 
 ## public (4 routes)
 
@@ -209,7 +209,7 @@ Generated from the route definitions in `apps/api/src/routes/`. Every entry belo
 | GET | `/api/admin/leads/follow-up` | Authenticated | List follow-up | `admin/leads/items.ts` |
 | GET | `/api/admin/leads/stats` | Authenticated | List stats | `admin/leads/items.ts` |
 
-## media (15 routes)
+## media (16 routes)
 
 | Method | Path | Auth | What it does | File |
 |---|---|---|---|---|
@@ -227,6 +227,7 @@ Generated from the route definitions in `apps/api/src/routes/`. Every entry belo
 | PATCH | `/api/admin/media/folders/:id` | Public (no auth) | Update folder | `admin/media/folders.ts` |
 | PUT | `/api/admin/media/folders/:id` | Public (no auth) | Update folder | `admin/media/folders.ts` |
 | POST | `/api/admin/media/upload` | Authenticated | Create upload | `admin/media/items.ts` |
+| POST | `/api/admin/media/bulk-move` | Authenticated | Bulk move media to a folder | `admin/media/items.ts` |
 | GET | `/api/admin/media/usage/:id` | Authenticated | Get usage by id | `admin/media/items.ts` |
 
 ## portal (4 routes)

@@ -4,9 +4,9 @@
 // Shared helpers live in ./helpers.ts; folder routes in ./folders.ts.
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { and, asc, count, desc, eq, ilike, isNull, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNull, or } from "drizzle-orm";
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
-import { mediaAssets } from "@repo/database/schema";
+import { mediaAssets, mediaFolders } from "@repo/database/schema";
 import { getApiDb } from "../../../db";
 import { requireAuth } from "../../../lib/admin-auth";
 import { z } from "zod";
@@ -372,6 +372,63 @@ app.post("/upload", async (c) => {
     }
     return c.json(
       { error: err instanceof Error ? err.message : "Upload failed" },
+      500,
+    );
+  }
+});
+
+// ─── Bulk move ─────────────────────────────────────────────────────────────
+// One request moves many files to one folder — the UI must NOT loop
+// per-file PATCH calls for a bulk move (that is what "move one by one"
+// means to the user, and it is slow + half-applied on failure).
+// Registered here, right after /upload and BEFORE any /:id route: a
+// single-segment POST /:id route would swallow "bulk-move" as an id.
+// (There is no POST /:id today, but this placement keeps the static
+// segment safe by construction, same convention as /folders.)
+const bulkMoveSchema = z.object({
+  ids: z.array(uuidSchema).min(1).max(500),
+  // null = top level ("All Media").
+  folderId: uuidSchema.nullable(),
+});
+
+app.post("/bulk-move", async (c) => {
+  try {
+    const user = await requireAuth(c);
+    if (!user) return c.json({ error: "Unauthorized" }, 401);
+    const body = await readJsonBody(c);
+    if (!isRecord(body)) return c.json({ error: "Invalid request body" }, 400);
+    const v = validateBody(body, bulkMoveSchema);
+    if ("error" in v) return c.json({ error: v.error }, 400);
+    const ids = [...new Set(v.data.ids)];
+    const folderId = v.data.folderId;
+    const db = getApiDb();
+    if (folderId !== null) {
+      const [folder] = await db
+        .select({ id: mediaFolders.id })
+        .from(mediaFolders)
+        .where(eq(mediaFolders.id, folderId))
+        .limit(1);
+      if (!folder) return c.json({ error: "Folder not found" }, 400);
+    }
+    const rows = await db
+      .select({ id: mediaAssets.id })
+      .from(mediaAssets)
+      .where(inArray(mediaAssets.id, ids));
+    const existing = new Set(rows.map((r) => r.id));
+    const failed = ids
+      .filter((id) => !existing.has(id))
+      .map((id) => ({ id, error: "Media file not found" }));
+    const toMove = ids.filter((id) => existing.has(id));
+    if (toMove.length > 0) {
+      await db
+        .update(mediaAssets)
+        .set({ folderId })
+        .where(inArray(mediaAssets.id, toMove));
+    }
+    return c.json({ success: true, moved: toMove.length, failed });
+  } catch (err) {
+    return c.json(
+      { error: err instanceof Error ? err.message : "Failed to move media" },
       500,
     );
   }

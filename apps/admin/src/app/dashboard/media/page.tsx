@@ -10,6 +10,7 @@ import { UploadDialog } from "./components/upload-dialog";
 import { MetadataPanel, type MediaUpdateData } from "./components/metadata-panel";
 import { MediaSearch } from "./components/media-search";
 import { SelectionToolbar } from "./components/selection-toolbar";
+import { BulkMoveDialog } from "./components/bulk-move-dialog";
 import { findFolderPath, flattenFolders } from "./components/media-types";
 import type { MediaItem, FolderNode } from "./components/media-types";
 import { ConfirmDialog, PromptDialog } from "../../../components/confirm-dialog";
@@ -51,6 +52,10 @@ export default function MediaLibraryPage() {
   const [deleteFolder, setDeleteFolder] = useState<FolderNode | null>(null);
   const [folderError, setFolderError] = useState("");
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  // Result of the last bulk move, shown under the toolbar until the next
+  // selection change — success counts the files, failure names them.
+  const [bulkMoveStatus, setBulkMoveStatus] = useState<{ ok: boolean; message: string } | null>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 720px)");
@@ -204,6 +209,64 @@ export default function MediaLibraryPage() {
     fetchItems();
     fetchFolders();
   }, [selectedIds, fetchItems, fetchFolders]);
+
+  // Bulk move: ONE request moves every selected file (POST /api/media/
+  // bulk-move). A per-file PATCH loop is not a bulk move — it is slow
+  // and can leave half the files moved when one request fails.
+  const handleBulkMove = useCallback(async (folderId: string | null) => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return { ok: false as const, error: "No files selected." };
+    setBulkMoveStatus(null);
+    let res: Response;
+    try {
+      res = await fetch("/api/media/bulk-move", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, folderId }),
+      });
+    } catch {
+      return { ok: false as const, error: "Could not move files." };
+    }
+    let body: any = {};
+    try {
+      body = await res.json();
+    } catch {
+      // Keep the default message below.
+    }
+    if (!res.ok) {
+      // Whole request failed — the dialog stays open with the real API
+      // error (PR #7 rule: never fail silently, never pretend it worked).
+      return { ok: false as const, error: body.error || "Could not move files." };
+    }
+    const moved = typeof body.moved === "number" ? body.moved : 0;
+    const failed: { id: string; error: string }[] = Array.isArray(body.failed) ? body.failed : [];
+    const destName = folderId
+      ? flattenFolders(folders).find((f) => f.id === folderId)?.displayPath || "folder"
+      : "All Media";
+    if (failed.length > 0) {
+      // Partial move: say exactly which files did not move and why —
+      // the moved ones still count, the failures are named, not hidden.
+      const failedNames = failed.map((f) => {
+        const item = items.find((i) => i.id === f.id);
+        return `${item?.originalName || f.id} — ${f.error}`;
+      });
+      setBulkMoveStatus({
+        ok: false,
+        message: `Moved ${moved} of ${ids.length} ${ids.length === 1 ? "file" : "files"} to ${destName}. Failed: ${failedNames.join("; ")}`,
+      });
+    } else {
+      setBulkMoveStatus({
+        ok: true,
+        message: `Moved ${moved} ${moved === 1 ? "file" : "files"} to ${destName}.`,
+      });
+    }
+    setSelectedIds(new Set());
+    fetchItems();
+    // A move changes folder counts — refresh the tree too, or the
+    // sidebar badges go stale (the "0" that looked broken).
+    fetchFolders();
+    return { ok: true as const };
+  }, [selectedIds, items, folders, fetchItems, fetchFolders]);
 
   // Uploads change folder counts as well — refresh the tree with the grid.
   const handleUploadComplete = useCallback(() => {
@@ -439,8 +502,28 @@ export default function MediaLibraryPage() {
             count={selectedIds.size}
             onDelete={() => setBulkDeleteOpen(true)}
             onDownload={handleBulkDownload}
-            onClear={() => setSelectedIds(new Set())}
+            onMove={() => setBulkMoveOpen(true)}
+            onClear={() => { setSelectedIds(new Set()); setBulkMoveStatus(null); }}
           />
+
+          {bulkMoveStatus && (
+            <p style={{
+              fontSize: 13, margin: "8px 0 0", padding: "8px 12px", borderRadius: 8,
+              color: bulkMoveStatus.ok ? "var(--accent-success)" : "var(--accent-danger)",
+              background: bulkMoveStatus.ok
+                ? "var(--brand-50, rgba(12, 124, 108, 0.08))"
+                : "rgba(220, 38, 38, 0.08)",
+            }}>
+              {bulkMoveStatus.message}
+              <button
+                onClick={() => setBulkMoveStatus(null)}
+                style={{ background: "none", border: "none", cursor: "pointer", float: "right", fontSize: 14, color: "inherit", padding: 0 }}
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </p>
+          )}
 
           <div style={{ marginTop: selectedIds.size > 0 ? 8 : 0 }}>
             <MediaGrid
@@ -491,6 +574,14 @@ export default function MediaLibraryPage() {
         defaultParentId={newFolderParentId}
         onConfirm={handleCreateFolder}
         onCreated={(id) => setSelectedFolderId(id)}
+      />
+
+      <BulkMoveDialog
+        open={bulkMoveOpen}
+        onOpenChange={setBulkMoveOpen}
+        folders={folders}
+        count={selectedIds.size}
+        onConfirm={handleBulkMove}
       />
 
       <PromptDialog

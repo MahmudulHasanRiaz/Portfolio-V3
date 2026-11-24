@@ -1,16 +1,17 @@
 "use client";
 
 import { Button } from "@repo/ui";
-import { Trash2, Download, X } from "lucide-react";
+import { Trash2, Download, X, FolderInput } from "lucide-react";
 
 interface Props {
   count: number;
   onDelete: () => void;
   onDownload: () => void;
+  onMove: () => void;
   onClear: () => void;
 }
 
-export function SelectionToolbar({ count, onDelete, onDownload, onClear }: Props) {
+export function SelectionToolbar({ count, onDelete, onDownload, onMove, onClear }: Props) {
   if (count === 0) return null;
 
   return (
@@ -28,6 +29,9 @@ export function SelectionToolbar({ count, onDelete, onDownload, onClear }: Props
       </span>
       <Button variant="outline" size="sm" onClick={onDownload}>
         <Download size={14} style={{ marginRight: 4 }} />Download
+      </Button>
+      <Button variant="outline" size="sm" onClick={onMove}>
+        <FolderInput size={14} style={{ marginRight: 4 }} />Move
       </Button>
       <Button variant="outline" size="sm" onClick={onDelete} style={{ color: "var(--accent-danger)" }}>
         <Trash2 size={14} style={{ marginRight: 4 }} />Delete
