@@ -681,9 +681,23 @@ button:focus-visible {
 
 /* Stuck (scrolled) header: the breathe animation pauses and the glow
    deepens. Note the paused breathe animation still owns box-shadow, so
-   the extra 26px glow rides on filter (drop-shadow is not animated). */
+   the extra 26px glow rides on filter (drop-shadow is not animated).
+   PR #25: the stuck pill ALSO gets a SOLID background (var(--bg)).
+   Its base background is var(--card) — 0.06 white in dark mode, nearly
+   transparent — and its frosted look depends on backdrop-filter: blur.
+   In the stuck state that blur is neutered: .pill-stack carries a
+   translateY transform and the pill itself a drop-shadow filter, and
+   either one limits the backdrop to header-internal content (i.e.
+   nothing to blur), so the pill went effectively transparent and page
+   content showed through the nav links once scrolled. A solid --bg
+   (same precedent as the PR #6 deck-body fix) keeps the stuck pill
+   readable regardless of backdrop-filter. Top-of-page look is
+   unchanged — this rule only applies when stuck. Do NOT "fix" this by
+   removing the stuck transform: it is load-bearing against the
+   stuck/un-stuck scroll feedback loop (see the .pill-stack comment). */
 .site-header.is-stuck .sticky-pill {
 	animation-play-state: paused;
+	background: var(--bg);
 	box-shadow:
 		var(--shadow),
 		inset 0 1px 0 rgba(45, 212, 191, 0.85),

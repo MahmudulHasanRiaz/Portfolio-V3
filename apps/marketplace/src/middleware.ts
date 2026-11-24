@@ -56,11 +56,21 @@ import { runWithLiveFallbackTracking } from "./lib/live-fallback";
 const DETAIL_ROUTE_RE =
 	/^\/(bn\/)?(posts|projects|case-studies|ventures|releases)\/[^/]+\/?$/;
 
-// Archives + Know Me (EN + BN). The homepage pattern also
-// matches "/bn" and "/bn/". (MARKETPLACE COPY: no "platforms" here —
-// the Platforms pages do not exist on this copy.)
+// Archives + Know Me + Skills + Education (EN + BN). The homepage
+// pattern also matches "/bn" and "/bn/". (MARKETPLACE COPY: no
+// "platforms" here — the Platforms pages do not exist on this copy.)
+// PR #25: `skills|education` were missing here while the routeRules in
+// astro.config.mjs DO list them (0039, PR #22) — so those two pages
+// shipped with NO browser Cache-Control (the adapter falls back to
+// `no-cache`). Every client-side navigation to them revalidated and
+// re-rendered in the Worker instead of serving from the browser cache
+// like every other archive — Astro's own prefetch stores the page but
+// `no-cache` forces a revalidation on use — so the old page stayed
+// visible through the whole fetch and the view-transition cross-fade
+// ghosted the two pages together. Keep this regex in sync with the
+// routeRules; a route missing here silently loses browser caching.
 const LIST_ROUTE_RE =
-	/^\/(bn\/)?(posts|projects|case-studies|ventures|releases|know-me)\/?$/;
+	/^\/(bn\/)?(posts|projects|case-studies|ventures|releases|know-me|skills|education)\/?$/;
 const HOME_ROUTE_RE = /^\/(bn\/?)?$/;
 
 // Keep in sync with the routeRules in astro.config.mjs (all content
