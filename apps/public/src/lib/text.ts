@@ -16,9 +16,30 @@
 // no copy is rewritten to fit — only the display is limited.
 export const SHORT_DESC_MAX = 200;
 
+// Strip the legacy `## ` + paragraph markup out of a card excerpt so no
+// markdown syntax ever leaks into a grid/card preview (2026-11-24: the
+// Jannat card showed a literal "## " because truncateShort only trimmed
+// and truncated the stored description, whose first block is a `## `
+// heading the detail-page renderer turns into an <h2>). The stored
+// description is untouched — this is display-only cleanup. Images and
+// links keep their visible text, never the URL.
+function stripMarkdown(text: string): string {
+	return text
+		.replace(/!\[([^\]]*)\]\([^)\s]+(?:\s+"[^"]*")?\)/g, "$1")
+		.replace(/\[([^\]]+)\]\([^)\s]+(?:\s+"[^"]*")?\)/g, "$1")
+		.replace(/\*\*([^*]+)\*\*/g, "$1")
+		.replace(/__([^_]+)__/g, "$1")
+		.replace(/^#{1,6}\s+/gm, "")
+		.replace(/^[-*+]\s+/gm, "")
+		.replace(/^>\s?/gm, "")
+		.replace(/\*\*/g, "")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
 export function truncateShort(text: string | undefined | null): string {
 	if (!text) return "";
-	const clean = text.trim();
+	const clean = stripMarkdown(text);
 	if (clean.length <= SHORT_DESC_MAX) return clean;
 	return clean.slice(0, SHORT_DESC_MAX - 1).trimEnd() + "…";
 }
