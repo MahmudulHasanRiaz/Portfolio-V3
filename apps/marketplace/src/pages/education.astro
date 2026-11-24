@@ -31,6 +31,12 @@ function periodLabel(entry: EducationEntry): string {
 	if (!end) return `${start} – ${t.educationPresent}`;
 	return `${start} – ${end}`;
 }
+function startYear(iso: string | undefined): string {
+	if (!iso) return "";
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return "";
+	return String(d.getFullYear());
+}
 ---
 
 <Layout
@@ -42,14 +48,18 @@ function periodLabel(entry: EducationEntry): string {
 		<p style="margin:0 0 8px;">
 			<a class="back-link" href={langUrl("/", lang)}>{t.backHome}</a>
 		</p>
-		<h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;">{t.allEducation}</h1>
+		<h1 class="edu-title">{t.allEducation}</h1>
 		{
 			entries.length === 0 ? (
 				<p class="empty-state">{t.emptyEducation}</p>
 			) : (
 				<ol class="edu-timeline">
-					{entries.map((entry) => (
-						<li class="edu-item">
+					{entries.map((entry, i) => (
+						<li class={entry.endDate ? "edu-item" : "edu-item is-running"}>
+							<div class="edu-card">
+								<span class="edu-index" aria-hidden="true">
+									{String(i + 1).padStart(2, "0")}
+								</span>
 							<h2 class="edu-degree">{entry.degree}</h2>
 							{entry.institution && (
 								<p class="edu-institution">
@@ -65,6 +75,12 @@ function periodLabel(entry: EducationEntry): string {
 							)}
 							{entry.description && (
 								<p class="edu-description">{entry.description}</p>
+							)}
+							</div>
+							{startYear(entry.startDate) && (
+								<span class="edu-year" aria-hidden="true">
+									{startYear(entry.startDate)}
+								</span>
 							)}
 						</li>
 					))}
@@ -121,5 +137,160 @@ function periodLabel(entry: EducationEntry): string {
 	.edu-description {
 		margin: 8px 0 0;
 		color: var(--ink-dim);
+	}
+	.edu-title {
+		margin: 0 0 16px;
+		font-size: 24px;
+		line-height: 1.25;
+	}
+	/* Desktop-only ornaments — hidden below 1024px so the mobile
+	   layout stays exactly as it was (PR #27). */
+	.edu-year,
+	.edu-index {
+		display: none;
+	}
+	/* Desktop journey (PR #27, min-width 1024px) — central-spine
+	   alternating timeline. Everything in this block is desktop-only;
+	   below 1024px the plain left-border list above is untouched. */
+	@media (min-width: 1024px) {
+		.glass {
+			padding: 40px 48px;
+		}
+		.edu-title {
+			font-size: 32px;
+			text-align: center;
+		}
+		.edu-title::after {
+			content: "";
+			display: block;
+			width: 56px;
+			height: 3px;
+			margin: 14px auto 0;
+			border-radius: 2px;
+			background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+		}
+		.edu-timeline {
+			margin: 36px 0 0;
+			padding: 0;
+			border-left: 0;
+			position: relative;
+		}
+		/* Central spine — gradient fades toward the oldest entry. */
+		.edu-timeline::before {
+			content: "";
+			position: absolute;
+			left: 50%;
+			top: 8px;
+			bottom: 8px;
+			width: 2px;
+			transform: translateX(-50%);
+			background: linear-gradient(180deg, var(--accent), var(--accent-wash));
+			border-radius: 2px;
+		}
+		.edu-item {
+			display: grid;
+			grid-template-columns: 1fr 96px 1fr;
+			align-items: start;
+			padding: 0 0 40px;
+		}
+		/* The mobile dot is replaced by the year pill on the spine. */
+		.edu-item::before {
+			display: none;
+		}
+		.edu-item:nth-child(odd) .edu-card {
+			grid-column: 1;
+			grid-row: 1;
+		}
+		.edu-item:nth-child(even) .edu-card {
+			grid-column: 3;
+			grid-row: 1;
+		}
+		.edu-card {
+			position: relative;
+			background: var(--card);
+			border: 1px solid var(--card-border);
+			border-top: 3px solid var(--accent);
+			border-radius: 16px;
+			box-shadow: var(--shadow);
+			padding: 20px 22px;
+			transition:
+				transform 160ms ease,
+				border-color 160ms ease,
+				box-shadow 160ms ease;
+		}
+		/* Connector from the card edge to the spine. */
+		.edu-item:nth-child(odd) .edu-card::after,
+		.edu-item:nth-child(even) .edu-card::after {
+			content: "";
+			position: absolute;
+			top: 32px;
+			width: 48px;
+			height: 2px;
+			background: var(--accent);
+			opacity: 0.35;
+		}
+		.edu-item:nth-child(odd) .edu-card::after {
+			right: -48px;
+		}
+		.edu-item:nth-child(even) .edu-card::after {
+			left: -48px;
+		}
+		.edu-year {
+			display: block;
+			grid-column: 2;
+			grid-row: 1;
+			justify-self: center;
+			margin-top: 18px;
+			font-size: 13px;
+			font-weight: 700;
+			letter-spacing: 0.04em;
+			color: var(--accent-strong);
+			background: var(--bg);
+			border: 1.5px solid var(--accent);
+			border-radius: 999px;
+			padding: 4px 12px;
+			white-space: nowrap;
+			z-index: 1;
+		}
+		/* Ongoing entry — the year pill gently pulses. */
+		.edu-item.is-running .edu-year {
+			animation: edu-pulse 2.4s ease-out infinite;
+		}
+		.edu-index {
+			display: block;
+			position: absolute;
+			top: 8px;
+			right: 16px;
+			font-size: 34px;
+			font-weight: 800;
+			line-height: 1;
+			color: var(--ink-faint);
+			opacity: 0.35;
+		}
+		@media (hover: hover) {
+			.edu-card:hover {
+				transform: translateY(-3px);
+				border-color: var(--accent);
+			}
+		}
+		@media (prefers-reduced-motion: reduce) {
+			.edu-item.is-running .edu-year {
+				animation: none;
+			}
+			.edu-card {
+				transition: none;
+			}
+		}
+	}
+	@keyframes edu-pulse {
+		0% {
+			box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.35);
+		}
+		70% {
+			box-shadow: 0 0 0 10px rgba(13, 148, 136, 0);
+		}
+		100% {
+			box-shadow: 0 0 0 0 rgba(13, 148, 136, 0);
+		}
 	}
 </style>
