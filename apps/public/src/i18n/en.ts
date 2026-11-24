@@ -71,6 +71,7 @@ export const en: Dict = {
 	viewAllPosts: "View all posts →",
 	viewAllReleases: "View all releases →",
 	viewAllVentures: "View all ventures →",
+	viewAllSkills: "View all skills →",
 	caseStudiesTitle: "Case studies",
 	readCaseStudy: "Read the case study",
 	stackTitle: "The stack I work in",

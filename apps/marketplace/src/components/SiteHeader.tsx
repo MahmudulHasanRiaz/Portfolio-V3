@@ -117,16 +117,16 @@ export default function SiteHeader({
 		},
 		{ label: dict.navVentures, href: langUrl("/ventures", lang) },
 		{ label: dict.navReleases, href: langUrl("/releases", lang) },
+		// Skills + Education are top-level nav items (PR #24): they
+		// were nested under About before, where the live verify found
+		// nobody could find them — the homepage never linked to them.
+		{ label: dict.navSkills, href: langUrl("/skills", lang) },
+		{ label: dict.navEducation, href: langUrl("/education", lang) },
 		{
 			label: dict.navAbout,
 			href: langUrl("/know-me", lang),
 			children: [
 				{ label: dict.profileKnowMe, href: langUrl("/know-me", lang) },
-				{ label: dict.navSkills, href: langUrl("/skills", lang) },
-				{
-					label: dict.navEducation,
-					href: langUrl("/education", lang),
-				},
 			],
 		},
 		// MARKETPLACE COPY: no Contact nav link — there is no contact

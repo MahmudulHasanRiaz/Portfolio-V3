@@ -71,7 +71,9 @@ const journey = JOURNEY_STAGES.map(({ stage, label }) => ({
 										{byCategory.get(category)!.map((tech) => (
 											<div class="skill-card">
 												<div class="skill-name">
-													<BrandIcon icon={tech.icon} name={tech.name} size={16} decorative />
+													{tech.icon ? (
+														<BrandIcon icon={tech.icon} name={tech.name} size={16} decorative />
+													) : null}
 													<span>{tech.name}</span>
 												</div>
 												{tech.use && <p class="skill-use">{tech.use}</p>}
@@ -100,7 +102,9 @@ const journey = JOURNEY_STAGES.map(({ stage, label }) => ({
 									<div class="tag-row">
 										{stage.skills.map((tech) => (
 											<span class="tag tag-muted" style="display:inline-flex;align-items:center;gap:6px;">
-												<BrandIcon icon={tech.icon} name={tech.name} size={14} decorative />
+												{tech.icon ? (
+													<BrandIcon icon={tech.icon} name={tech.name} size={14} decorative />
+												) : null}
 												{tech.name}
 											</span>
 										))}
