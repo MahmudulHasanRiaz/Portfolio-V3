@@ -30,11 +30,13 @@ import {
   findUsageForAssets,
   ForbiddenError,
   getAssetById,
+  getDescendantFolderIds,
   getPublicUrl,
   getR2Bucket,
   MediaError,
   NotFoundError,
   R2_FOLDERS,
+  resolveFolderForFile,
   sanitizeFilename,
   slugify,
   StorageError,
@@ -99,7 +101,7 @@ app.get("/", async (c) => {
     if (queryRaw !== undefined && queryRaw.length > 255) {
       return c.json({ error: "query must be at most 255 characters" }, 400);
     }
-    for (const flag of ["includeDeleted", "attached", "includeUsage"] as const) {
+    for (const flag of ["includeDeleted", "attached", "includeUsage", "recursive"] as const) {
       const raw = queryParam(c, flag);
       if (raw !== undefined && raw !== "true" && raw !== "false") {
         return c.json({ error: `${flag} must be "true" or "false"` }, 400);
@@ -118,7 +120,17 @@ app.get("/", async (c) => {
       conditions.push(isNull(mediaAssets.deletedAt));
     }
     if (folderIdRaw) {
-      conditions.push(eq(mediaAssets.folderId, folderIdRaw));
+      // Recursive view: a folder shows its whole subtree (its own files
+      // plus every subfolder's), not just its direct children. The Media
+      // Library page passes recursive=true when a folder is selected;
+      // without it (media picker, other callers) the filter stays
+      // direct-only, exactly as before.
+      if (queryParam(c, "recursive") === "true") {
+        const ids = await getDescendantFolderIds(db, folderIdRaw);
+        conditions.push(inArray(mediaAssets.folderId, ids));
+      } else {
+        conditions.push(eq(mediaAssets.folderId, folderIdRaw));
+      }
     }
     if (typeRaw) {
       // The UI sends a prefix ("image/", "video/") for categories — an
@@ -313,6 +325,16 @@ app.post("/upload", async (c) => {
     const category = validation.category || "document";
     const db = getApiDb();
     const slug = await ensureUniqueSlug(db, slugify(file.name) || "file");
+    // Files placed in a folder live in its "Unorganized" bucket (unless
+    // the folder IS the bucket, or no folder was chosen — root stays
+    // root). A folder id that names no folder fails loudly here instead
+    // of storing a dangling folderId. The R2 key is unaffected: it is
+    // built from the `folder` form field / the images base, never from
+    // the folder id.
+    const targetFolderId = await resolveFolderForFile(
+      db,
+      validatedFolderId ?? null,
+    );
     const [record] = await db
       .insert(mediaAssets)
       .values({
@@ -325,7 +347,7 @@ app.post("/upload", async (c) => {
         height: null,
         altText: validatedAltText || null,
         slug,
-        folderId: validatedFolderId || null,
+        folderId: targetFolderId,
         variants: null,
         uploadedBy: internalUser.id,
       })
@@ -420,9 +442,16 @@ app.post("/bulk-move", async (c) => {
       .map((id) => ({ id, error: "Media file not found" }));
     const toMove = ids.filter((id) => existing.has(id));
     if (toMove.length > 0) {
+      // Moving files to a folder lands them in its "Unorganized" bucket
+      // (unless the target IS the bucket, or null = top level) — the
+      // same rule as uploads and single-file moves.
+      const targetFolderId =
+        folderId === null
+          ? null
+          : await resolveFolderForFile(db, folderId);
       await db
         .update(mediaAssets)
-        .set({ folderId })
+        .set({ folderId: targetFolderId })
         .where(inArray(mediaAssets.id, toMove));
     }
     return c.json({ success: true, moved: toMove.length, failed });

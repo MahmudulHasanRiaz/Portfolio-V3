@@ -20,10 +20,13 @@ import {
   validateBody,
 } from "../../../lib/validate";
 import {
+  ensureUnorganizedFolders,
+  getOrCreateUnorganized,
   listFolders,
   MediaError,
   NotFoundError,
   R2_FOLDERS,
+  UNORGANIZED_FOLDER_NAME,
   type ApiDb,
   type Env,
 } from "./helpers";
@@ -39,6 +42,9 @@ app.get("/folders", async (c) => {
     const user = await requireAuth(c);
     if (!user) return c.json({ error: "Unauthorized" }, 401);
     const db = getApiDb();
+    // Backfill: every existing folder gets its default "Unorganized"
+    // child when it does not have one yet (idempotent; moves no files).
+    await ensureUnorganizedFolders(db);
     const folders = await listFolders(db, null);
     return c.json({ success: true, data: folders });
   } catch (err) {
@@ -95,6 +101,17 @@ app.post("/folders", async (c) => {
       })
       .returning();
     if (!created) throw new Error("Failed to create folder");
+    // Every folder gets its default "Unorganized" bucket at birth, so
+    // unsorted files always have somewhere to land. Best-effort: if
+    // this insert fails, the GET /folders backfill creates the bucket
+    // on the next tree read, so a failure here must not fail the 201.
+    // (getOrCreateUnorganized skips when the new folder itself is named
+    // "Unorganized" — never nest the bucket inside itself.)
+    try {
+      await getOrCreateUnorganized(db, created.id);
+    } catch {
+      // The backfill covers it; the folder itself was created fine.
+    }
     return c.json(
       {
         success: true,
@@ -234,12 +251,48 @@ app.delete("/folders/:id", async (c) => {
       .select()
       .from(mediaFolders)
       .where(eq(mediaFolders.parentId, id));
-    if (children.length > 0) {
+    // The default "Unorganized" bucket is an implementation detail, not
+    // a user folder: a folder whose only children are EMPTY "Unorganized"
+    // buckets can still be deleted — the buckets go with it. Any other
+    // child, or a bucket holding files or subfolders, still blocks the
+    // delete. All checks run before any delete, so a failed delete never
+    // leaves a half-removed bucket behind.
+    const buckets = children.filter(
+      (ch) => (ch.name || "").trim() === UNORGANIZED_FOLDER_NAME,
+    );
+    const realChildren = children.filter(
+      (ch) => (ch.name || "").trim() !== UNORGANIZED_FOLDER_NAME,
+    );
+    if (realChildren.length > 0) {
       throw new MediaError(
         "Cannot delete folder with subfolders.",
         "FOLDER_HAS_CHILDREN",
         400,
       );
+    }
+    for (const bucket of buckets) {
+      const grandchildren = await db
+        .select({ id: mediaFolders.id })
+        .from(mediaFolders)
+        .where(eq(mediaFolders.parentId, bucket.id));
+      if (grandchildren.length > 0) {
+        throw new MediaError(
+          "Cannot delete folder with subfolders.",
+          "FOLDER_HAS_CHILDREN",
+          400,
+        );
+      }
+      const [bucketAssets] = await db
+        .select({ count: count() })
+        .from(mediaAssets)
+        .where(eq(mediaAssets.folderId, bucket.id));
+      if (Number(bucketAssets?.count || 0) > 0) {
+        throw new MediaError(
+          "Cannot delete folder with assets.",
+          "FOLDER_HAS_ASSETS",
+          400,
+        );
+      }
     }
     const [assetCount] = await db
       .select({ count: count() })
@@ -251,6 +304,9 @@ app.delete("/folders/:id", async (c) => {
         "FOLDER_HAS_ASSETS",
         400,
       );
+    }
+    for (const bucket of buckets) {
+      await db.delete(mediaFolders).where(eq(mediaFolders.id, bucket.id));
     }
     await db.delete(mediaFolders).where(eq(mediaFolders.id, id));
     return c.json({ success: true });
