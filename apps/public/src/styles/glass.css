@@ -1246,12 +1246,21 @@ button:focus-visible {
 		background-color 200ms ease;
 }
 
+/* PR #26: same opaque treatment as the PR #25 stuck pill. The base
+   .corner-btn background is transparent, and this rule only set
+   width/opacity/border — so page content showed through the language
+   and theme buttons once scrolled (the pill was fixed by PR #25 but
+   these two flanking controls were not). A solid --bg keeps them
+   readable regardless of backdrop-filter. Top-of-page look is
+   unchanged — this rule only applies when stuck, and the unstuck
+   copies are collapsed to width 0 + opacity 0 anyway. */
 .site-header.is-stuck .stuck-corners .corner-btn {
 	width: 48px;
 	opacity: 1;
 	pointer-events: auto;
 	border-color: var(--card-border);
 	border-width: 1px;
+	background: var(--bg);
 }
 
 @media (min-width: 640px) {
