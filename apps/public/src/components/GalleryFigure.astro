@@ -1,0 +1,90 @@
+---
+// One gallery tile on a detail page. Every tile is a button that opens
+// the lightbox (detail.js, delegated) at the FULL-resolution URL
+// (data-full) — never the sized thumbnail. A full-page screenshot
+// renders in a tall auto-scrolling frame (the same button, so it opens
+// the lightbox like any other tile) instead of a cropped 16/10 tile.
+interface Props {
+	/** Full-resolution image URL (what the lightbox shows). */
+	src: string;
+	/** Sized thumbnail URL for the tile itself. */
+	thumb: string;
+	/** srcset for the tile image, when one exists. */
+	srcset?: string | null;
+	/** Alt text for the tile (also the button's accessible label). */
+	alt: string;
+	/** Position in the gallery (lightbox index + counter). */
+	index: number;
+	/** True when the tile sits in the slider track (needs .media-slide). */
+	slide?: boolean;
+}
+
+const { src, thumb, srcset, alt, index, slide = false } = Astro.props;
+
+// Same image with different query params (?w=…&q=…) is still the same
+// image — compare without the query string.
+function stripQuery(url: string): string {
+	return url.split("?")[0];
+}
+
+// A full-page screenshot of a long page — by filename, as agreed with
+// the user: "screencapture-*" files are full-page shots, and so is any
+// file whose name ends "-full" before the extension.
+function isFullPage(url: string): boolean {
+	const name = stripQuery(url).split("/").pop() ?? "";
+	return name.includes("screencapture-") || /-full\.[a-z0-9]+$/i.test(name);
+}
+
+const full = isFullPage(src);
+const figureClass = slide
+	? full
+		? "media-slide media-scroll-figure"
+		: "media-slide"
+	: full
+		? "media-scroll-figure"
+		: undefined;
+---
+
+<figure class={figureClass}>
+	{full ? (
+		<button
+			type="button"
+			class="media-scroll-frame"
+			data-lightbox-open
+			data-index={index}
+			data-full={src}
+			data-alt={alt}
+			aria-label={alt}
+		>
+			<span class="scroll-frame-viewport" data-scroll-frame>
+				<img
+					src={thumb}
+					srcset={srcset}
+					sizes="(max-width: 640px) 100vw, (max-width: 1023px) 50vw, 720px"
+					alt={alt}
+					loading="lazy"
+					decoding="async"
+				/>
+			</span>
+		</button>
+	) : (
+		<button
+			type="button"
+			class="media-thumb"
+			data-lightbox-open
+			data-index={index}
+			data-full={src}
+			data-alt={alt}
+			aria-label={alt}
+		>
+			<img
+				src={thumb}
+				srcset={srcset}
+				sizes="(max-width: 640px) 100vw, (max-width: 1023px) 50vw, 720px"
+				alt={alt}
+				loading="lazy"
+				decoding="async"
+			/>
+		</button>
+	)}
+</figure>

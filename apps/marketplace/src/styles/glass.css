@@ -3159,6 +3159,156 @@ html[lang="bn"] .hero-name {
 	transition: width 200ms ease;
 }
 
+/* Gallery tiles are buttons — click opens the lightbox (detail.js).
+   The button itself is unstyled; the image inside keeps the existing
+   .media-grid / .media-slide sizing (16/10 cover). */
+.media-thumb,
+.media-scroll-frame {
+	display: block;
+	width: 100%;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	font: inherit;
+	cursor: zoom-in;
+}
+
+.media-thumb:focus-visible,
+.media-scroll-frame:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+/* Full-page screenshots (screencapture-* / *-full) sit in a tall
+   16/10 frame over the uncropped image — detail page only. The frame
+   auto-scrolls slowly (detail.js); without JS, or with
+   prefers-reduced-motion, it stays manually scrollable. The frame is
+   a button, so it opens the lightbox like any other tile. */
+.media-scroll-frame {
+	aspect-ratio: 16 / 10;
+	overflow: hidden;
+	position: relative;
+	border-radius: var(--radius-sm);
+	background: var(--card);
+}
+
+.scroll-frame-viewport {
+	display: block;
+	height: 100%;
+	overflow-y: auto;
+	scrollbar-width: none;
+	-webkit-overflow-scrolling: touch;
+}
+
+.scroll-frame-viewport::-webkit-scrollbar {
+	display: none;
+}
+
+/* Un-crop the image inside a scroll frame: the inherited 16/10 +
+   object-fit: cover would cut the tall screenshot down to a tile. */
+.media-grid .scroll-frame-viewport img,
+.media-slide .scroll-frame-viewport img {
+	aspect-ratio: auto;
+}
+
+/* Bottom fade hints that the frame scrolls. */
+.media-scroll-frame::after {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 48px;
+	background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.35));
+	pointer-events: none;
+}
+
+/* Gallery lightbox — fixed overlay, full-resolution image. The
+   [hidden] rule must win over the display:flex below (the UA
+   [hidden] rule loses to author display styles). */
+.lightbox {
+	position: fixed;
+	inset: 0;
+	z-index: 100;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 12px;
+	padding: 16px;
+	background: rgba(0, 0, 0, 0.88);
+}
+
+.lightbox[hidden] {
+	display: none;
+}
+
+.lightbox-figure {
+	margin: 0;
+	max-width: min(92vw, 1200px);
+	max-height: 88vh;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 10px;
+}
+
+.lightbox-figure img {
+	max-width: 100%;
+	max-height: 80vh;
+	width: auto;
+	height: auto;
+	display: block;
+	border-radius: var(--radius-sm);
+	background: #111;
+}
+
+.lightbox-counter {
+	font-size: 14px;
+	color: rgba(255, 255, 255, 0.85);
+}
+
+.lightbox-close,
+.lightbox-nav {
+	flex: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 44px;
+	height: 44px;
+	border-radius: 999px;
+	border: 1px solid rgba(255, 255, 255, 0.35);
+	background: rgba(0, 0, 0, 0.5);
+	color: #fff;
+	font-size: 24px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.lightbox-close {
+	position: absolute;
+	top: 16px;
+	right: 16px;
+}
+
+.lightbox-nav:disabled {
+	opacity: 0.35;
+	cursor: default;
+}
+
+@media (max-width: 640px) {
+	.lightbox {
+		padding: 8px;
+		gap: 6px;
+	}
+
+	.lightbox-nav {
+		width: 38px;
+		height: 38px;
+		font-size: 20px;
+	}
+}
+
 .slider-counter {
 	font-size: 13px;
 	color: var(--ink-dim);
