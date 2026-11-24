@@ -337,7 +337,15 @@ const publicFigureTexts = [
 								<div class="grid-body">
 									{post.data.tags?.[0] ? (
 										<div class="tag-row">
-											<span class="tag">{post.data.tags[0]}</span>
+											<button
+												type="button"
+												class="tag"
+												data-filter-link
+												data-filter-href={langUrl("/posts/", lang)}
+												data-filter-value={post.data.tags[0]}
+											>
+												{post.data.tags[0]}
+											</button>
 										</div>
 									) : null}
 									<h3>{post.data.title}</h3>

@@ -1,7 +1,7 @@
 ---
 import Layout from "../../../layouts/Layout.astro";
 import { getCaseStudies, truncateShort } from "../../../lib/content";
-import { applySiteCopy, getDict, langUrl, localizeCaseStudy } from "../../../lib/i18n";
+import { applySiteCopy, getDict, langUrl, localizeCaseStudy, showingLabel } from "../../../lib/i18n";
 import { getSiteSettings } from "../../../lib/settings";
 import ThumbImage from "../../../components/ThumbImage.astro";
 
@@ -37,6 +37,15 @@ const sizedThumb = (url: string | null | undefined, w = 800) =>
 		<h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;">
 			{t.allCaseStudies}
 		</h1>
+		{studies.length > 0 && (
+			<p class="count-line">
+				{showingLabel(
+					t.showingCaseStudies,
+					studies.length,
+					studies.length,
+				)}
+			</p>
+		)}
 		{
 			studies.length === 0 ? (
 				<p class="empty-state">{t.emptyCaseStudies}</p>

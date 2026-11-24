@@ -350,4 +350,46 @@
 	}
 	document.addEventListener("astro:page-load", wireScrollFrames);
 	wireScrollFrames();
+
+	// 6. Filter-link pills — tag pills on cards (projects, posts,
+	// homepage) that filter an archive instead of opening the detail
+	// page. The pill is a <button> inside the card link; this
+	// delegated document handler intercepts the click
+	// (preventDefault stops the card navigation), then either applies
+	// the filter in place — same archive page, by clicking the
+	// matching chip — or navigates to the archive URL with
+	// ?filter=<tag>. Delegated on `document` and bound once, so it
+	// survives client-side navigation (language switch) without
+	// re-binding, the same resilience pattern as the lightbox above.
+	// Without JS the pill is just a button inside the card link, so
+	// the click falls through to the detail page as before.
+	document.addEventListener("click", function (event) {
+		var target = event.target;
+		if (!(target instanceof HTMLElement)) return;
+		var pill = target.closest("[data-filter-link]");
+		if (!pill) return;
+		event.preventDefault();
+		var href = pill.getAttribute("data-filter-href") || "";
+		var value = pill.getAttribute("data-filter-value") || "";
+		if (!href || !value) return;
+		var url;
+		try {
+			url = new URL(href, window.location.origin);
+		} catch (e) {
+			return;
+		}
+		url.searchParams.set("filter", value);
+		var root = document.querySelector("[data-archive-filter]");
+		var samePage = window.location.pathname === url.pathname;
+		if (root && samePage) {
+			var chips = root.querySelectorAll(".chip[data-filter]");
+			for (var i = 0; i < chips.length; i++) {
+				if (chips[i].getAttribute("data-filter") === value) {
+					chips[i].click();
+					return;
+				}
+			}
+		}
+		window.location.href = url.toString();
+	});
 })();

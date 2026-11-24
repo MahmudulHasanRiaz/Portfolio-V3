@@ -64,7 +64,15 @@ const sizedThumb = (url: string | null | undefined, w = 800) =>
 			project.tags.length > 0 && (
 				<div class="tag-row">
 					{project.tags.map((tag) => (
-						<span class="tag">{tag}</span>
+						<button
+							type="button"
+							class="tag"
+							data-filter-link
+							data-filter-href={langUrl("/projects/", lang)}
+							data-filter-value={tag}
+						>
+							{tag}
+						</button>
 					))}
 				</div>
 			)

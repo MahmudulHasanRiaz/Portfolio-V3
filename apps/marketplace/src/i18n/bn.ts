@@ -122,6 +122,7 @@ export interface Dict {
 	showingPosts: string;
 	showingReleases: string;
 	showingVentures: string;
+	showingCaseStudies: string;
 	emptyProjects: string;
 	emptyPosts: string;
 	emptyCaseStudies: string;
@@ -401,6 +402,7 @@ export const bn: Dict = {
 	showingPosts: "মোট {total}টি পোস্টের মধ্যে {shown}টি দেখাচ্ছে",
 	showingReleases: "মোট {total}টি রিলিজের মধ্যে {shown}টি দেখাচ্ছে",
 	showingVentures: "মোট {total}টি উদ্যোগের মধ্যে {shown}টি দেখাচ্ছে",
+	showingCaseStudies: "মোট {total}টি কেস স্টাডির মধ্যে {shown}টি দেখাচ্ছে",
 	emptyProjects: "এখনো কোনো প্রজেক্ট পাবলিশ হয়নি।",
 	emptyPosts: "এখনো কোনো পোস্ট পাবলিশ হয়নি।",
 	emptyCaseStudies: "এখনো কোনো কেস স্টাডি পাবলিশ হয়নি।",

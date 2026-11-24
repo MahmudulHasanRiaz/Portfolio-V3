@@ -158,6 +158,7 @@ export const en: Dict = {
 	showingPosts: "Showing {shown} of {total} posts",
 	showingReleases: "Showing {shown} of {total} releases",
 	showingVentures: "Showing {shown} of {total} ventures",
+	showingCaseStudies: "Showing {shown} of {total} case studies",
 	emptyProjects: "No projects published yet.",
 	emptyPosts: "No posts published yet.",
 	emptyCaseStudies: "No case studies published yet.",
