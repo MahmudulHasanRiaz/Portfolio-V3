@@ -5,6 +5,11 @@
 //  2. [data-media-slider] scroll-snap sliders: prev/next page buttons,
 //     "N of M" page counter + progress bar, updated on scroll.
 //  3. [data-video-facade] poster buttons swap in a <video> on tap.
+//  4. Gallery lightbox (detail pages) — delegated, survives navigation.
+//  5. Scroll-frames for full-page screenshots — re-wired on astro:page-load.
+//  6. Filter-link pills on cards — delegated, survives navigation.
+//  7. [data-service-slug] service cards dispatch "open-service" for
+//     the ServiceModal island — delegated, survives navigation.
 (function () {
 	if (window.__detailJsWired) return;
 	window.__detailJsWired = true;
@@ -391,5 +396,27 @@
 			}
 		}
 		window.location.href = url.toString();
+	});
+
+	// 7. Service cards — open the service detail modal. Delegated on
+	// `document` and bound once, so it survives client-side navigation
+	// (language switch) without re-binding, the same resilience
+	// pattern as §1/§4/§6. (PR #16: the old Services.astro inline
+	// script bound each card once on initial load; Astro dedupes
+	// identical scripts on View Transitions swaps, so after a
+	// language switch the new cards had no handlers and clicks did
+	// nothing until a reload. The ServiceModal island re-mounts on
+	// every navigation and listens for "open-service" — only the
+	// card binding was broken. Services.astro carries no script now.)
+	document.addEventListener("click", function (event) {
+		var target = event.target;
+		if (!(target instanceof HTMLElement)) return;
+		var card = target.closest("[data-service-slug]");
+		if (!card) return;
+		var slug = card.getAttribute("data-service-slug") || "";
+		if (!slug) return;
+		window.dispatchEvent(
+			new CustomEvent("open-service", { detail: { slug: slug } }),
+		);
 	});
 })();

@@ -67,7 +67,7 @@ const rightsLabel = dict?.footerRights ?? "All rights reserved.";
 		class="footer-links"
 		style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:space-between;"
 	>
-		<button type="button" class="footer-text-link" data-open-contact>
+		<button type="button" class="footer-text-link" data-open-contact data-source="footer">
 			{contactLabel} →
 		</button>
 		<a href={langUrl("/platforms", lang)}>{allPlatformsLabel}</a>
@@ -77,13 +77,9 @@ const rightsLabel = dict?.footerRights ?? "All rights reserved.";
 	</p>
 </footer>
 
-<script>
-	// Footer "Contact me" opens the shared contact modal (see ContactModal).
-	document
-		.querySelector("[data-open-contact]")
-		?.addEventListener("click", () => {
-			window.dispatchEvent(
-				new CustomEvent("open-contact", { detail: { source: "footer" } }),
-			);
-		});
-</script>
+<!-- Footer "Contact me" is a [data-open-contact] button — the delegated
+     handler in /js/detail.js (§1) opens the contact modal with
+     source "footer". NO inline script here. (PR #16: the old one-time
+     script also double-dispatched on initial load — its direct listener
+     fired, then the delegated one overwrote source "footer" with
+     undefined. One handler now, and the source is preserved.) -->

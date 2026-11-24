@@ -213,7 +213,8 @@ const designations =
 						<button
 							type="button"
 							class="btn btn-ghost"
-							data-contact-source="hero"
+							data-open-contact
+							data-source="hero"
 						>
 							{t.contactMe}
 						</button>
@@ -279,21 +280,8 @@ const designations =
 	})();
 </script>
 
-<script>
-	// Opens the contact modal (ContactModal island listens for "open-contact").
-	// Guarded against double-binding: Services.astro runs the same script,
-	// so an element already bound by the other instance is skipped.
-	document
-		.querySelectorAll("[data-contact-source]:not([data-contact-bound])")
-		.forEach((el) => {
-			el.setAttribute("data-contact-bound", "");
-			el.addEventListener("click", () => {
-				const target = el as HTMLElement;
-				const detail: { service?: string; source?: string } = {};
-				if (target.dataset.service) detail.service = target.dataset.service;
-				if (target.dataset.contactSource)
-					detail.source = target.dataset.contactSource;
-				window.dispatchEvent(new CustomEvent("open-contact", { detail }));
-			});
-		});
-</script>
+<!-- Hero "Contact me" is a [data-open-contact] button — the delegated
+     handler in /js/detail.js (§1) opens the contact modal. NO inline
+     script here. (PR #16: the old one-time binding script ran once per
+     full load; after a View Transitions navigation the new button had
+     no handler and the click did nothing until a reload.) -->
