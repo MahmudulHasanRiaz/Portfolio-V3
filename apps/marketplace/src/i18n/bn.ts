@@ -9,6 +9,8 @@ export interface Dict {
 	navVentures: string;
 	navReleases: string;
 	navProjects: string;
+	navSkills: string;
+	navEducation: string;
 	navCaseStudies: string;
 	navPosts: string;
 	navAbout: string;
@@ -116,6 +118,8 @@ export interface Dict {
 	allReleases: string;
 	allVentures: string;
 	allCaseStudies: string;
+	allSkills: string;
+	allEducation: string;
 	allChip: string;
 	moreFilters: string;
 	showingProjects: string;
@@ -128,6 +132,8 @@ export interface Dict {
 	emptyCaseStudies: string;
 	emptyVentures: string;
 	emptyReleases: string;
+	emptySkills: string;
+	emptyEducation: string;
 	releaseTypeNasheed: string;
 	releaseTypeTilawat: string;
 	releaseTypePodcast: string;
@@ -257,6 +263,18 @@ export interface Dict {
 	venturesPageDescription: string;
 	caseStudiesPageTitle: string;
 	caseStudiesPageDescription: string;
+	skillsPageTitle: string;
+	skillsPageDescription: string;
+	educationPageTitle: string;
+	educationPageDescription: string;
+	skillsMainTitle: string;
+	skillsMainIntro: string;
+	skillsJourneyTitle: string;
+	skillsJourneyIntro: string;
+	stageSoftware: string;
+	stageGraphicDesign: string;
+	stageDigitalMarketing: string;
+	educationPresent: string;
 }
 
 export const bn: Dict = {
@@ -266,6 +284,8 @@ export const bn: Dict = {
 	navProjects: "প্রজেক্ট",
 	navCaseStudies: "কেস স্টাডি",
 	navPosts: "পোস্ট",
+	navSkills: "Skills",
+	navEducation: "Education",
 	navAbout: "আমার সম্পর্কে",
 	navContact: "যোগাযোগ",
 	navHome: "হোম",
@@ -396,6 +416,8 @@ export const bn: Dict = {
 	allReleases: "সব রিলিজ",
 	allVentures: "সব উদ্যোগ",
 	allCaseStudies: "সব কেস স্টাডি",
+	allSkills: "সব Skills",
+	allEducation: "Education",
 	allChip: "সবগুলো",
 	moreFilters: "আরও",
 	showingProjects: "মোট {total}টি প্রজেক্টের মধ্যে {shown}টি দেখাচ্ছে",
@@ -408,6 +430,8 @@ export const bn: Dict = {
 	emptyCaseStudies: "এখনো কোনো কেস স্টাডি পাবলিশ হয়নি।",
 	emptyVentures: "এখনো কোনো উদ্যোগ পাবলিশ হয়নি।",
 	emptyReleases: "এখনো কোনো রিলিজ পাবলিশ হয়নি।",
+	emptySkills: "এখনো কোনো skill যোগ করা হয়নি।",
+	emptyEducation: "এখনো কোনো education entry নেই — admin panel থেকে যোগ করুন।",
 	releaseTypeNasheed: "নাশিদ",
 	releaseTypeTilawat: "তিলাওয়াত",
 	releaseTypePodcast: "পডকাস্ট",
@@ -552,4 +576,18 @@ export const bn: Dict = {
 	caseStudiesPageTitle: "সব কেস স্টাডি — মাহমুদুল হাসান রিয়াজ",
 	caseStudiesPageDescription:
 		"মাহমুদুল হাসান রিয়াজের কেস স্টাডি — সিস্টেমগুলো কীভাবে বানানো হয়েছিল আর কী বদলে দিয়েছিল।",
+	skillsPageTitle: "Skills — মাহমুদুল হাসান রিয়াজ",
+	skillsPageDescription:
+		"মাহমুদুল হাসান রিয়াজের Skills — software development, আর graphic design ও digital marketing-এর জার্নি।",
+	educationPageTitle: "Education — মাহমুদুল হাসান রিয়াজ",
+	educationPageDescription: "মাহমুদুল হাসান রিয়াজের শিক্ষাজীবন।",
+	skillsMainTitle: "Software Development",
+	skillsMainIntro: "প্রতিদিন যে tools আর technologies দিয়ে কাজ করি।",
+	skillsJourneyTitle: "এখানে আসার জার্নি",
+	skillsJourneyIntro:
+		"Software-এর আগে ছিল design — আর তার আগে marketing। আগের skills-গুলো এখানেই আছে, একটু ছোট করে।",
+	stageSoftware: "Software Development",
+	stageGraphicDesign: "Graphic Design",
+	stageDigitalMarketing: "Digital Marketing",
+	educationPresent: "বর্তমান",
 };

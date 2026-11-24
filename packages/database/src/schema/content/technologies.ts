@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, varchar, integer } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, varchar, integer, boolean } from "drizzle-orm/pg-core";
 
 export const technologies = pgTable("technologies", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -18,4 +18,17 @@ export const technologies = pgTable("technologies", {
   // API falls back to English when empty.
   useBn: text("use_bn"),
   sortOrder: integer("sort_order"),
+  // proficiency (0039): 0–100, optional; NULL = no bar shown on the
+  // Skills page. Never seeded — the admin sets it per skill, or it
+  // stays unset.
+  proficiency: integer("proficiency"),
+  // journey_stage (0039): which stage of his skill journey the tech
+  // belongs to — 'software' | 'graphic_design' | 'digital_marketing'.
+  // NULL = 'software' (all 45 existing rows). The Skills page shows
+  // software skills prominently on top and the earlier stages in a
+  // de-emphasized Journey section below.
+  journeyStage: varchar("journey_stage", { length: 30 }),
+  // is_visible (0039): hide a skill from the Skills page without
+  // deleting it. NULL = visible.
+  isVisible: boolean("is_visible"),
 });

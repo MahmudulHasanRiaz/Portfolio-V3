@@ -117,7 +117,18 @@ export default function SiteHeader({
 		},
 		{ label: dict.navVentures, href: langUrl("/ventures", lang) },
 		{ label: dict.navReleases, href: langUrl("/releases", lang) },
-		{ label: dict.navAbout, href: langUrl("/know-me", lang) },
+		{
+			label: dict.navAbout,
+			href: langUrl("/know-me", lang),
+			children: [
+				{ label: dict.profileKnowMe, href: langUrl("/know-me", lang) },
+				{ label: dict.navSkills, href: langUrl("/skills", lang) },
+				{
+					label: dict.navEducation,
+					href: langUrl("/education", lang),
+				},
+			],
+		},
 		{ label: dict.navContact, href: langUrl("/#contact", lang) },
 	];
 

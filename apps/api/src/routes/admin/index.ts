@@ -6,6 +6,7 @@
 import { Hono } from "hono";
 import contentRoutes from "./content";
 import directoryRoutes from "./directory";
+import educationRoutes from "./education";
 import releasesRoutes from "./releases";
 import venturesRoutes from "./ventures";
 import settingsRoutes from "./settings";
@@ -45,6 +46,7 @@ app.get("/", (c) => c.json({ ok: true, service: "portfolio-v3-api-admin" }));
 
 app.route("/content", contentRoutes);
 app.route("/directory", directoryRoutes);
+app.route("/education", educationRoutes);
 app.route("/releases", releasesRoutes);
 app.route("/ventures", venturesRoutes);
 app.route("/settings", settingsRoutes);

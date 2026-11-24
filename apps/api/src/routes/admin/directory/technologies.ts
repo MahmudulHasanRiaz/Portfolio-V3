@@ -10,8 +10,9 @@
 // Drizzle rows are already camelCase, so no toCamel conversion is applied.
 //
 // Cache purge (wired at cutover via lib/side-effects): the source calls
-// purgePublicCache(["home"]) after every create/update/delete
-// (best-effort, never fails the save).
+// purgePublicCache(["home", "skills"]) after every create/update/delete
+// (best-effort, never fails the save) — "skills" refreshes the Skills
+// page, which renders these rows (0039, PR #22).
 import { Hono } from "hono";
 import {
   createTechnologySchema,
@@ -21,6 +22,7 @@ import { asc, eq, ilike } from "drizzle-orm";
 import { technologies } from "@repo/database/schema";
 import { getApiDb } from "../../../db";
 import { requireAuth, unauthorized } from "../../../lib/admin-auth";
+import { ensureEducationSkills } from "../../../lib/ensure-schema";
 import { isRecord, readJsonBody, validateBody } from "../../../lib/validate";
 import { purgePublicCache, waitUntilOf } from "../../../lib/side-effects";
 import {
@@ -62,6 +64,14 @@ export interface TechnologyRow {
   use: string | null;
   useBn: string | null;
   sortOrder: number | null;
+  /** Skills page (0039): 0–100, NULL = no proficiency bar shown. */
+  proficiency: number | null;
+  /** Skills page (0039): 'software' | 'graphic_design' |
+   * 'digital_marketing'; NULL = 'software'. */
+  journeyStage: string | null;
+  /** Skills page (0039): hide from the Skills page without deleting;
+   * NULL = visible. */
+  isVisible: boolean | null;
 }
 
 function toTechnologyRow(r: typeof technologies.$inferSelect): TechnologyRow {
@@ -74,6 +84,9 @@ function toTechnologyRow(r: typeof technologies.$inferSelect): TechnologyRow {
     use: r.use,
     useBn: r.useBn,
     sortOrder: r.sortOrder,
+    proficiency: r.proficiency,
+    journeyStage: r.journeyStage,
+    isVisible: r.isVisible,
   };
 }
 
@@ -85,7 +98,12 @@ export interface TechnologyInput {
   use?: string | null;
   useBn?: string | null;
   sortOrder?: number | null;
+  proficiency?: number | null;
+  journeyStage?: string | null;
+  isVisible?: boolean | null;
 }
+
+const JOURNEY_STAGES = ["software", "graphic_design", "digital_marketing"] as const;
 
 function technologyValues(data: TechnologyInput) {
   const name = asText(data.name);
@@ -98,6 +116,28 @@ function technologyValues(data: TechnologyInput) {
   ) {
     throw new ApiError(400, "Invalid category");
   }
+  // Proficiency (0039): an integer 0–100, or null (no bar). Anything
+  // else is a 400 — never silently clamp a bad value.
+  let proficiency: number | null = null;
+  if (data.proficiency !== undefined && data.proficiency !== null) {
+    const n =
+      typeof data.proficiency === "number"
+        ? data.proficiency
+        : parseInt(String(data.proficiency), 10);
+    if (!Number.isInteger(n) || n < 0 || n > 100) {
+      throw new ApiError(400, "Proficiency must be a whole number from 0 to 100");
+    }
+    proficiency = n;
+  }
+  // Journey stage (0039): one of the three known stages, or null
+  // (= 'software').
+  let journeyStage: string | null = null;
+  if (data.journeyStage !== undefined && data.journeyStage !== null && data.journeyStage !== "") {
+    if (!(JOURNEY_STAGES as readonly string[]).includes(String(data.journeyStage))) {
+      throw new ApiError(400, "Invalid journey stage");
+    }
+    journeyStage = String(data.journeyStage);
+  }
   return {
     name,
     nameBn: asText(data.nameBn),
@@ -106,6 +146,10 @@ function technologyValues(data: TechnologyInput) {
     use: asText(data.use),
     useBn: asText(data.useBn),
     sortOrder: asSortOrder(data.sortOrder),
+    proficiency,
+    journeyStage,
+    isVisible:
+      typeof data.isVisible === "boolean" ? data.isVisible : null,
   };
 }
 
@@ -114,6 +158,9 @@ app.get("/technologies", async (c) => {
     const user = await requireAuth(c);
     if (!user) return c.json(unauthorized(), 401);
     const db = getApiDb();
+    // 0039 auto-apply: create the new columns before the first query
+    // that selects them (no manual migration).
+    await ensureEducationSkills(db);
     const search = (c.req.query("search") ?? "").trim();
     if (search.length > 255) {
       return c.json({ error: "search must be at most 255 characters" }, 400);
@@ -137,6 +184,7 @@ app.get("/technologies/:id", async (c) => {
     const id = c.req.param("id");
     assertUuid(id, "technology");
     const db = getApiDb();
+    await ensureEducationSkills(db);
     const [row] = await db
       .select()
       .from(technologies)
@@ -160,12 +208,13 @@ app.post("/technologies", async (c) => {
     if ("error" in v) return c.json({ error: v.error }, 400);
     const data = v.data;
     const db = getApiDb();
+    await ensureEducationSkills(db);
     const [row] = await db
       .insert(technologies)
       .values(technologyValues(data))
       .returning();
     if (!row) return c.json({ error: "Failed to create technology" }, 500);
-    void purgePublicCache(c.env, ["home"], waitUntilOf(c));
+    void purgePublicCache(c.env, ["home", "skills"], waitUntilOf(c));
     return c.json(toTechnologyRow(row), 201);
   } catch (err) {
     if (err instanceof ApiError) return c.json({ error: err.message }, err.status);
@@ -187,6 +236,7 @@ app.put("/technologies/:id", async (c) => {
     // still enforces "Name is required" at runtime, as before.
     const data = v.data as TechnologyInput;
     const db = getApiDb();
+    await ensureEducationSkills(db);
     // Note: the technologies table has no updated_at column (unlike
     // platforms/clients), so — like the source — no timestamp is set here.
     const [row] = await db
@@ -195,7 +245,7 @@ app.put("/technologies/:id", async (c) => {
       .where(eq(technologies.id, id))
       .returning();
     if (!row) throw new ApiError(404, "Technology not found");
-    void purgePublicCache(c.env, ["home"], waitUntilOf(c));
+    void purgePublicCache(c.env, ["home", "skills"], waitUntilOf(c));
     return c.json(toTechnologyRow(row));
   } catch (err) {
     if (err instanceof ApiError) return c.json({ error: err.message }, err.status);
@@ -210,7 +260,7 @@ app.delete("/technologies/:id", async (c) => {
     const id = c.req.param("id");
     assertUuid(id, "technology");
     await getApiDb().delete(technologies).where(eq(technologies.id, id));
-    void purgePublicCache(c.env, ["home"], waitUntilOf(c));
+    void purgePublicCache(c.env, ["home", "skills"], waitUntilOf(c));
     return c.json({ success: true });
   } catch (err) {
     if (err instanceof ApiError) return c.json({ error: err.message }, err.status);

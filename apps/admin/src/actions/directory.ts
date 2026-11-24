@@ -169,6 +169,14 @@ export interface TechnologyRow {
   use: string | null;
   useBn: string | null;
   sortOrder: number | null;
+  /** Skills page (0039): 0–100, NULL = no proficiency bar shown. */
+  proficiency: number | null;
+  /** Skills page (0039): 'software' | 'graphic_design' |
+   * 'digital_marketing'; NULL = 'software'. */
+  journeyStage: string | null;
+  /** Skills page (0039): hide from the Skills page without deleting;
+   * NULL = visible. */
+  isVisible: boolean | null;
 }
 
 export async function listTechnologies(params?: {
@@ -199,7 +207,19 @@ export interface TechnologyInput {
   use?: string | null;
   useBn?: string | null;
   sortOrder?: number | null;
+  proficiency?: number | null;
+  journeyStage?: string | null;
+  isVisible?: boolean | null;
 }
+
+// Journey stages for the Skills page (0039, PR #22). NOT exported:
+// a "use server" file can only export async functions — the admin
+// form keeps its own copy of the labels (see directory-form.tsx).
+const JOURNEY_STAGES = [
+  "software",
+  "graphic_design",
+  "digital_marketing",
+] as const;
 
 function technologyValues(data: TechnologyInput) {
   const name = asText(data.name);
@@ -212,6 +232,27 @@ function technologyValues(data: TechnologyInput) {
   ) {
     throw new Error("Invalid category");
   }
+  // Proficiency (0039): a whole number 0–100, or null (no bar).
+  let proficiency: number | null = null;
+  if (data.proficiency !== undefined && data.proficiency !== null) {
+    const n =
+      typeof data.proficiency === "number"
+        ? data.proficiency
+        : parseInt(String(data.proficiency), 10);
+    if (!Number.isInteger(n) || n < 0 || n > 100) {
+      throw new Error("Proficiency must be a whole number from 0 to 100");
+    }
+    proficiency = n;
+  }
+  // Journey stage (0039): one of the three known stages, or null
+  // (= 'software').
+  let journeyStage: string | null = null;
+  if (data.journeyStage !== undefined && data.journeyStage !== null && data.journeyStage !== "") {
+    if (!(JOURNEY_STAGES as readonly string[]).includes(String(data.journeyStage))) {
+      throw new Error("Invalid journey stage");
+    }
+    journeyStage = String(data.journeyStage);
+  }
   return {
     name,
     nameBn: asText(data.nameBn),
@@ -220,6 +261,10 @@ function technologyValues(data: TechnologyInput) {
     use: asText(data.use),
     useBn: asText(data.useBn),
     sortOrder: asSortOrder(data.sortOrder),
+    proficiency,
+    journeyStage,
+    isVisible:
+      typeof data.isVisible === "boolean" ? data.isVisible : null,
   };
 }
 
@@ -233,7 +278,9 @@ export async function createTechnology(
     { method: "POST", json: technologyValues(data) },
   );
   // Instant public-site refresh (best-effort, never fails the save).
-  void purgePublicCache(["home"]);
+  // "skills" refreshes the Skills page, which renders these rows
+  // (0039, PR #22).
+  void purgePublicCache(["home", "skills"]);
   return row;
 }
 
@@ -249,7 +296,7 @@ export async function updateTechnology(
     { method: "PUT", json: technologyValues(data) },
   );
   // Instant public-site refresh (best-effort, never fails the save).
-  void purgePublicCache(["home"]);
+  void purgePublicCache(["home", "skills"]);
   return row;
 }
 
@@ -262,7 +309,7 @@ export async function deleteTechnology(id: string): Promise<void> {
     { method: "DELETE" },
   );
   // Instant public-site refresh (best-effort, never fails the save).
-  void purgePublicCache(["home"]);
+  void purgePublicCache(["home", "skills"]);
 }
 
 // ─── Clients ─────────────────────────────────────────────────────────────────

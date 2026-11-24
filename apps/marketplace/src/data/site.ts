@@ -141,6 +141,13 @@ export interface StackTech {
 	/** Optional Bangla variant from the API (title → name, use → use).
 	 * `category` is NEVER overlaid — filter state keys stay English. */
 	bn?: { title?: string; name?: string; use?: string };
+	/** Skills page (0039): proficiency 0–100 (undefined = no bar),
+	 * journey stage (undefined = 'software'), visibility (false =
+	 * hidden from the Skills page; the globe is unaffected — the
+	 * toggle only filters the Skills page). */
+	proficiency?: number;
+	journeyStage?: "software" | "graphic_design" | "digital_marketing";
+	isVisible?: boolean;
 }
 
 export const STACK_CATEGORIES: StackCategory[] = [

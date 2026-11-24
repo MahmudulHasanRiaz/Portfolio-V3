@@ -188,6 +188,45 @@ const liveTechnologies = defineLiveCollection({
 		use: z.string().optional(),
 		sort_order: z.number().optional(),
 		sortOrder: z.number().optional(),
+		// Skills page (0039): proficiency 0–100 (absent = no bar),
+		// journey_stage (absent = 'software'), is_visible (absent =
+		// visible). Both spellings declared: zod strips undeclared
+		// live fields.
+		proficiency: z.number().optional(),
+		journey_stage: z.string().optional(),
+		journeyStage: z.string().optional(),
+		is_visible: z.boolean().optional(),
+		isVisible: z.boolean().optional(),
+		meta: z.record(z.string(), z.unknown()).optional(),
+	}),
+});
+
+// Education entries (0039) are NOT a content collection — there are
+// no build-time rows; the live rows come from the Public Content API
+// (`education` type). The API returns visible rows only, newest first
+// by start_date. `slug` is the stable row id (no detail page exists).
+const liveEducation = defineLiveCollection({
+	loader: createPublicContentLoader(liveType("education")),
+	schema: baseSchema.extend({
+		degree: z.string().optional(),
+		degree_bn: z.string().optional(),
+		degreeBn: z.string().optional(),
+		institution: z.string().optional(),
+		institution_bn: z.string().optional(),
+		institutionBn: z.string().optional(),
+		field_of_study: z.string().optional(),
+		fieldOfStudy: z.string().optional(),
+		start_date: z.string().optional(),
+		startDate: z.string().optional(),
+		end_date: z.string().optional(),
+		endDate: z.string().optional(),
+		grade: z.string().optional(),
+		description_bn: z.string().optional(),
+		descriptionBn: z.string().optional(),
+		sort_order: z.number().optional(),
+		sortOrder: z.number().optional(),
+		is_visible: z.boolean().optional(),
+		isVisible: z.boolean().optional(),
 		meta: z.record(z.string(), z.unknown()).optional(),
 	}),
 });
@@ -211,4 +250,4 @@ const liveClients = defineLiveCollection({
 	}),
 });
 
-export const collections = { livePosts, liveProjects, liveCaseStudies, liveVentures, liveReleases, liveServices, livePlatforms, liveTechnologies, liveClients };
+export const collections = { livePosts, liveProjects, liveCaseStudies, liveVentures, liveReleases, liveServices, livePlatforms, liveTechnologies, liveClients, liveEducation };

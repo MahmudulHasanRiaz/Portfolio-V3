@@ -19,6 +19,7 @@ export * from "./content/services";
 export * from "./content/service-faqs";
 export * from "./content/projects";
 export * from "./content/technologies";
+export * from "./content/education-entries";
 export * from "./content/project-technologies";
 export * from "./content/case-studies";
 export * from "./content/platforms";
