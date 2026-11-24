@@ -38,6 +38,15 @@ export interface FolderNode {
   assetCount?: number;
 }
 
+/** One folder's files inside a recursive folder view (a folder open in
+ *  the Media Library shows its own files plus every subfolder's, grouped
+ *  by folder). `label` is the folder's full display path. */
+export interface MediaItemGroup {
+  key: string;
+  label: string;
+  items: MediaItem[];
+}
+
 export const MEDIA_TYPE_LABELS: Record<string, string> = {
   "image/jpeg": "JPEG",
   "image/png": "PNG",

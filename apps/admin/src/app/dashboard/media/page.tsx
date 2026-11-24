@@ -12,7 +12,7 @@ import { MediaSearch } from "./components/media-search";
 import { SelectionToolbar } from "./components/selection-toolbar";
 import { BulkMoveDialog } from "./components/bulk-move-dialog";
 import { findFolderPath, flattenFolders } from "./components/media-types";
-import type { MediaItem, FolderNode } from "./components/media-types";
+import type { MediaItem, MediaItemGroup, FolderNode } from "./components/media-types";
 import { ConfirmDialog, PromptDialog } from "../../../components/confirm-dialog";
 
 type SortKey = "newest" | "oldest" | "name-asc" | "name-desc" | "size-desc" | "size-asc";
@@ -74,7 +74,12 @@ export default function MediaLibraryPage() {
         includeUsage: "true",
       });
       if (searchQuery) params.set("query", searchQuery);
-      if (selectedFolderId) params.set("folderId", selectedFolderId);
+      if (selectedFolderId) {
+        params.set("folderId", selectedFolderId);
+        // Recursive view: opening a folder shows its whole subtree (its
+        // own files plus every subfolder's), not just its direct children.
+        params.set("recursive", "true");
+      }
       if (filterType && filterType !== "all") params.set("type", filterType);
       if (attachedFilter === "attached") params.set("attached", "true");
       if (attachedFilter === "unattached") params.set("attached", "false");
@@ -348,6 +353,33 @@ export default function MediaLibraryPage() {
 
   const flatFolders = flattenFolders(folders);
 
+  // Recursive view groups: when a folder is open, its files arrive from
+  // the folder itself plus every subfolder — group them by folder so the
+  // list reads as "Jannat Fashion", "Unorganized", ... instead of one
+  // flat pile. A single group needs no header (rendered flat, as before).
+  // Root files (no folder) group under "All Media".
+  const folderLabelById = new Map(flatFolders.map((f) => [f.id, f.displayPath]));
+  const itemGroups: MediaItemGroup[] | null = selectedFolderId
+    ? (() => {
+        const byId = new Map<string, MediaItem[]>();
+        for (const item of items) {
+          const key = item.folderId || "__root__";
+          const list = byId.get(key) || [];
+          list.push(item);
+          byId.set(key, list);
+        }
+        if (byId.size <= 1) return null;
+        return Array.from(byId.entries()).map(([key, list]) => ({
+          key,
+          label:
+            key === "__root__"
+              ? "All Media"
+              : folderLabelById.get(key) || "Folder",
+          items: list,
+        }));
+      })()
+    : null;
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
@@ -494,7 +526,7 @@ export default function MediaLibraryPage() {
               {showTrash
                 ? `Trash — ${items.length} deleted ${items.length === 1 ? "file" : "files"} (open one to restore it)`
                 : `Showing ${items.length} of ${total} ${total === 1 ? "file" : "files"}`}
-              {!showTrash && selectedFolderId ? " in this folder" : ""}
+              {!showTrash && selectedFolderId ? " in this folder and its subfolders" : ""}
             </p>
           )}
 
@@ -528,6 +560,7 @@ export default function MediaLibraryPage() {
           <div style={{ marginTop: selectedIds.size > 0 ? 8 : 0 }}>
             <MediaGrid
               items={items}
+              groups={itemGroups ?? undefined}
               selected={selectedIds}
               onSelect={handleSelect}
               onClick={setDetailItem}

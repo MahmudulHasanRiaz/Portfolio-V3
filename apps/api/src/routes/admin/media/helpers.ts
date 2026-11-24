@@ -654,6 +654,18 @@ export async function updateMetadata(
   if (displayName !== undefined && !nextName) {
     throw new ValidationError("File name cannot be empty.");
   }
+  // Moving a file to a folder lands it in that folder's "Unorganized"
+  // bucket (unless the target IS the bucket, or null = top level) —
+  // the same rule as uploads and bulk move, so a file placed in a
+  // folder never sits directly in it. A folder id that names no folder
+  // fails loudly here instead of storing a dangling folderId.
+  let nextFolderId: string | null | undefined;
+  if (data.folderId !== undefined) {
+    nextFolderId =
+      data.folderId === null
+        ? null
+        : await resolveFolderForFile(db, data.folderId);
+  }
   // Slug: validate format + uniqueness; empty string means
   // "auto-suggest from the (new) file name". Assets without a slug get
   // one on edit.
@@ -697,7 +709,7 @@ export async function updateMetadata(
     .update(mediaAssets)
     .set({
       ...(data.altText !== undefined ? { altText: data.altText } : {}),
-      ...(data.folderId !== undefined ? { folderId: data.folderId } : {}),
+      ...(nextFolderId !== undefined ? { folderId: nextFolderId } : {}),
       ...(displayName !== undefined ? { originalName: nextName } : {}),
       ...(nextSlug !== undefined ? { slug: nextSlug } : {}),
     })
@@ -787,4 +799,124 @@ export async function listFolders(
     });
   }
   return nodes;
+}
+
+// ─── "Unorganized" default subfolder ─────────────────────────────────────────
+// Every folder has a default subfolder named "Unorganized": files that live
+// in a folder but in no subfolder live there. It is a REAL folder row, so
+// it works with the existing folder/move machinery (tree, bulk move,
+// counts, rename repathing). There is NO unique constraint on
+// (parentId, name), so the helpers below always pick the FIRST
+// "Unorganized" child (oldest) when resolving — a duplicate can only
+// appear if two requests create the bucket for the same parent at the
+// same moment (single-admin usage; the backfill and get-or-create both
+// re-check first, so in practice it never does).
+
+export const UNORGANIZED_FOLDER_NAME = "Unorganized";
+
+function isUnorganizedName(name: string | null): boolean {
+  return (name || "").trim() === UNORGANIZED_FOLDER_NAME;
+}
+
+/** The "Unorganized" child of a folder, if one exists (oldest first). */
+export async function getUnorganizedChild(
+  db: ApiDb,
+  parentId: string,
+): Promise<{ id: string; name: string | null; path: string | null } | null> {
+  const [row] = await db
+    .select()
+    .from(mediaFolders)
+    .where(
+      and(
+        eq(mediaFolders.parentId, parentId),
+        eq(mediaFolders.name, UNORGANIZED_FOLDER_NAME),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+/** Return the id of the "Unorganized" bucket for a folder, creating it
+ *  when missing. When the folder itself IS "Unorganized", it is already
+ *  the bucket — return it unchanged (never nest Unorganized inside
+ *  Unorganized). */
+export async function getOrCreateUnorganized(
+  db: ApiDb,
+  folderId: string,
+): Promise<string> {
+  const [folder] = await db
+    .select()
+    .from(mediaFolders)
+    .where(eq(mediaFolders.id, folderId))
+    .limit(1);
+  if (!folder) throw new NotFoundError("MediaFolder", folderId);
+  if (isUnorganizedName(folder.name)) return folder.id;
+  const existing = await getUnorganizedChild(db, folderId);
+  if (existing) return existing.id;
+  const [created] = await db
+    .insert(mediaFolders)
+    .values({
+      name: UNORGANIZED_FOLDER_NAME,
+      parentId: folderId,
+      path: `${folder.path || ""}/${UNORGANIZED_FOLDER_NAME}`,
+    })
+    .returning();
+  if (!created) throw new Error("Failed to create Unorganized folder");
+  return created.id;
+}
+
+/** Backfill: give every existing folder an "Unorganized" child when it
+ *  does not have one. Idempotent — safe to run on every tree read.
+ *  Moves NOTHING: existing files keep their folderId exactly as-is.
+ *  (The 24 Jannat screenshots already sit in "Project's Content /
+ *  Jannat Fashion" and stay there; the new bucket starts empty and only
+ *  collects FUTURE unsorted uploads/moves.) Folders named "Unorganized"
+ *  are buckets themselves and get no child. */
+export async function ensureUnorganizedFolders(db: ApiDb): Promise<void> {
+  const folders = await db.select().from(mediaFolders);
+  for (const folder of folders) {
+    if (isUnorganizedName(folder.name)) continue;
+    const existing = await getUnorganizedChild(db, folder.id);
+    if (existing) continue;
+    await db.insert(mediaFolders).values({
+      name: UNORGANIZED_FOLDER_NAME,
+      parentId: folder.id,
+      path: `${folder.path || ""}/${UNORGANIZED_FOLDER_NAME}`,
+    });
+  }
+}
+
+/** Resolve a folder id to the folder a file should actually live in:
+ *  a folder's own files belong in its "Unorganized" bucket; the bucket
+ *  itself and the root (null) pass through unchanged. Used by upload,
+ *  bulk move, and single-file move so the "files in a folder but in no
+ *  subfolder live in Unorganized" rule holds everywhere a file is placed. */
+export async function resolveFolderForFile(
+  db: ApiDb,
+  folderId: string | null,
+): Promise<string | null> {
+  if (folderId === null) return null;
+  return getOrCreateUnorganized(db, folderId);
+}
+
+/** All folder ids in a subtree: the folder itself plus every descendant,
+ *  breadth-first. Used by the recursive list (GET /?folderId=&recursive=true). */
+export async function getDescendantFolderIds(
+  db: ApiDb,
+  folderId: string,
+): Promise<string[]> {
+  const ids = [folderId];
+  const queue = [folderId];
+  while (queue.length > 0) {
+    const parent = queue.shift()!;
+    const children = await db
+      .select({ id: mediaFolders.id })
+      .from(mediaFolders)
+      .where(eq(mediaFolders.parentId, parent));
+    for (const child of children) {
+      ids.push(child.id);
+      queue.push(child.id);
+    }
+  }
+  return ids;
 }
