@@ -75,22 +75,9 @@ const visibleServices = services.slice(0, HOMEPAGE_SERVICES_LIMIT);
 	}
 </style>
 
-<script>
-	// Opens the service detail modal (ServiceModal island listens for
-	// "open-service"). Guarded against double-binding: Services.astro is
-	// rendered on both the home and Know Me pages, so an element already
-	// bound by the other instance is skipped.
-	document
-		.querySelectorAll("[data-service-slug]:not([data-service-bound])")
-		.forEach((el) => {
-			el.setAttribute("data-service-bound", "");
-			el.addEventListener("click", () => {
-				const target = el as HTMLElement;
-				window.dispatchEvent(
-					new CustomEvent("open-service", {
-						detail: { slug: target.dataset.serviceSlug },
-					}),
-				);
-			});
-		});
-</script>
+<!-- Service-card clicks are handled by the delegated handler in
+     /js/detail.js (§7) — NO inline script here. (PR #16: a one-time
+     binding script runs once per full load; Astro dedupes identical
+     scripts on View Transitions swaps, so after a language switch
+     the new cards had no handlers and clicks did nothing until a
+     reload. The delegated handler survives every swap.) -->

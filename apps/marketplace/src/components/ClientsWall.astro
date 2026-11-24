@@ -139,12 +139,26 @@ const duration = `${clients.length * 6}s`;
 <script>
 	// A logo URL that 404s must never leave a broken-image icon:
 	// hide the img and show the wordmark fallback instead.
-	const root = document.querySelector<HTMLElement>("[data-clients]");
-	if (root) {
+	// Bound on EVERY `astro:page-load` (initial load + every
+	// View-Transitions client navigation). A plain inline IIFE is
+	// NOT enough: Astro dedupes identical scripts, so it runs on
+	// initial load only — from the 1st navigation on, a new page's
+	// wall was never wired and a 404 logo kept its broken-image
+	// icon. (PR #16: same failure class as the service-card /
+	// hero-contact bindings.) The `:not([data-clients-bound])`
+	// guard keeps a wall from being wired twice.
+	function markClientsWall() {
+		const root = document.querySelector<HTMLElement>(
+			"[data-clients]:not([data-clients-bound])",
+		);
+		if (!root) return;
+		root.setAttribute("data-clients-bound", "");
 		root.querySelectorAll("img").forEach((img) => {
 			const markBroken = () => img.classList.add("is-broken");
 			if (img.complete && img.naturalWidth === 0) markBroken();
 			else img.addEventListener("error", markBroken);
 		});
 	}
+	document.addEventListener("astro:page-load", markClientsWall);
+	markClientsWall();
 </script>
