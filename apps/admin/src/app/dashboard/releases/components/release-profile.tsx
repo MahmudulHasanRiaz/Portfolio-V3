@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button, Input, Textarea, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Card, CardContent } from "@repo/ui";
 import { Save } from "lucide-react";
 import { MediaPicker } from "@/components/media-picker";
+import { MediaUrlPreview } from "@/components/media-url-preview";
 
 interface ReleaseProfileProps {
   release: {
@@ -168,6 +169,7 @@ export function ReleaseProfile({ release, onUpdate }: ReleaseProfileProps) {
                 <Input value={form.coverImage} onChange={(e) => handleChange("coverImage", e.target.value)} style={{ flex: 1 }} />
                 <Button type="button" variant="outline" onClick={() => setPickerTarget("coverImage")}>Choose from library</Button>
               </div>
+              <MediaUrlPreview url={form.coverImage} kind="image" onRemove={() => handleChange("coverImage", "")} />
               <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
                 WebP/AVIF preferred (JPEG/PNG ok), quality 75–80 — don&apos;t compress aggressively. Upload
                 close to the display size; oversized files only waste bandwidth. No manual resizing needed —
@@ -244,6 +246,7 @@ export function ReleaseProfile({ release, onUpdate }: ReleaseProfileProps) {
                 <Input value={form.ogImage} onChange={(e) => handleChange("ogImage", e.target.value)} placeholder="https://... (social share image)" style={{ flex: 1 }} />
                 <Button type="button" variant="outline" onClick={() => setPickerTarget("ogImage")}>Choose from library</Button>
               </div>
+              <MediaUrlPreview url={form.ogImage} kind="image" onRemove={() => handleChange("ogImage", "")} />
               <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
                 Recommended: 1200×630 (social share). WebP/AVIF preferred (JPEG/PNG ok), quality 75–80 — don&apos;t
                 compress aggressively. No manual resizing needed — images are automatically optimized for the

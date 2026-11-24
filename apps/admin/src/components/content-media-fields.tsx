@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Button, Input, Textarea, RadioGroup, RadioGroupItem, Checkbox } from "@repo/ui";
 import { MediaPicker } from "@/components/media-picker";
+import { MediaUrlPreview, MediaUrlListPreview } from "@/components/media-url-preview";
 
 /**
  * Shared Media fields for the Content forms (Blog / Projects / Services /
@@ -30,6 +31,12 @@ export function parseUrlList(v: FormDataEntryValue | null): string[] {
 function listValue(v: unknown): string {
   if (!Array.isArray(v)) return "";
   return v.filter((i): i is string => typeof i === "string" && i.length > 0).join("\n");
+}
+
+/** Stored string[] (jsonb) -> string[] for the preview state. */
+function toList(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter((i): i is string => typeof i === "string" && i.length > 0);
 }
 
 const labelStyle = { display: "block", fontSize: 14, fontWeight: 500, color: "var(--text-primary)", marginBottom: 6 } as const;
@@ -60,6 +67,15 @@ export function ContentMediaFields({
   const galleryRef = useRef<HTMLTextAreaElement>(null);
   const [pickerTarget, setPickerTarget] = useState<PickerTarget>(null);
 
+  // Selected-state previews — the URL inputs stay the fields that save
+  // (FormData reads them), these only mirror what they hold so the picked
+  // file shows as its image, not as a bare link. A pasted/typed URL
+  // previews the same way via the inputs' onChange.
+  const [thumbPreview, setThumbPreview] = useState((initial?.thumbnailUrl as string) || "");
+  const [thumbVideoPreview, setThumbVideoPreview] = useState((initial?.thumbnailVideoUrl as string) || "");
+  const [videosPreview, setVideosPreview] = useState<string[]>(toList(initial?.videos));
+  const [galleryPreview, setGalleryPreview] = useState<string[]>(toList(initial?.galleryImages));
+
   const handlePickerSelect = (url: string) => {
     const appendLine = (ref: React.RefObject<HTMLTextAreaElement | null>) => {
       if (!ref.current) return;
@@ -67,10 +83,31 @@ export function ContentMediaFields({
         ? `${ref.current.value.replace(/\n*$/, "")}\n${url}`
         : url;
     };
-    if (pickerTarget === "thumbnailUrl" && thumbUrlRef.current) thumbUrlRef.current.value = url;
-    else if (pickerTarget === "thumbnailVideoUrl" && thumbVideoUrlRef.current) thumbVideoUrlRef.current.value = url;
-    else if (pickerTarget === "videos") appendLine(videosRef);
-    else if (pickerTarget === "galleryImages") appendLine(galleryRef);
+    if (pickerTarget === "thumbnailUrl" && thumbUrlRef.current) {
+      thumbUrlRef.current.value = url;
+      setThumbPreview(url);
+    } else if (pickerTarget === "thumbnailVideoUrl" && thumbVideoUrlRef.current) {
+      thumbVideoUrlRef.current.value = url;
+      setThumbVideoPreview(url);
+    } else if (pickerTarget === "videos") {
+      appendLine(videosRef);
+      setVideosPreview((prev) => [...prev, url]);
+    } else if (pickerTarget === "galleryImages") {
+      appendLine(galleryRef);
+      setGalleryPreview((prev) => [...prev, url]);
+    }
+  };
+
+  /** Remove one line from a URL-list textarea, keeping the field + preview in sync. */
+  const removeListItem = (
+    ref: React.RefObject<HTMLTextAreaElement | null>,
+    list: string[],
+    setList: (next: string[]) => void,
+    index: number,
+  ) => {
+    const next = list.filter((_, i) => i !== index);
+    setList(next);
+    if (ref.current) ref.current.value = next.join("\n");
   };
 
   return (
@@ -94,9 +131,17 @@ export function ContentMediaFields({
         <div>
           <label style={labelStyle}>Thumbnail image URL</label>
           <div style={{ display: "flex", gap: 8 }}>
-            <Input ref={thumbUrlRef} name="thumbnailUrl" defaultValue={(initial?.thumbnailUrl as string) || ""} placeholder="https://... (image)" style={{ flex: 1 }} />
+            <Input ref={thumbUrlRef} name="thumbnailUrl" defaultValue={(initial?.thumbnailUrl as string) || ""} placeholder="https://... (image)" style={{ flex: 1 }} onChange={(e) => setThumbPreview(e.target.value)} />
             <Button type="button" variant="outline" onClick={() => setPickerTarget("thumbnailUrl")}>Choose from library</Button>
           </div>
+          <MediaUrlPreview
+            url={thumbPreview}
+            kind="image"
+            onRemove={() => {
+              if (thumbUrlRef.current) thumbUrlRef.current.value = "";
+              setThumbPreview("");
+            }}
+          />
           <p style={hintStyle}>
             Recommended: 1200×630. WebP/AVIF preferred (JPEG/PNG ok), quality 75–80 — don&apos;t compress
             aggressively. Upload close to the display size. {AUTO_OPTIMIZE_HINT}
@@ -105,9 +150,17 @@ export function ContentMediaFields({
         <div>
           <label style={labelStyle}>Thumbnail video URL</label>
           <div style={{ display: "flex", gap: 8 }}>
-            <Input ref={thumbVideoUrlRef} name="thumbnailVideoUrl" defaultValue={(initial?.thumbnailVideoUrl as string) || ""} placeholder="https://... (video, used when type is Video)" style={{ flex: 1 }} />
+            <Input ref={thumbVideoUrlRef} name="thumbnailVideoUrl" defaultValue={(initial?.thumbnailVideoUrl as string) || ""} placeholder="https://... (video, used when type is Video)" style={{ flex: 1 }} onChange={(e) => setThumbVideoPreview(e.target.value)} />
             <Button type="button" variant="outline" onClick={() => setPickerTarget("thumbnailVideoUrl")}>Choose from library</Button>
           </div>
+          <MediaUrlPreview
+            url={thumbVideoPreview}
+            kind="video"
+            onRemove={() => {
+              if (thumbVideoUrlRef.current) thumbVideoUrlRef.current.value = "";
+              setThumbVideoPreview("");
+            }}
+          />
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Checkbox id="thumb-autoplay" checked={thumbnailAutoplay} onCheckedChange={(v) => setThumbnailAutoplay(v === true)} />
@@ -118,12 +171,22 @@ export function ContentMediaFields({
           <>
             <div>
               <label style={labelStyle}>Videos (one URL per line)</label>
-              <Textarea ref={videosRef} name="videos" defaultValue={listValue(initial?.videos)} placeholder={"https://.../demo-1.mp4\nhttps://.../demo-2.mp4"} rows={3} />
+              <Textarea ref={videosRef} name="videos" defaultValue={listValue(initial?.videos)} placeholder={"https://.../demo-1.mp4\nhttps://.../demo-2.mp4"} rows={3} onChange={(e) => setVideosPreview(parseUrlList(e.target.value))} />
+              <MediaUrlListPreview
+                urls={videosPreview}
+                kind="video"
+                onRemove={(i) => removeListItem(videosRef, videosPreview, setVideosPreview, i)}
+              />
               <Button type="button" variant="outline" size="sm" onClick={() => setPickerTarget("videos")} style={{ marginTop: 8 }}>Add from library</Button>
             </div>
             <div>
               <label style={labelStyle}>Gallery images (one URL per line)</label>
-              <Textarea ref={galleryRef} name="galleryImages" defaultValue={listValue(initial?.galleryImages)} placeholder={"https://.../shot-1.jpg\nhttps://.../shot-2.jpg"} rows={3} />
+              <Textarea ref={galleryRef} name="galleryImages" defaultValue={listValue(initial?.galleryImages)} placeholder={"https://.../shot-1.jpg\nhttps://.../shot-2.jpg"} rows={3} onChange={(e) => setGalleryPreview(parseUrlList(e.target.value))} />
+              <MediaUrlListPreview
+                urls={galleryPreview}
+                kind="image"
+                onRemove={(i) => removeListItem(galleryRef, galleryPreview, setGalleryPreview, i)}
+              />
               <p style={hintStyle}>
                 Recommended: up to 1600px wide. WebP/AVIF preferred (JPEG/PNG ok), quality 75–80 — don&apos;t
                 compress aggressively. Upload close to the display size. {AUTO_OPTIMIZE_HINT}

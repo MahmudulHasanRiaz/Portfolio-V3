@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Button, Input, Textarea } from "@repo/ui";
 import { MediaPicker } from "@/components/media-picker";
+import { MediaUrlPreview } from "@/components/media-url-preview";
 
 /**
  * Shared SEO fields for the Content forms (Blog / Projects / Services /
@@ -26,6 +27,10 @@ export function ContentSeoFields({
 }) {
   const ogImageRef = useRef<HTMLInputElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Selected-state preview — the OG Image input stays the field that saves
+  // (FormData reads it); this only mirrors what it holds so the picked
+  // image shows as its image, not as a bare link.
+  const [ogPreview, setOgPreview] = useState((initial?.ogImage as string) || "");
 
   return (
     <div style={{ paddingTop: 16, borderTop: "1px solid var(--border)" }}>
@@ -48,9 +53,17 @@ export function ContentSeoFields({
         <div>
           <label style={labelStyle}>OG Image URL</label>
           <div style={{ display: "flex", gap: 8 }}>
-            <Input ref={ogImageRef} name="ogImage" defaultValue={(initial?.ogImage as string) || ""} placeholder="https://... (image shown when the page is shared)" style={{ flex: 1 }} />
+            <Input ref={ogImageRef} name="ogImage" defaultValue={(initial?.ogImage as string) || ""} placeholder="https://... (image shown when the page is shared)" style={{ flex: 1 }} onChange={(e) => setOgPreview(e.target.value)} />
             <Button type="button" variant="outline" onClick={() => setPickerOpen(true)}>Choose from library</Button>
           </div>
+          <MediaUrlPreview
+            url={ogPreview}
+            kind="image"
+            onRemove={() => {
+              if (ogImageRef.current) ogImageRef.current.value = "";
+              setOgPreview("");
+            }}
+          />
         </div>
         <div>
           <label style={labelStyle}>Canonical URL</label>
@@ -62,6 +75,7 @@ export function ContentSeoFields({
         onOpenChange={setPickerOpen}
         onSelect={(url) => {
           if (ogImageRef.current) ogImageRef.current.value = url;
+          setOgPreview(url);
         }}
         type="image"
         title="Choose OG image"

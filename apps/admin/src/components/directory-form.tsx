@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@repo/ui";
 import { useRouter } from "next/navigation";
 import { MediaPicker } from "@/components/media-picker";
+import { MediaUrlPreview } from "@/components/media-url-preview";
 import { type PlatformGroup } from "@/actions/directory";
 import { TECHNOLOGY_CATEGORIES } from "@/lib/technology-categories";
 import type { DirectoryEntity } from "@/components/directory-list";
@@ -208,6 +209,11 @@ export function DirectoryForm({
                 <Input ref={logoRef} name="logoUrl" value={logoUrlValue} onChange={(e) => setLogoUrlValue(e.target.value)} placeholder="https://... (image, optional)" style={{ flex: 1 }} />
                 <Button type="button" variant="outline" onClick={() => setLogoPickerOpen(true)}>Choose from library</Button>
               </div>
+              <MediaUrlPreview
+                url={logoUrlValue}
+                kind="image"
+                onRemove={() => setLogoUrlValue("")}
+              />
               <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
                 Recommended: transparent PNG or SVG preferred (WebP also ok) — upload close to the display size,
                 don&apos;t upload an oversized file. No manual resizing needed — images are automatically
