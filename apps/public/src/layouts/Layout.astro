@@ -40,6 +40,12 @@ interface Props {
 	/** SEO keywords (admin seo_meta row, via the detail page). Rendered
 	    as a keywords meta tag only when non-empty. */
 	keywords?: string;
+	/** Per-item search indexing (0038): the detail page's own toggle.
+	    NULL/absent = indexable. The global admin switch stays the
+	    master — when it is off, nothing indexes regardless of this
+	    prop. Detail pages pass the item's flag; list/home pages omit
+	    it (indexable by default, subject to the global switch). */
+	indexable?: boolean;
 	/** Live-merged services (getServices()) for the contact modal's
 	    service select — pages that already fetch services pass them;
 	    pages that don't leave the modal on build-time SERVICES. */
@@ -56,6 +62,7 @@ const {
 	canonical,
 	keywords,
 	services,
+	indexable,
 } = Astro.props;
 
 // OG image: explicit prop wins, then the admin-managed portrait, then
@@ -164,12 +171,15 @@ const isHome =
 		<link rel="alternate" hreflang="x-default" href={xDefaultUrl} />
 		<!-- Search-indexing gate: admin toggle (settings key
 		     "search_indexing_enabled", read via getSiteSettings()
-		     above — no second fetch). OFF (default) keeps the
-		     in-progress site out of indexes; ON allows indexing.
-		     robots.txt + sitemap.xml.ts honor the same setting. -->
+		     above — no second fetch) AND the per-item toggle
+		     (0038, `indexable` prop from detail pages). OFF (default)
+		     keeps the in-progress site out of indexes; ON allows
+		     indexing — except a detail page whose item is toggled off,
+		     which stays noindex even when the global switch is on.
+		     robots.txt + sitemap.xml.ts honor the same rule. -->
 		<meta
 			name="robots"
-			content={settings.searchIndexingEnabled ? "index, follow" : "noindex, nofollow"}
+			content={settings.searchIndexingEnabled && indexable !== false ? "index, follow" : "noindex, nofollow"}
 		/>
 		<meta property="og:title" content={pageTitle} />
 		<meta property="og:description" content={pageDescription} />

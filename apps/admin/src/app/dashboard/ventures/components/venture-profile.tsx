@@ -58,6 +58,10 @@ interface VentureProfileProps {
     sortOrder?: number | null;
     ogImage?: string | null;
     canonicalUrl?: string | null;
+    /** Optional — present only once migration 0038 (per-item
+     * search indexing) has landed (same detection pattern as the
+     * 0029 columns above). */
+    indexable?: boolean | null;
   };
   onUpdate: () => void;
 }
@@ -79,6 +83,14 @@ export function VentureProfile({ venture, onUpdate }: VentureProfileProps) {
   // pre-migration PATCH with an unknown column would 500 the whole
   // save) — same pattern as shortDescSupported / migration 0029.
   const foundedYearSupported = "foundedYear" in venture;
+
+  // Migration 0038 detection: the `indexable` column exists only
+  // when the loaded row carries it. Until then the toggle below is
+  // hidden and never sent to the API (a pre-migration PATCH with an
+  // unknown column would 500 the whole save) — same pattern as
+  // shortDescSupported / migration 0029. The admin API creates the
+  // column on its first touch, so in practice this is always true.
+  const indexableSupported = "indexable" in venture;
 
   const handlePickerSelect = (url: string) => {
     if (!pickerTarget) return;
@@ -122,6 +134,8 @@ export function VentureProfile({ venture, onUpdate }: VentureProfileProps) {
     ogImage: venture.ogImage || "",
     canonicalUrl: venture.canonicalUrl || "",
     keywords: venture.keywords || "",
+    // Per-item search indexing (0038): NULL/absent = indexable.
+    indexable: venture.indexable !== false,
     // Migration 0029: short description + sort order (archive card).
     shortDescription: venture.shortDescription || "",
     shortDescriptionBn: venture.shortDescriptionBn || "",
@@ -197,6 +211,10 @@ export function VentureProfile({ venture, onUpdate }: VentureProfileProps) {
         delete body.shortDescriptionBn;
         delete body.sortOrder;
       }
+
+      // Per-item search indexing (0038): only send the toggle when
+      // the column exists (see indexableSupported above).
+      if (!indexableSupported) delete body.indexable;
 
       const res = await fetch(`/api/ventures/${venture.id}`, {
         method: "PATCH",
@@ -457,6 +475,19 @@ export function VentureProfile({ venture, onUpdate }: VentureProfileProps) {
               <Input value={form.canonicalUrl} onChange={(e) => handleChange("canonicalUrl", e.target.value)} placeholder="https://riaz.com.bd/ventures/..." />
             </div>
           </div>
+          {indexableSupported ? (
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+              <Checkbox id="indexable" checked={form.indexable} onCheckedChange={(v) => handleChange("indexable", v === true)} />
+              <div>
+                <label htmlFor="indexable" style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>Search indexing — allow search engines to index this page</label>
+                <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
+                  Off keeps this page out of search results (noindex) and out of the sitemap, even when the
+                  global indexing switch is on. The global switch still governs everything — when it is off,
+                  nothing indexes regardless of this setting.
+                </p>
+              </div>
+            </div>
+          ) : null}
 
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <Button type="submit" disabled={saving}>

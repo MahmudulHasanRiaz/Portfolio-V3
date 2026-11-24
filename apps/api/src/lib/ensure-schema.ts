@@ -93,3 +93,40 @@ export function ensureVentureCategories(db: ApiDb): Promise<void> {
   }
   return ventureCategoriesTables;
 }
+
+// 0038 (packages/database/drizzle/0038_per_item_indexing.sql):
+// `indexable` on `case_studies`, `ventures` and `releases` — the
+// per-item search-indexing toggle. Projects / posts / services
+// already carry this column (their schemas defined it from the
+// start); these three types never had one. Nullable, no default;
+// existing rows keep NULL (= indexable). The admin edit form flips
+// it per item; the public site renders noindex + drops the item from
+// the sitemap when false. Await this before any query that reads or
+// writes the column on any of the three tables — a Drizzle select
+// from a table whose column does not exist yet fails, so every
+// handler that touches one of these tables must await it first.
+let perItemIndexingColumns: Promise<void> | null = null;
+
+export function ensurePerItemIndexing(db: ApiDb): Promise<void> {
+  if (!perItemIndexingColumns) {
+    perItemIndexingColumns = (async () => {
+      try {
+        await db.execute(
+          sql`ALTER TABLE "case_studies" ADD COLUMN IF NOT EXISTS "indexable" boolean`,
+        );
+        await db.execute(
+          sql`ALTER TABLE "ventures" ADD COLUMN IF NOT EXISTS "indexable" boolean`,
+        );
+        await db.execute(
+          sql`ALTER TABLE "releases" ADD COLUMN IF NOT EXISTS "indexable" boolean`,
+        );
+      } catch (err) {
+        // A transient failure must not poison the isolate: clear the
+        // guard so the next request retries.
+        perItemIndexingColumns = null;
+        throw err;
+      }
+    })();
+  }
+  return perItemIndexingColumns;
+}

@@ -340,6 +340,18 @@ export function seoString(data: unknown, key: string): string | undefined {
 	return typeof v === "string" && v.trim() !== "" ? v : undefined;
 }
 
+/** Boolean from a merged detail record, or undefined when absent /
+ *  not a boolean. Reads the per-item `indexable` flag (0038) the API
+ *  emits on every public item — detail pages pass it to Layout so a
+ *  toggled-off item renders noindex even when the global switch is
+ *  on. NULL on the row means the API omits the field (undefined
+ *  here), which Layout treats as indexable. */
+export function seoBoolean(data: unknown, key: string): boolean | undefined {
+	if (!data || typeof data !== "object") return undefined;
+	const v = (data as Record<string, unknown>)[key];
+	return typeof v === "boolean" ? v : undefined;
+}
+
 /** "2023" from an ISO date, or "" when there is none. */
 export function yearOf(iso: string | null | undefined): string {
 	if (!iso) return "";

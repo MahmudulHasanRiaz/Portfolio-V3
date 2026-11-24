@@ -311,6 +311,9 @@ export const caseStudySchema = z.object({
   ogImage: z.string().nullable().optional(),
   canonicalUrl: z.string().nullable().optional(),
   keywords: z.string().nullable().optional(),
+  // Per-item search indexing (0038): false = excluded from indexing
+  // when the global switch is ON; NULL/absent = indexable.
+  indexable: z.boolean().optional(),
   createdBy: uuidSchema.optional(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
@@ -344,6 +347,9 @@ export const createCaseStudySchema = z.object({
   ogImage: z.string().nullable().optional(),
   canonicalUrl: z.string().nullable().optional(),
   keywords: z.string().nullable().optional(),
+  // Per-item search indexing (0038): false = excluded from indexing
+  // when the global switch is ON; NULL/absent = indexable.
+  indexable: z.boolean().optional(),
   createdBy: uuidSchema.optional(),
 });
 

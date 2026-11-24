@@ -46,6 +46,7 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
+import { ensurePerItemIndexing } from "../../lib/ensure-schema";
 import { parsePagination, uuidParam, invalidParam } from "../../lib/validate";
 import { cacheTagsForContentType, deleteSearchEntity, indexSearchEntity, purgePublicCache, searchEntityTypeForContentType, waitUntilOf } from "../../lib/side-effects";
 
@@ -199,6 +200,8 @@ const RESTORE_FIELDS: Record<string, { table: any; fields: string[] }> = {
       "isFeatured",
       "canonicalUrl",
       "keywords",
+      // Per-item search indexing (0038).
+      "indexable",
     ],
   },
 };
@@ -309,6 +312,10 @@ app.post("/revisions/:id/restore", async (c) => {
     if (!ENTITY_TYPES.includes(entityType)) {
       return c.json({ error: "Unsupported entity type" }, 400);
     }
+    // 0038 auto-apply: the restore select/update below reads the
+    // `indexable` column for case_studies — create it first (no
+    // manual migration).
+    if (entityType === "case_studies") await ensurePerItemIndexing(db);
     // RevisionService.create writes createdBy into a uuid column, so
     // the restore must be attributed to the real internal user id
     // (authorizeByEmail with no role list — any authenticated user).

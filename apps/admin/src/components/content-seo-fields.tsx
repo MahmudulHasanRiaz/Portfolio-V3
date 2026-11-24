@@ -21,9 +21,13 @@ const labelStyle = { display: "block", fontSize: 14, fontWeight: 500, color: "va
 
 export function ContentSeoFields({
   initial,
+  showIndexable = true,
 }: {
   /** The loaded row (edit) — a Record<string, unknown> is fine. */
   initial?: Record<string, unknown>;
+  /** Hide the per-item indexing toggle (services have no public
+   * detail page, so there is nothing to index). */
+  showIndexable?: boolean;
 }) {
   const ogImageRef = useRef<HTMLInputElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -69,6 +73,20 @@ export function ContentSeoFields({
           <label style={labelStyle}>Canonical URL</label>
           <Input name="canonicalUrl" defaultValue={(initial?.canonicalUrl as string) || ""} placeholder="https://... (empty = the item's own URL)" />
         </div>
+        {showIndexable ? (
+          <div>
+            <label style={{ ...labelStyle, display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input type="checkbox" name="indexable" defaultChecked={initial?.indexable !== false} style={{ width: 16, height: 16, accentColor: "var(--accent, #2563eb)" }} />
+              Search indexing — allow search engines to index this page
+            </label>
+            <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0 24px" }}>
+              Off keeps this page out of search results (noindex) and out of the sitemap, even when the
+              global indexing switch is on. Unchecked items stay unpublished-safe: flipping it back on
+              re-indexes the page. The global switch still governs everything — when it is off, nothing
+              indexes regardless of this setting.
+            </p>
+          </div>
+        ) : null}
       </div>
       <MediaPicker
         open={pickerOpen}

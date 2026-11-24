@@ -18,6 +18,7 @@ import {
 	dedupeBlocks,
 	mergeDetail,
 	seoString,
+	seoBoolean,
 	parseBodyBlocks,
 } from "../../lib/detail";
 import { optimizedImageUrl, optimizedSrcset } from "../../lib/images";
@@ -207,6 +208,9 @@ const jsonLd = d
 	ogImage={seoOgImage ?? (coverImage ? absUrl(optimizedImageUrl(coverImage, 1200), siteBase) : null)}
 	canonical={seoCanonical ?? pageUrl}
 	keywords={seoKeywords}
+	// Per-item search indexing (0038): false = this page stays
+	// noindex even when the global switch is on.
+	indexable={seoBoolean(d, "indexable")}
 	lang={lang}
 >
 	{

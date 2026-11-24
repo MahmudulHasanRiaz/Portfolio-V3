@@ -39,6 +39,9 @@ export const ventureSchema = z.object({
   ogImage: z.string().optional(),
   canonicalUrl: z.string().optional(),
   keywords: z.string().optional(),
+  // Per-item search indexing (0038): false = excluded from indexing
+  // when the global switch is ON; NULL/absent = indexable.
+  indexable: z.boolean().optional(),
   createdBy: uuidSchema.optional(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
@@ -79,6 +82,9 @@ export const createVentureSchema = z.object({
   ogImage: z.string().optional(),
   canonicalUrl: z.string().optional(),
   keywords: z.string().optional(),
+  // Per-item search indexing (0038): false = excluded from indexing
+  // when the global switch is ON; NULL/absent = indexable.
+  indexable: z.boolean().optional(),
   createdBy: uuidSchema.optional(),
 });
 

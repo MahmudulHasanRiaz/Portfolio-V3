@@ -78,12 +78,18 @@ async function liveSlugs(
 			: Array.isArray((raw as { items?: unknown }).items)
 				? (raw as { items: unknown[] }).items
 				: [];
+		// Per-item search indexing (0038): an item whose toggle is OFF
+		// (indexable === false) is excluded from the sitemap, so a
+		// crawler never discovers a page the detail route renders
+		// noindex. NULL/absent means indexable (the API omits the
+		// field for NULL rows), so only an explicit false excludes.
 		return items
 			.filter(
-				(i): i is { slug: string } =>
+				(i): i is { slug: string; indexable?: boolean } =>
 					typeof i === "object" &&
 					i !== null &&
-					typeof (i as { slug?: unknown }).slug === "string",
+					typeof (i as { slug?: unknown }).slug === "string" &&
+					(i as { indexable?: unknown }).indexable !== false,
 			)
 			.map((i) => i.slug);
 	} catch {

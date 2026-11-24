@@ -21,6 +21,9 @@ export const releaseSchema = z.object({
   ogImage: z.string().optional(),
   canonicalUrl: z.string().optional(),
   keywords: z.string().optional(),
+  // Per-item search indexing (0038): false = excluded from indexing
+  // when the global switch is ON; NULL/absent = indexable.
+  indexable: z.boolean().optional(),
   lyrics: z.string().optional(),
   credits: z.record(z.string(), z.unknown()).optional(),
   createdBy: uuidSchema.optional(),
@@ -45,6 +48,9 @@ export const createReleaseSchema = z.object({
   ogImage: z.string().optional(),
   canonicalUrl: z.string().optional(),
   keywords: z.string().optional(),
+  // Per-item search indexing (0038): false = excluded from indexing
+  // when the global switch is ON; NULL/absent = indexable.
+  indexable: z.boolean().optional(),
   lyrics: z.string().optional(),
   credits: z.record(z.string(), z.unknown()).optional(),
   createdBy: uuidSchema.optional(),

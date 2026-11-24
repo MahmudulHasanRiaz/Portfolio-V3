@@ -67,6 +67,9 @@ export default function EditProjectPage() {
       ogImage: form.get("ogImage"),
       canonicalUrl: form.get("canonicalUrl"),
       keywords: form.get("keywords"),
+      // Per-item search indexing (0038): unchecked = excluded from
+      // indexing while the global switch is on.
+      indexable: form.get("indexable") === "on",
     };
     try {
       await updateContent("projects", params.id, data);
