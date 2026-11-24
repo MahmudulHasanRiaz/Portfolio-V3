@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Button, Input, Textarea, Badge, RadioGroup, RadioGroupItem, Checkbox } from "@repo/ui";
 import { getContentById, updateContent, transitionContent, deleteContent } from "@/actions/content";
+import { toErrorMessage } from "@/lib/error-message";
 import { getEntityTags, setEntityTags } from "@/actions/entity-tags";
 import { useRouter, useParams } from "next/navigation";
 import { MediaPicker } from "@/components/media-picker";
@@ -148,12 +149,12 @@ export default function EditCaseStudy() {
         canonicalUrl: form.get("canonicalUrl"),
         keywords: form.get("keywords"),
       });
-    } catch (err) { setError(err instanceof Error ? err.message : "Failed"); setLoading(false); return; }
+    } catch (err) { setError(toErrorMessage(err)); setLoading(false); return; }
     try {
       await setEntityTags("case_studies", params.id, String(form.get("tags") || ""));
       router.push("/dashboard/content/case-studies");
     } catch (tagErr) {
-      setError(`Case study saved, but tags could not be saved: ${tagErr instanceof Error ? tagErr.message : "unknown error"}`);
+      setError(`Case study saved, but tags could not be saved: ${toErrorMessage(tagErr, "unknown error")}`);
     } finally { setLoading(false); }
   }
 
@@ -162,7 +163,7 @@ export default function EditCaseStudy() {
       const r = await transitionContent("case_studies", params.id, action);
       setData(r);
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Failed to ${action}`);
+      setError(toErrorMessage(err, `Failed to ${action}`));
     }
   }
 
@@ -172,7 +173,7 @@ export default function EditCaseStudy() {
       await deleteContent("case_studies", params.id);
       router.push("/dashboard/content/case-studies");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete case study");
+      setError(toErrorMessage(err, "Failed to delete case study"));
       setDeleting(false);
     }
   }

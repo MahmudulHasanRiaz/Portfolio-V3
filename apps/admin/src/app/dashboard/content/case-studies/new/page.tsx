@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button, Input, Textarea, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@repo/ui";
 import { createContent } from "@/actions/content";
+import { toErrorMessage } from "@/lib/error-message";
 import { useRouter } from "next/navigation";
 import { ContentMediaFields, parseUrlList } from "@/components/content-media-fields";
 
@@ -57,7 +58,7 @@ export default function NewCaseStudy() {
       });
       router.push(`/dashboard/content/case-studies/${result.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create case study");
+      setError(toErrorMessage(err, "Failed to create case study"));
     } finally {
       setLoading(false);
     }

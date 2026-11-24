@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button, Input, Textarea } from "@repo/ui";
 import { getContentById, updateContent, transitionContent, deleteContent } from "@/actions/content";
+import { toErrorMessage } from "@/lib/error-message";
 import { useRouter, useParams } from "next/navigation";
 import { Badge } from "@repo/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -70,7 +71,7 @@ export default function EditProjectPage() {
     try {
       await updateContent("projects", params.id, data);
     }
-    catch (err) { setError(err instanceof Error ? err.message : "Failed"); setLoading(false); return; }
+    catch (err) { setError(toErrorMessage(err)); setLoading(false); return; }
     // Tags + technologies save after the main save (parallel actions —
     // updateContent does not accept a technologies array). Either
     // failing must not navigate away: the user retries from this form.
@@ -78,12 +79,12 @@ export default function EditProjectPage() {
     try {
       await setEntityTags("projects", params.id, String(form.get("tags") || ""));
     } catch (tagErr) {
-      failures.push(`tags could not be saved: ${tagErr instanceof Error ? tagErr.message : "unknown error"}`);
+      failures.push(`tags could not be saved: ${toErrorMessage(tagErr, "unknown error")}`);
     }
     try {
       await setEntityTechnologies("projects", params.id, form.getAll("technologies").map(String));
     } catch (techErr) {
-      failures.push(`technologies could not be saved: ${techErr instanceof Error ? techErr.message : "unknown error"}`);
+      failures.push(`technologies could not be saved: ${toErrorMessage(techErr, "unknown error")}`);
     }
     setLoading(false);
     if (failures.length > 0) {
@@ -95,7 +96,7 @@ export default function EditProjectPage() {
 
   async function handleTransition(action: string) {
     try { const r = await transitionContent("projects", params.id, action); setProject(r); }
-    catch (err) { setError(err instanceof Error ? err.message : `Failed: ${action}`); }
+    catch (err) { setError(toErrorMessage(err, `Failed: ${action}`)); }
   }
 
   async function handleDelete() {
@@ -104,7 +105,7 @@ export default function EditProjectPage() {
       await deleteContent("projects", params.id);
       router.push("/dashboard/projects");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete project");
+      setError(toErrorMessage(err, "Failed to delete project"));
       setDeleting(false);
     }
   }
