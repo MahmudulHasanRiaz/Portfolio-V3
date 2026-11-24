@@ -354,7 +354,14 @@ export async function getStats(): Promise<Stat[]> {
 // top-level or under `meta`, so a naming choice on the dashboard side
 // can never silently drop a row.
 
-function slugify(value: string): string {
+// URL-safe slug (lowercase, non-alphanumerics → "-"). Used internally
+// for platform/technology matching, and EXPORTED for the ventures
+// archive filter: ArchiveFilter splits card data-tags on "," in
+// "card-data-tags" mode, so a facet containing a comma (e.g. the stage
+// "Active, ongoing") could never match and the filter showed 0 results
+// (2026-11-24, PR #18) — the chip's data-filter value and the card's
+// data-tags are the slug, the chip label stays the human text.
+export function slugify(value: string): string {
 	return value
 		.toLowerCase()
 		.trim()

@@ -1,6 +1,6 @@
 ---
 import Layout from "../../layouts/Layout.astro";
-import { getVentures, formatDate, truncateShort } from "../../lib/content";
+import { getVentures, formatDate, truncateShort, slugify } from "../../lib/content";
 import { getDict, langUrl, showingLabel } from "../../lib/i18n";
 import ThumbImage from "../../components/ThumbImage.astro";
 import ArchiveFilter from "../../components/ArchiveFilter.astro";
@@ -24,9 +24,15 @@ for (const v of ventures) {
 	const facet = facetOf(v);
 	if (facet) tagCounts.set(facet, (tagCounts.get(facet) ?? 0) + 1);
 }
-const filterItems = [...tagCounts.entries()].map(([value, count]) => ({
-	value,
-	label: value,
+const filterItems = [...tagCounts.entries()].map(([facet, count]) => ({
+	// Filter VALUE is a comma-free slug of the facet (ArchiveFilter
+	// splits card data-tags on "," in "card-data-tags" mode, so a facet
+	// containing a comma — e.g. the stage "Active, ongoing" — could
+	// never match and the filter showed 0 results; 2026-11-24, PR #18).
+	// The chip LABEL stays the human text. The slug is language-neutral,
+	// so the same ?filter= value works on the EN and BN pages.
+	value: slugify(facet),
+	label: facet,
 	count,
 }));
 
@@ -77,7 +83,7 @@ const sizedThumb = (url: string | null | undefined, w = 800) =>
 							class="grid-card"
 							href={langUrl(`/ventures/${venture.data.slug}`, lang)}
 							data-astro-prefetch="hover"
-							data-tags={facetOf(venture)}
+							data-tags={slugify(facetOf(venture))}
 						>
 							<div class="grid-thumb">
 								{venture.data.thumbnailType === "video" &&
