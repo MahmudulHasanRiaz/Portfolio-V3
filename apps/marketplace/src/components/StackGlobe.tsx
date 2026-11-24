@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { MouseEvent, PointerEvent } from "preact/compat";
 import { RotateCw, X } from "lucide-react";
-import { getDict, type StackGlobeDict, type Lang } from "../lib/i18n";
+import { getDict, langUrl, type StackGlobeDict, type Lang } from "../lib/i18n";
 import { hasSpriteIcon } from "../lib/icons";
 import SpriteIcon from "./SpriteIcon";
 import {
@@ -1058,6 +1058,10 @@ export default function StackGlobe({
 				<div>
 					<h2>{t.stackTitle}</h2>
 				</div>
+				{/* PR #24: homepage entry point to the Skills page. */}
+				<a className="view-all" href={langUrl("/skills", lang)}>
+					{t.viewAllSkills}
+				</a>
 			</div>
 			<div className="globe-wrap">
 				<div

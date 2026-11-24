@@ -56,6 +56,7 @@ export interface Dict {
 	viewAllPosts: string;
 	viewAllReleases: string;
 	viewAllVentures: string;
+	viewAllSkills: string;
 	caseStudiesTitle: string;
 	readCaseStudy: string;
 	stackTitle: string;
@@ -284,8 +285,8 @@ export const bn: Dict = {
 	navProjects: "প্রজেক্ট",
 	navCaseStudies: "কেস স্টাডি",
 	navPosts: "পোস্ট",
-	navSkills: "Skills",
-	navEducation: "Education",
+	navSkills: "স্কিল",
+	navEducation: "শিক্ষা",
 	navAbout: "আমার সম্পর্কে",
 	navContact: "যোগাযোগ",
 	navHome: "হোম",
@@ -338,6 +339,7 @@ export const bn: Dict = {
 	viewAllPosts: "সব পোস্ট দেখুন →",
 	viewAllReleases: "সব রিলিজ দেখুন →",
 	viewAllVentures: "সব উদ্যোগ দেখুন →",
+	viewAllSkills: "সব স্কিল দেখুন →",
 	caseStudiesTitle: "কেস স্টাডি",
 	readCaseStudy: "কেস স্টাডিটা পড়ুন",
 	stackTitle: "আমি যে স্ট্যাকে কাজ করি",
@@ -416,8 +418,8 @@ export const bn: Dict = {
 	allReleases: "সব রিলিজ",
 	allVentures: "সব উদ্যোগ",
 	allCaseStudies: "সব কেস স্টাডি",
-	allSkills: "সব Skills",
-	allEducation: "Education",
+	allSkills: "সব স্কিল",
+	allEducation: "শিক্ষা",
 	allChip: "সবগুলো",
 	moreFilters: "আরও",
 	showingProjects: "মোট {total}টি প্রজেক্টের মধ্যে {shown}টি দেখাচ্ছে",
@@ -430,8 +432,8 @@ export const bn: Dict = {
 	emptyCaseStudies: "এখনো কোনো কেস স্টাডি পাবলিশ হয়নি।",
 	emptyVentures: "এখনো কোনো উদ্যোগ পাবলিশ হয়নি।",
 	emptyReleases: "এখনো কোনো রিলিজ পাবলিশ হয়নি।",
-	emptySkills: "এখনো কোনো skill যোগ করা হয়নি।",
-	emptyEducation: "এখনো কোনো education entry নেই — admin panel থেকে যোগ করুন।",
+	emptySkills: "এখনও কোনো স্কিল যোগ করা হয়নি।",
+	emptyEducation: "এখনও কোনো শিক্ষাগত তথ্য যোগ করা হয়নি — অ্যাডমিন প্যানেল থেকে যোগ করুন।",
 	releaseTypeNasheed: "নাশিদ",
 	releaseTypeTilawat: "তিলাওয়াত",
 	releaseTypePodcast: "পডকাস্ট",
@@ -576,10 +578,10 @@ export const bn: Dict = {
 	caseStudiesPageTitle: "সব কেস স্টাডি — মাহমুদুল হাসান রিয়াজ",
 	caseStudiesPageDescription:
 		"মাহমুদুল হাসান রিয়াজের কেস স্টাডি — সিস্টেমগুলো কীভাবে বানানো হয়েছিল আর কী বদলে দিয়েছিল।",
-	skillsPageTitle: "Skills — মাহমুদুল হাসান রিয়াজ",
+	skillsPageTitle: "স্কিল — মাহমুদুল হাসান রিয়াজ",
 	skillsPageDescription:
 		"মাহমুদুল হাসান রিয়াজের Skills — software development, আর graphic design ও digital marketing-এর জার্নি।",
-	educationPageTitle: "Education — মাহমুদুল হাসান রিয়াজ",
+	educationPageTitle: "শিক্ষা — মাহমুদুল হাসান রিয়াজ",
 	educationPageDescription: "মাহমুদুল হাসান রিয়াজের শিক্ষাজীবন।",
 	skillsMainTitle: "Software Development",
 	skillsMainIntro: "প্রতিদিন যে tools আর technologies দিয়ে কাজ করি।",
