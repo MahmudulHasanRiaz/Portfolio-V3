@@ -1,19 +1,29 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import BrandIcon from "../components/BrandIcon.astro";
+import StackGlobe from "../components/StackGlobe";
 import { getTechnologies } from "../lib/content";
 import { STACK_CATEGORIES, type StackTech } from "../data/site";
-import { applySiteCopy, getDict, langUrl } from "../lib/i18n";
+import {
+	applySiteCopy,
+	getDict,
+	langUrl,
+	pickDict,
+	STACK_GLOBE_DICT_KEYS,
+} from "../lib/i18n";
 import { getSiteSettings } from "../lib/settings";
 
-// Skills page (0039, PR #22) — dedicated page for the full skill
-// set. Software-development skills are the main section on top,
-// grouped by category; the journey (Graphic Design → Digital
-// Marketing → Software Development) sits below in a smaller, muted
-// style. A proficiency bar renders ONLY when the admin set one —
-// never invented. Hidden skills (is_visible = false) never render.
-// No client-side script: nothing here needs re-wiring after a
-// language switch (PR #16 lesson).
+// Skills page (0039, PR #22; globe-first redesign PR #28) — the
+// icon-only globe is the hero on top (StackGlobe `iconOnly`), then
+// the software skills grouped by category, then the journey: PAST
+// stages only (Graphic Design → Digital Marketing), ending in a
+// "Today" node that points back up to the detailed skills above as
+// the last step — NO separate Software Development stage, NO tech
+// lists in the journey (PR #22's wholesale repeat was the user's
+// "osundor" complaint). The journey section is hidden entirely
+// while no past-stage skill exists. A proficiency bar renders ONLY
+// when the admin set one — never invented. Hidden skills
+// (is_visible = false) never render.
 const lang = "en" as const;
 const t = applySiteCopy(getDict(lang), lang, await getSiteSettings());
 
@@ -42,15 +52,18 @@ const categories = [...byCategory.keys()].sort((a, b) => {
 	return a.localeCompare(b);
 });
 
-// Journey section: the three stages in journey order. A stage
-// renders ONLY when it has at least one skill.
+// Journey section: PAST stages only, in journey order. A stage
+// renders ONLY when it has at least one visible skill. Software
+// Development is NOT a stage here — the detailed skills above ARE
+// the last step; the timeline below ends in a "Today" node pointing
+// back up to them.
 const JOURNEY_STAGES = [
-	{ stage: "graphic_design", label: t.stageGraphicDesign },
-	{ stage: "digital_marketing", label: t.stageDigitalMarketing },
-	{ stage: "software", label: t.stageSoftware },
+	{ stage: "graphic_design", label: t.stageGraphicDesign, note: t.stageGraphicDesignNote },
+	{ stage: "digital_marketing", label: t.stageDigitalMarketing, note: t.stageDigitalMarketingNote },
 ] as const;
-const journey = JOURNEY_STAGES.map(({ stage, label }) => ({
+const journey = JOURNEY_STAGES.map(({ stage, label, note }) => ({
 	label,
+	note,
 	skills: visible.filter((tech) => (tech.journeyStage ?? "software") === stage),
 })).filter((s) => s.skills.length > 0);
 ---
@@ -64,14 +77,21 @@ const journey = JOURNEY_STAGES.map(({ stage, label }) => ({
 		<p style="margin:0 0 8px;">
 			<a class="back-link" href={langUrl("/", lang)}>{t.backHome}</a>
 		</p>
-		<h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;">{t.allSkills}</h1>
+		<h1 class="skills-hero-h1" style="margin:0 0 8px;font-size:24px;line-height:1.25;">{t.allSkills}</h1>
 		{
 			visible.length === 0 ? (
 				<p class="empty-state">{t.emptySkills}</p>
 			) : (
 				<>
+					<StackGlobe
+						lang={lang}
+						dict={pickDict(t, STACK_GLOBE_DICT_KEYS)}
+						techs={visible}
+						iconOnly
+						client:visible
+					/>
 					{software.length > 0 && (
-						<section aria-label={t.skillsMainTitle}>
+						<section aria-label={t.skillsMainTitle} id="skills-main">
 							<h2 class="detail-h2">{t.skillsMainTitle}</h2>
 							<p style="margin:0 0 16px;color:var(--ink-dim);">{t.skillsMainIntro}</p>
 							{categories.map((category) => (
@@ -103,24 +123,26 @@ const journey = JOURNEY_STAGES.map(({ stage, label }) => ({
 						</section>
 					)}
 					{journey.length > 0 && (
-						<section aria-label={t.skillsJourneyTitle} style="margin-top:32px;">
+						<section aria-label={t.skillsJourneyTitle} class="journey-section">
 							<h2 class="detail-h2">{t.skillsJourneyTitle}</h2>
-							<p style="margin:0 0 16px;color:var(--ink-dim);">{t.skillsJourneyIntro}</p>
-							{journey.map((stage) => (
-								<div style="margin-bottom:16px;">
-									<h3 class="skills-h3 skills-h3-muted">{stage.label}</h3>
-									<div class="tag-row">
-										{stage.skills.map((tech) => (
-											<span class="tag tag-muted" style="display:inline-flex;align-items:center;gap:6px;">
-												{tech.icon ? (
-													<BrandIcon icon={tech.icon} name={tech.name} size={14} decorative />
-												) : null}
-												{tech.name}
-											</span>
-										))}
-									</div>
-								</div>
-							))}
+							<p class="journey-intro">{t.skillsJourneyIntro}</p>
+							<ol class="journey-timeline">
+								{journey.map((stage) => (
+									<li class="journey-step">
+										<span class="journey-dot" aria-hidden="true" />
+										<h3 class="journey-step-title">{stage.label}</h3>
+										<p class="journey-step-note">{stage.note}</p>
+									</li>
+								))}
+								<li class="journey-step journey-step-today">
+									<span class="journey-dot journey-dot-today" aria-hidden="true" />
+									<h3 class="journey-step-title">{t.skillsJourneyTodayTitle}</h3>
+									<p class="journey-step-note">{t.skillsJourneyTodayNote}</p>
+									<a class="journey-up" href="#skills-main">
+										↑ {t.skillsMainTitle}
+									</a>
+								</li>
+							</ol>
 						</section>
 					)}
 				</>
@@ -135,9 +157,8 @@ const journey = JOURNEY_STAGES.map(({ stage, label }) => ({
 		line-height: 1.35;
 		margin: 0 0 10px;
 	}
-	.skills-h3-muted {
-		color: var(--ink-dim);
-		font-weight: 600;
+	.skills-hero-h1 {
+		text-align: center;
 	}
 	.skill-grid {
 		display: grid;
@@ -149,6 +170,20 @@ const journey = JOURNEY_STAGES.map(({ stage, label }) => ({
 		border-radius: 12px;
 		padding: 12px 14px;
 		background: var(--card);
+		transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+	}
+	.skill-card:hover {
+		transform: translateY(-2px);
+		border-color: var(--accent);
+		box-shadow: 0 6px 18px rgba(12, 26, 21, 0.08);
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.skill-card {
+			transition: none;
+		}
+		.skill-card:hover {
+			transform: none;
+		}
 	}
 	.skill-name {
 		display: flex;
@@ -185,7 +220,77 @@ const journey = JOURNEY_STAGES.map(({ stage, label }) => ({
 		color: var(--ink-dim);
 		font-variant-numeric: tabular-nums;
 	}
-	.tag-muted {
-		opacity: 0.85;
+	/* Journey timeline (PR #28): past stages only, vertical spine;
+	   the "Today" node ends the line and points back up to the
+	   detailed skills above — the last step of the journey. */
+	.journey-section {
+		margin-top: 40px;
+	}
+	.journey-intro {
+		margin: 0 0 24px;
+		color: var(--ink-dim);
+	}
+	.journey-timeline {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		position: relative;
+	}
+	.journey-timeline::before {
+		content: "";
+		position: absolute;
+		left: 7px;
+		top: 8px;
+		bottom: 8px;
+		width: 2px;
+		background: linear-gradient(var(--accent), transparent);
+		opacity: 0.45;
+	}
+	.journey-step {
+		position: relative;
+		padding: 0 0 28px 32px;
+	}
+	.journey-step:last-child {
+		padding-bottom: 0;
+	}
+	.journey-dot {
+		position: absolute;
+		left: 0;
+		top: 4px;
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		background: var(--bg);
+		border: 2px solid var(--accent);
+	}
+	.journey-dot-today {
+		background: var(--accent);
+		box-shadow:
+			0 0 0 4px var(--accent-wash),
+			0 0 16px rgba(13, 148, 136, 0.45);
+	}
+	.journey-step-title {
+		font-size: 16px;
+		line-height: 1.35;
+		margin: 0 0 4px;
+	}
+	.journey-step-note {
+		margin: 0;
+		font-size: 14px;
+		color: var(--ink-dim);
+	}
+	.journey-step-today .journey-step-title {
+		color: var(--accent-strong);
+	}
+	.journey-up {
+		display: inline-block;
+		margin-top: 8px;
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--accent-strong);
+		text-decoration: none;
+	}
+	.journey-up:hover {
+		text-decoration: underline;
 	}
 </style>

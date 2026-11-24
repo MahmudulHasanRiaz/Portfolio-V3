@@ -275,6 +275,10 @@ export interface Dict {
 	stageSoftware: string;
 	stageGraphicDesign: string;
 	stageDigitalMarketing: string;
+	stageGraphicDesignNote: string;
+	stageDigitalMarketingNote: string;
+	skillsJourneyTodayTitle: string;
+	skillsJourneyTodayNote: string;
 	educationPresent: string;
 }
 
@@ -591,5 +595,10 @@ export const bn: Dict = {
 	stageSoftware: "Software Development",
 	stageGraphicDesign: "Graphic Design",
 	stageDigitalMarketing: "Digital Marketing",
+	stageGraphicDesignNote: "যেখান থেকে শুরু।",
+	stageDigitalMarketingNote: "পরের ধাপ।",
+	skillsJourneyTodayTitle: "আজ",
+	skillsJourneyTodayNote:
+		"উপরের স্কিলগুলো — Software Development-ই এই জার্নির শেষ ধাপ।",
 	educationPresent: "বর্তমান",
 };

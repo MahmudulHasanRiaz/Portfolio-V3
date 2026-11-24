@@ -3830,6 +3830,76 @@ button.tag:hover {
 	opacity: 0.75;
 }
 
+/* Skills-page hero globe (PR #28): ICONS ONLY — no names, no pills,
+   no ball, no orbit, no constellation lines. Bare monochrome marks
+   on the card, depth-scaled and faded like the reference
+   (codervai.vercel.app/skills): the sphere is implied solely by the
+   icons' 3D positions. Theme-aware: dark-grey marks on light,
+   white marks on dark. The homepage globe is untouched. */
+.globe-hero {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	margin: 8px 0 4px;
+}
+
+.globe-icon-only .globe-tag-pill {
+	background: transparent;
+	border-color: transparent;
+	box-shadow: none;
+	padding: 3px;
+	border-radius: 50%;
+	gap: 0;
+}
+
+.globe-icon-only .globe-tag-pill img {
+	width: 26px;
+	height: 26px;
+}
+
+.globe-icon-only .globe-tag-pill svg {
+	width: 26px;
+	height: auto;
+}
+
+/* Monochrome marks: light theme → dark grey; dark theme → white
+   (brightness(0) + invert(1) turns any brand mark into a white
+   silhouette; the existing .logo-dark-invert rule loses to this
+   higher-specificity selector, so no icon is filtered twice). */
+.globe-icon-only .globe-tag-pill img,
+.globe-icon-only .globe-tag-pill svg {
+	filter: grayscale(1) brightness(0.42);
+}
+
+[data-theme="dark"] .globe-icon-only .globe-tag-pill img,
+[data-theme="dark"] .globe-icon-only .globe-tag-pill svg {
+	filter: brightness(0) invert(1);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .globe-icon-only .globe-tag-pill img,
+	:root:not([data-theme="light"]) .globe-icon-only .globe-tag-pill svg {
+		filter: brightness(0) invert(1);
+	}
+}
+
+/* Front (spotlight) icon: soft halo only — no pill, no border. */
+.globe-icon-only .globe-tag.front .globe-tag-pill {
+	border-color: transparent;
+	box-shadow: 0 0 22px rgba(13, 148, 136, 0.35);
+}
+
+@media (max-width: 639px) {
+	.globe-icon-only .globe-tag-pill img {
+		width: 20px;
+		height: 20px;
+	}
+
+	.globe-icon-only .globe-tag-pill svg {
+		width: 20px;
+	}
+}
+
 .globe-now {
 	margin-top: 12px;
 	font-size: 14px;
