@@ -9,6 +9,7 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { MediaPicker } from "@/components/media-picker";
+import { MediaUrlPreview } from "@/components/media-url-preview";
 
 interface FinanceExpense {
   id: string;
@@ -396,6 +397,7 @@ export default function FinanceExpensesPage() {
                   <Input value={form.receiptUrl} onChange={(e) => set("receiptUrl", e.target.value)} placeholder="https://…" style={{ flex: 1 }} />
                   <Button type="button" variant="outline" onClick={() => setPickerOpen(true)}>Choose from library</Button>
                 </div>
+                <MediaUrlPreview url={form.receiptUrl} kind="all" onRemove={() => set("receiptUrl", "")} />
               </div>
             </div>
             {formError && <div style={{ color: "var(--danger, #c0392b)", fontSize: 13, marginTop: 12 }}>{formError}</div>}

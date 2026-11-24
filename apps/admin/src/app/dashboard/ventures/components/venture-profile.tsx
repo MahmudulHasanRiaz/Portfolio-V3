@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button, Input, Textarea, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Card, CardContent, Checkbox } from "@repo/ui";
 import { Save } from "lucide-react";
 import { MediaPicker } from "@/components/media-picker";
+import { MediaUrlPreview, MediaUrlListPreview } from "@/components/media-url-preview";
 
 /** Stored string[] (jsonb) -> one URL per line for the textarea. */
 function listValue(v: string[] | null | undefined): string {
@@ -139,6 +140,12 @@ export function VentureProfile({ venture, onUpdate }: VentureProfileProps) {
     });
   };
 
+  /** Remove one line from a URL-list field, keeping the textarea + preview in sync. */
+  const removeListItem = (field: "videos" | "galleryImages", index: number) => {
+    const next = parseUrlList(form[field]).filter((_, i) => i !== index);
+    handleChange(field, next.join("\n"));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -241,6 +248,7 @@ export function VentureProfile({ venture, onUpdate }: VentureProfileProps) {
                 <Input value={form.logo} onChange={(e) => handleChange("logo", e.target.value)} style={{ flex: 1 }} />
                 <Button type="button" variant="outline" onClick={() => setPickerTarget("logo")}>Choose from library</Button>
               </div>
+              <MediaUrlPreview url={form.logo} kind="image" onRemove={() => handleChange("logo", "")} />
               <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
                 Recommended: transparent PNG or SVG preferred (WebP also ok) — upload close to the display size,
                 don&apos;t upload an oversized file. No manual resizing needed — images are automatically
@@ -253,6 +261,7 @@ export function VentureProfile({ venture, onUpdate }: VentureProfileProps) {
                 <Input value={form.coverImage} onChange={(e) => handleChange("coverImage", e.target.value)} style={{ flex: 1 }} />
                 <Button type="button" variant="outline" onClick={() => setPickerTarget("coverImage")}>Choose from library</Button>
               </div>
+              <MediaUrlPreview url={form.coverImage} kind="image" onRemove={() => handleChange("coverImage", "")} />
               <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
                 Recommended: 1200×630. WebP/AVIF preferred (JPEG/PNG ok), quality 75–80 — don&apos;t compress
                 aggressively. Upload close to the display size. No manual resizing needed — images are
@@ -374,6 +383,7 @@ export function VentureProfile({ venture, onUpdate }: VentureProfileProps) {
                 <Input value={form.thumbnailUrl} onChange={(e) => handleChange("thumbnailUrl", e.target.value)} placeholder="https://... (image)" style={{ flex: 1 }} />
                 <Button type="button" variant="outline" onClick={() => setPickerTarget("thumbnailUrl")}>Choose from library</Button>
               </div>
+              <MediaUrlPreview url={form.thumbnailUrl} kind="image" onRemove={() => handleChange("thumbnailUrl", "")} />
               <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
                 Recommended: 1200×630. WebP/AVIF preferred (JPEG/PNG ok), quality 75–80 — don&apos;t compress
                 aggressively. Upload close to the display size. No manual resizing needed — images are
@@ -386,16 +396,19 @@ export function VentureProfile({ venture, onUpdate }: VentureProfileProps) {
                 <Input value={form.thumbnailVideoUrl} onChange={(e) => handleChange("thumbnailVideoUrl", e.target.value)} placeholder="https://... (video, used when type is Video)" style={{ flex: 1 }} />
                 <Button type="button" variant="outline" onClick={() => setPickerTarget("thumbnailVideoUrl")}>Choose from library</Button>
               </div>
+              <MediaUrlPreview url={form.thumbnailVideoUrl} kind="video" onRemove={() => handleChange("thumbnailVideoUrl", "")} />
             </div>
           </div>
           <div>
             <label style={{ fontSize: 14, fontWeight: 500, marginBottom: 4, display: "block" }}>Videos (one URL per line)</label>
             <Textarea value={form.videos} onChange={(e) => handleChange("videos", e.target.value)} rows={3} placeholder={"https://.../demo-1.mp4\nhttps://.../demo-2.mp4"} />
+            <MediaUrlListPreview urls={parseUrlList(form.videos)} kind="video" onRemove={(i) => removeListItem("videos", i)} />
             <Button type="button" variant="outline" size="sm" onClick={() => setPickerTarget("videos")} style={{ marginTop: 8 }}>Add from library</Button>
           </div>
           <div>
             <label style={{ fontSize: 14, fontWeight: 500, marginBottom: 4, display: "block" }}>Gallery Images (one URL per line)</label>
             <Textarea value={form.galleryImages} onChange={(e) => handleChange("galleryImages", e.target.value)} rows={3} placeholder={"https://.../shot-1.jpg\nhttps://.../shot-2.jpg"} />
+            <MediaUrlListPreview urls={parseUrlList(form.galleryImages)} kind="image" onRemove={(i) => removeListItem("galleryImages", i)} />
             <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
               Recommended: up to 1600px wide. WebP/AVIF preferred (JPEG/PNG ok), quality 75–80 — don&apos;t
               compress aggressively. Upload close to the display size. No manual resizing needed — images are
@@ -432,6 +445,7 @@ export function VentureProfile({ venture, onUpdate }: VentureProfileProps) {
                 <Input value={form.ogImage} onChange={(e) => handleChange("ogImage", e.target.value)} placeholder="https://... (social share image)" style={{ flex: 1 }} />
                 <Button type="button" variant="outline" onClick={() => setPickerTarget("ogImage")}>Choose from library</Button>
               </div>
+              <MediaUrlPreview url={form.ogImage} kind="image" onRemove={() => handleChange("ogImage", "")} />
               <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
                 Recommended: 1200×630 (social share). WebP/AVIF preferred (JPEG/PNG ok), quality 75–80 — don&apos;t
                 compress aggressively. No manual resizing needed — images are automatically optimized for the
