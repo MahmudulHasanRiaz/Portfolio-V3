@@ -61,7 +61,10 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../../db";
 import { requireAuth, unauthorized } from "../../../lib/admin-auth";
-import { ensureVentureCategories } from "../../../lib/ensure-schema";
+import {
+  ensurePerItemIndexing,
+  ensureVentureCategories,
+} from "../../../lib/ensure-schema";
 import {
   invalidParam,
   isRecord,
@@ -147,6 +150,9 @@ app.get("/", async (c) => {
     const offset = (page - 1) * pageSize;
 
     const db = getApiDb();
+    // 0038 auto-apply: ventures selects read the `indexable` column —
+    // create it first (no manual migration).
+    await ensurePerItemIndexing(db);
     // The categoryId filter joins venture_category_assignments, so the
     // tables must exist before that query runs (see ensure-schema.ts).
     if (categoryId) await ensureVentureCategories(db);
@@ -238,6 +244,9 @@ app.post("/", async (c) => {
     const data = { ...(v.data as Record<string, unknown>) };
     stripServerManaged(data);
     const db = getApiDb();
+    // 0038 auto-apply: ventures inserts read the `indexable` column —
+    // create it first (no manual migration).
+    await ensurePerItemIndexing(db);
     const [row] = await db
       .insert(ventures)
       .values({
@@ -264,6 +273,9 @@ app.get("/:id", async (c) => {
     const id = uuidParam(c, "id");
     if (!id) return invalidParam(c, "id");
     const db = getApiDb();
+    // 0038 auto-apply: ventures selects read the `indexable` column —
+    // create it first (no manual migration).
+    await ensurePerItemIndexing(db);
     const [row] = await db
       .select()
       .from(ventures)
@@ -289,6 +301,9 @@ app.patch("/:id", async (c) => {
     const data = { ...(v.data as Record<string, unknown>) };
     stripServerManaged(data);
     const db = getApiDb();
+    // 0038 auto-apply: ventures selects read the `indexable` column —
+    // create it first (no manual migration).
+    await ensurePerItemIndexing(db);
     const values = ventureFields(data, false);
     if (Object.keys(values).length === 0) {
       // No updatable fields — the repository returns the existing row.
@@ -324,6 +339,9 @@ app.delete("/:id", async (c) => {
     const id = uuidParam(c, "id");
     if (!id) return invalidParam(c, "id");
     const db = getApiDb();
+    // 0038 auto-apply: ventures deletes read the `indexable` column —
+    // create it first (no manual migration).
+    await ensurePerItemIndexing(db);
     // No FKs point from products / timeline_events to ventures, so delete
     // the children first — otherwise a deleted venture leaves orphaned
     // products and timeline rows behind. (Media mentions FK to ventures

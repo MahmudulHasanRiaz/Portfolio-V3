@@ -56,6 +56,11 @@ export const ventures = pgTable("ventures", {
   ogImage: text("og_image"),
   canonicalUrl: text("canonical_url"),
   keywords: text("keywords"),
+  // Per-item search indexing (0038): NULL = indexable (the default).
+  // The admin edit form flips this per item; the public site renders
+  // noindex + drops the item from the sitemap when false. The global
+  // search_indexing_enabled switch stays the master.
+  indexable: boolean("indexable"),
   createdBy: uuid("created_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),

@@ -139,7 +139,7 @@ export default function EditServicePage() {
               <label htmlFor="isFeatured" style={{ fontSize: 14, color: "var(--text-primary)" }}>Featured service</label>
             </div>
             <ContentMediaFields initial={service} videosAndGallery={false} />
-            <ContentSeoFields initial={service} />
+            <ContentSeoFields initial={service} showIndexable={false} />
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <Button type="submit" disabled={loading}>{loading ? "Saving..." : "Save Changes"}</Button>
               <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>

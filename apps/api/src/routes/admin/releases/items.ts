@@ -27,6 +27,7 @@ import {
 } from "@repo/database/schema";
 import { getApiDb } from "../../../db";
 import { requireAuth, unauthorized } from "../../../lib/admin-auth";
+import { ensurePerItemIndexing } from "../../../lib/ensure-schema";
 import {
   invalidParam,
   isRecord,
@@ -108,6 +109,9 @@ app.get("/", async (c) => {
     const offset = (page - 1) * pageSize;
 
     const db = getApiDb();
+    // 0038 auto-apply: releases selects read the `indexable` column —
+    // create it first (no manual migration).
+    await ensurePerItemIndexing(db);
     const where = and(
       search
         ? or(
@@ -166,6 +170,9 @@ app.post("/", async (c) => {
     const data = { ...(v.data as Record<string, unknown>) };
     stripServerManaged(data);
     const db = getApiDb();
+    // 0038 auto-apply: releases inserts read the `indexable` column —
+    // create it first (no manual migration).
+    await ensurePerItemIndexing(db);
     const [row] = await db
       .insert(releases)
       .values({
@@ -190,6 +197,9 @@ app.get("/:id", async (c) => {
     const id = uuidParam(c, "id");
     if (!id) return invalidParam(c, "id");
     const db = getApiDb();
+    // 0038 auto-apply: releases selects read the `indexable` column —
+    // create it first (no manual migration).
+    await ensurePerItemIndexing(db);
     const [row] = await db
       .select()
       .from(releases)
@@ -221,6 +231,9 @@ app.patch("/:id", async (c) => {
     const data = { ...(v.data as Record<string, unknown>) };
     stripServerManaged(data);
     const db = getApiDb();
+    // 0038 auto-apply: releases selects read the `indexable` column —
+    // create it first (no manual migration).
+    await ensurePerItemIndexing(db);
     const values = releaseFields(data, false);
     if (Object.keys(values).length === 0) {
       // No updatable fields — the repository returns the existing row.
@@ -256,6 +269,9 @@ app.delete("/:id", async (c) => {
     const id = uuidParam(c, "id");
     if (!id) return invalidParam(c, "id");
     const db = getApiDb();
+    // 0038 auto-apply: releases deletes read the `indexable` column —
+    // create it first (no manual migration).
+    await ensurePerItemIndexing(db);
     // No FKs point from the child tables to releases, so delete the
     // children first — otherwise a deleted release leaves orphaned rows.
     await db.delete(releasePlatforms).where(eq(releasePlatforms.releaseId, id));

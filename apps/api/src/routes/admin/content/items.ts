@@ -59,6 +59,7 @@ import {
   services,
 } from "@repo/database/schema";
 import { getApiDb } from "../../../db";
+import { ensurePerItemIndexing } from "../../../lib/ensure-schema";
 import { requireAuth } from "../../../lib/admin-auth";
 import {
   invalidParam,
@@ -251,6 +252,8 @@ const CONTENT_TYPES: Record<string, ContentTypeConfig> = {
       "isFeatured",
       "canonicalUrl",
       "keywords",
+      // Per-item search indexing (0038).
+      "indexable",
     ],
   },
 };
@@ -400,6 +403,9 @@ app.get("/:type", async (c) => {
     const def = CONTENT_TYPES[type];
     if (!def) return c.json({ error: "Unknown content type" }, 404);
     const db = getApiDb();
+    // 0038 auto-apply: case_studies selects read the `indexable`
+    // column — create it first (no manual migration).
+    if (type === "case_studies") await ensurePerItemIndexing(db);
     const { page, pageSize } = parsePagination(c);
     const status = queryParam(c, "status");
     const search = queryParam(c, "search");
@@ -533,6 +539,9 @@ app.get("/:type/:id", async (c) => {
     const id = uuidParam(c, "id");
     if (!id) return invalidParam(c, "id");
     const db = getApiDb();
+    // 0038 auto-apply: case_studies selects read the `indexable`
+    // column — create it first (no manual migration).
+    if (c.req.param("type") === "case_studies") await ensurePerItemIndexing(db);
     const row = await getContentRow(db, def, id);
     if (!row) return c.json({ error: "Not found" }, 404);
     return c.json(row);
@@ -564,6 +573,9 @@ app.post("/:type", async (c) => {
       return c.json({ error: "slug is required" }, 400);
     }
     const db = getApiDb();
+    // 0038 auto-apply: case_studies inserts read the `indexable`
+    // column — create it first (no manual migration).
+    if (type === "case_studies") await ensurePerItemIndexing(db);
     const [row] = (await db
       .insert(def.table)
       .values({
@@ -620,6 +632,9 @@ app.put("/:type/:id", async (c) => {
     const data = { ...(v.data as Record<string, unknown>) };
     stripServerManaged(data);
     const db = getApiDb();
+    // 0038 auto-apply: case_studies selects read the `indexable`
+    // column — create it first (no manual migration).
+    if (type === "case_studies") await ensurePerItemIndexing(db);
     const existing = await getContentRow(db, def, id);
     if (existing) {
       await createRevision(db, type, id, existing, user.id);
@@ -660,6 +675,9 @@ app.delete("/:type/:id", async (c) => {
     const id = uuidParam(c, "id");
     if (!id) return invalidParam(c, "id");
     const db = getApiDb();
+    // 0038 auto-apply: case_studies selects read the `indexable`
+    // column — create it first (no manual migration).
+    if (type === "case_studies") await ensurePerItemIndexing(db);
     const existing = await getContentRow(db, def, id);
     if (!existing) throw new Error(`Content not found: ${id}`);
     const currentStatus = existing.status as string;
@@ -697,6 +715,9 @@ app.post("/:type/:id/transition", async (c) => {
     if ("error" in v) return c.json({ error: v.error }, 400);
     const action = v.data.action;
     const db = getApiDb();
+    // 0038 auto-apply: case_studies selects read the `indexable`
+    // column — create it first (no manual migration).
+    if (type === "case_studies") await ensurePerItemIndexing(db);
     const existing = await getContentRow(db, def, id);
     if (!existing) throw new Error(`Content not found: ${id}`);
     const currentStatus = existing.status as string;

@@ -148,6 +148,9 @@ export default function EditCaseStudy() {
         ogImage: form.get("ogImage"),
         canonicalUrl: form.get("canonicalUrl"),
         keywords: form.get("keywords"),
+        // Per-item search indexing (0038): unchecked = excluded from
+        // indexing while the global switch is on.
+        indexable: form.get("indexable") === "on",
       });
     } catch (err) { setError(toErrorMessage(err)); setLoading(false); return; }
     try {

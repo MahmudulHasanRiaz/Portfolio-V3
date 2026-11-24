@@ -17,6 +17,7 @@ import {
 	absUrl,
 	mergeDetail,
 	parseBodyBlocks,
+	seoBoolean,
 } from "../../../lib/detail";
 import {
 	optimizedImageUrl,
@@ -204,6 +205,9 @@ const jsonLd = data
 	ogType="article"
 	ogImage={coverImage ? absUrl(optimizedImageUrl(coverImage, 1200), siteBase) : null}
 	canonical={pageUrl}
+	// Per-item search indexing (0038): false = this page stays
+	// noindex even when the global switch is on.
+	indexable={seoBoolean(data, "indexable")}
 	lang={lang}
 >
 	{!entry || !data ? (

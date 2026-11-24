@@ -50,7 +50,7 @@ import {
 } from "./integrations";
 import { asc, desc, eq } from "drizzle-orm";
 import { getApiDb } from "../db";
-import { ensureClientsLogoDisplayMode } from "./ensure-schema";
+import { ensureClientsLogoDisplayMode, ensurePerItemIndexing } from "./ensure-schema";
 import {
   homepageSections,
   posts,
@@ -178,19 +178,23 @@ function toStringList(value: unknown): string[] {
 /** Per-item SEO fields (re-audit row 53). Every content type carries
  * these columns in the DB; they are emitted flat on every list item +
  * single item (undefined when unset) so the Astro detail pages can pass
- * them to Layout. Keywords is the stored string, verbatim. */
+ * them to Layout. Keywords is the stored string, verbatim. `indexable`
+ * is the per-item indexing toggle (0038): false = excluded from
+ * indexing when the global switch is ON; NULL/absent = indexable. */
 function seoFields(r: {
   metaTitle?: string | null;
   metaDescription?: string | null;
   ogImage?: string | null;
   canonicalUrl?: string | null;
   keywords?: string | null;
+  indexable?: boolean | null;
 }): {
   metaTitle?: string;
   metaDescription?: string;
   ogImage?: string;
   canonicalUrl?: string;
   keywords?: string;
+  indexable?: boolean;
 } {
   return {
     metaTitle: r.metaTitle ?? undefined,
@@ -198,6 +202,7 @@ function seoFields(r: {
     ogImage: r.ogImage ?? undefined,
     canonicalUrl: r.canonicalUrl ?? undefined,
     keywords: r.keywords ?? undefined,
+    indexable: r.indexable ?? undefined,
   };
 }
 
@@ -732,6 +737,9 @@ async function listProjects(db: Db): Promise<PublicContentItem[]> {
 }
 
 async function listCaseStudies(db: Db): Promise<PublicContentItem[]> {
+  // 0038 auto-apply: create `indexable` before the first query that
+  // selects it (no manual migration).
+  await ensurePerItemIndexing(db);
   const rows = await db
     .select()
     .from(caseStudies)
@@ -802,6 +810,9 @@ async function listCaseStudies(db: Db): Promise<PublicContentItem[]> {
 }
 
 async function listVentures(db: Db): Promise<PublicContentItem[]> {
+  // 0038 auto-apply: create `indexable` before the first query that
+  // selects it (no manual migration).
+  await ensurePerItemIndexing(db);
   const rows = await db
     .select()
     .from(ventures)
@@ -870,6 +881,9 @@ async function listVentures(db: Db): Promise<PublicContentItem[]> {
 }
 
 async function listReleases(db: Db): Promise<PublicContentItem[]> {
+  // 0038 auto-apply: create `indexable` before the first query that
+  // selects it (no manual migration).
+  await ensurePerItemIndexing(db);
   const rows = await db
     .select()
     .from(releases)

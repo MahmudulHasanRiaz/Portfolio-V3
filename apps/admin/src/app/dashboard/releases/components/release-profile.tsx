@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Input, Textarea, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Card, CardContent } from "@repo/ui";
+import { Button, Input, Textarea, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Card, CardContent, Checkbox } from "@repo/ui";
 import { Save } from "lucide-react";
 import { MediaPicker } from "@/components/media-picker";
 import { MediaUrlPreview } from "@/components/media-url-preview";
@@ -26,6 +26,10 @@ interface ReleaseProfileProps {
     keywords: string | null;
     ogImage?: string | null;
     canonicalUrl?: string | null;
+    /** Optional — present only once migration 0038 (per-item search
+     * indexing) has landed (same detection pattern as the venture
+     * profile's 0029/0035 columns). */
+    indexable?: boolean | null;
     credits: Record<string, unknown> | null;
   };
   onUpdate: () => void;
@@ -39,6 +43,12 @@ export function ReleaseProfile({ release, onUpdate }: ReleaseProfileProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [pickerTarget, setPickerTarget] = useState<"coverImage" | "ogImage" | null>(null);
+  // Migration 0038 detection: the `indexable` column exists only
+  // when the loaded row carries it. Until then the toggle below is
+  // hidden and never sent to the API (a pre-migration PATCH with an
+  // unknown column would 500 the whole save). The admin API creates
+  // the column on its first touch, so in practice this is always true.
+  const indexableSupported = "indexable" in release;
   const [form, setForm] = useState({
     title: release.title,
     titleBn: release.titleBn || "",
@@ -57,6 +67,8 @@ export function ReleaseProfile({ release, onUpdate }: ReleaseProfileProps) {
     ogImage: release.ogImage || "",
     canonicalUrl: release.canonicalUrl || "",
     keywords: release.keywords || "",
+    // Per-item search indexing (0038): NULL/absent = indexable.
+    indexable: release.indexable !== false,
     credits: JSON.stringify(release.credits || {}, null, 2),
     // Bangla credits live in the credits jsonb as tune_bn / lyricist_bn.
     tuneBn:
@@ -69,7 +81,7 @@ export function ReleaseProfile({ release, onUpdate }: ReleaseProfileProps) {
         : "",
   });
 
-  const handleChange = (field: string, value: string) => {
+  const handleChange = (field: string, value: string | boolean) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -99,6 +111,10 @@ export function ReleaseProfile({ release, onUpdate }: ReleaseProfileProps) {
       // tuneBn / lyricistBn are not columns — they live inside credits.
       delete body.tuneBn;
       delete body.lyricistBn;
+
+      // Per-item search indexing (0038): only send the toggle when
+      // the column exists (see indexableSupported above).
+      if (!indexableSupported) delete body.indexable;
 
       const res = await fetch(`/api/releases/${release.id}`, {
         method: "PATCH",
@@ -258,6 +274,19 @@ export function ReleaseProfile({ release, onUpdate }: ReleaseProfileProps) {
               <Input value={form.canonicalUrl} onChange={(e) => handleChange("canonicalUrl", e.target.value)} placeholder="https://riaz.com.bd/releases/..." />
             </div>
           </div>
+          {indexableSupported ? (
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+              <Checkbox id="indexable" checked={form.indexable} onCheckedChange={(v) => handleChange("indexable", v === true)} />
+              <div>
+                <label htmlFor="indexable" style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>Search indexing — allow search engines to index this page</label>
+                <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
+                  Off keeps this page out of search results (noindex) and out of the sitemap, even when the
+                  global indexing switch is on. The global switch still governs everything — when it is off,
+                  nothing indexes regardless of this setting.
+                </p>
+              </div>
+            </div>
+          ) : null}
 
           <h3 style={{ fontSize: 16, fontWeight: 600, marginTop: 16, marginBottom: 8 }}>Credits (JSON)</h3>
           <Textarea value={form.credits} onChange={(e) => handleChange("credits", e.target.value)} rows={4} />

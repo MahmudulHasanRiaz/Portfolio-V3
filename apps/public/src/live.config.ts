@@ -55,6 +55,11 @@ const baseSchema = z.object({
 	// English top level). Zod strips undeclared live fields, so this
 	// must be declared here or live `bn` never reaches the page.
 	bn: z.record(z.string(), z.unknown()).optional(),
+	// Per-item search indexing (0038): false = excluded from indexing
+	// when the global switch is ON; NULL/absent = indexable. Zod
+	// strips undeclared live fields, so this must be declared here or
+	// the flag never reaches the detail pages / sitemap.
+	indexable: z.boolean().optional(),
 });
 
 const livePosts = defineLiveCollection({

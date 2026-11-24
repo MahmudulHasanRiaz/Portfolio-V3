@@ -49,6 +49,7 @@ import {
   workflows,
 } from "@repo/database/schema";
 import type { ApiDb } from "../db";
+import { ensurePerItemIndexing } from "./ensure-schema";
 
 export type SideEffectEnv = Record<string, string | undefined>;
 
@@ -241,6 +242,11 @@ async function loadSearchEntity(
   entityId: string,
   baseUrl: string,
 ): Promise<SearchIndexData | null> {
+  // 0038 auto-apply: the case_studies / ventures / releases selects
+  // below read the `indexable` column — create it first (no manual
+  // migration). Best-effort callers tolerate a failure here the same
+  // way they tolerate a missing row.
+  await ensurePerItemIndexing(db);
   switch (entityType) {
     case "page": {
       const [r] = await db
