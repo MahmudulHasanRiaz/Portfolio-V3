@@ -208,7 +208,17 @@ export default function MediaLibraryPage() {
     if (res.ok) {
       fetchFolders();
     } else {
-      setFolderError("Could not create folder.");
+      // Surface the real API error (e.g. "Invalid id") instead of only
+      // the generic text — a silent/generic failure hid the routing bug
+      // that broke folder creation entirely.
+      let message = "Could not create folder.";
+      try {
+        const body = await res.json();
+        if (body.error) message = body.error;
+      } catch {
+        // Keep the default message.
+      }
+      setFolderError(message);
     }
   }, [fetchFolders]);
 
@@ -220,7 +230,16 @@ export default function MediaLibraryPage() {
       body: JSON.stringify({ name }),
     });
     if (res.ok) fetchFolders();
-    else setFolderError("Could not rename folder.");
+    else {
+      let message = "Could not rename folder.";
+      try {
+        const body = await res.json();
+        if (body.error) message = body.error;
+      } catch {
+        // Keep the default message.
+      }
+      setFolderError(message);
+    }
   }, [renameFolder, fetchFolders]);
 
   const handleDeleteFolder = useCallback(async () => {
