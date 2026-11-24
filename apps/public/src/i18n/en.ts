@@ -332,5 +332,10 @@ export const en: Dict = {
 	stageSoftware: "Software Development",
 	stageGraphicDesign: "Graphic Design",
 	stageDigitalMarketing: "Digital Marketing",
+	stageGraphicDesignNote: "Where it all started.",
+	stageDigitalMarketingNote: "The next step.",
+	skillsJourneyTodayTitle: "Today",
+	skillsJourneyTodayNote:
+		"The skills above — Software Development is the latest step of this journey.",
 	educationPresent: "Present",
 };

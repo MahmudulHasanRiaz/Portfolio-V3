@@ -226,12 +226,19 @@ export default function StackGlobe({
 	lang = "en",
 	dict,
 	techs: techsProp,
+	iconOnly = false,
 }: {
 	lang?: Lang;
 	/** Subset dict only (Issue 7B) — the 8 keys the globe reads. */
 	dict?: StackGlobeDict;
 	/** Live-merged techs (getTechnologies()); defaults to build-time STACK. */
 	techs?: StackTech[];
+	/** Skills-page hero mode (PR #28): icons ONLY in the sphere — no
+		names, no filter chips, no constellation lines, no orbit ring,
+		no frosted ball. The sphere is implied by the icons' 3D
+		positions (codervai reference). Drag / auto-rotate / tap card /
+		Now row / Spin stay. Homepage use is unchanged (false). */
+	iconOnly?: boolean;
 }) {
 	// Live rows win; build-time STACK is the fallback until the API
 	// `technologies` type exists. The prop is fixed for the island's
@@ -1024,7 +1031,10 @@ export default function StackGlobe({
 	const frontTech = techs.find((t) => t.name === frontName);
 
 	return (
-		<section className="glass section" id="stack">
+		<section
+			className={iconOnly ? "globe-hero globe-icon-only" : "glass section"}
+			id={iconOnly ? undefined : "stack"}
+		>
 			<style dangerouslySetInnerHTML={{ __html: `
 				/* Globe skeleton (loading state): the frosted ball is
 				   already in the stage from SSR; while the island
@@ -1056,16 +1066,19 @@ export default function StackGlobe({
 					.globe-skeleton-shimmer::after { animation: none; }
 				}
 			` }} />
-			<div className="section-head">
-				<div>
-					<h2>{t.stackTitle}</h2>
+			{!iconOnly && (
+				<div className="section-head">
+					<div>
+						<h2>{t.stackTitle}</h2>
+					</div>
+					{/* PR #24: homepage entry point to the Skills page. */}
+					<a className="view-all" href={langUrl("/skills", lang)}>
+						{t.viewAllSkills}
+					</a>
 				</div>
-				{/* PR #24: homepage entry point to the Skills page. */}
-				<a className="view-all" href={langUrl("/skills", lang)}>
-					{t.viewAllSkills}
-				</a>
-			</div>
+			)}
 			<div className="globe-wrap">
+				{!iconOnly && (
 				<div
 					className="chip-row globe-filters"
 					role="group"
@@ -1132,6 +1145,7 @@ export default function StackGlobe({
 						</button>
 					))}
 				</div>
+				)}
 				<div
 					className={
 						ready ? "globe-stage" : "globe-stage globe-loading"
@@ -1143,21 +1157,24 @@ export default function StackGlobe({
 					onPointerCancel={onPointerCancel}
 					style={{ touchAction: "none", cursor: "grab" }}
 				>
-					<div className="globe-ball" aria-hidden="true" />
+					{!iconOnly && <div className="globe-ball" aria-hidden="true" />}
 					{!ready ? (
 						<div
 							className="globe-skeleton-shimmer"
 							aria-hidden="true"
 						/>
 					) : null}
-					<div
-						className="globe-orbit"
-						aria-hidden="true"
-						style={{ inset: "-7%" }}
-					>
-						<span className="globe-satellite" aria-hidden="true" />
-					</div>
-					<svg
+					{!iconOnly && (
+						<div
+							className="globe-orbit"
+							aria-hidden="true"
+							style={{ inset: "-7%" }}
+						>
+							<span className="globe-satellite" aria-hidden="true" />
+						</div>
+					)}
+					{!iconOnly && (
+						<svg
 						aria-hidden="true"
 						viewBox="0 0 100 100"
 						preserveAspectRatio="none"
@@ -1186,6 +1203,7 @@ export default function StackGlobe({
 							/>
 						))}
 					</svg>
+					)}
 					{!reduced &&
 						DUST_SPOTS.map((spot, i) => (
 							<span
@@ -1241,17 +1259,23 @@ export default function StackGlobe({
 										pillRefs.current[i] = el;
 									}}
 								>
-									<span
-										aria-hidden="true"
-										className="globe-tag-dot"
-										style={{
-											background:
-												CATEGORY_COLORS[tech.category] ??
-												"var(--accent)",
-										}}
-									/>
-									<TechLogo tech={tech} />
-									{tech.name}
+									{iconOnly ? (
+										<TechLogo tech={tech} />
+									) : (
+										<>
+											<span
+												aria-hidden="true"
+												className="globe-tag-dot"
+												style={{
+													background:
+														CATEGORY_COLORS[tech.category] ??
+														"var(--accent)",
+												}}
+											/>
+											<TechLogo tech={tech} />
+											{tech.name}
+										</>
+									)}
 								</span>
 							</button>
 						);
