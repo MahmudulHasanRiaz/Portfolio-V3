@@ -72,6 +72,13 @@ const sizedThumb = (url: string | null | undefined, w = 800) =>
 						gridSelector="#venture-grid"
 						countSelector="#venture-count"
 						cardSelector=".grid-card"
+						// Legacy URLs (?filter=Active%2C+ongoing) are
+						// slugified to the chip value before matching,
+						// so old shared links still filter
+						// (2026-11-24, PR #19). Other archive pages
+						// must NOT set this — their values are tag
+						// names, not slugs.
+						normalize="slug"
 					/>
 				) : null}
 				<p class="count-line" id="venture-count" data-count-template={t.showingVentures}>
