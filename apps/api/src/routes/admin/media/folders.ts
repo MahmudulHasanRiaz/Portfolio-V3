@@ -24,6 +24,7 @@ import {
   MediaError,
   NotFoundError,
   R2_FOLDERS,
+  type ApiDb,
   type Env,
 } from "./helpers";
 
@@ -62,28 +63,33 @@ app.post("/folders", async (c) => {
     );
     if ("error" in v) return c.json({ error: v.error }, 400);
     const data = v.data;
-    if (!data.name) {
+    const name = data.name.trim();
+    if (!name) {
       return c.json({ error: "Folder name is required" }, 400);
     }
     const db = getApiDb();
     const parentId = data.parentId;
-    let folderPath = R2_FOLDERS.base;
+    let folderPath: string;
     if (parentId) {
+      // A parentId that names no folder must fail loudly: the old code
+      // silently fell back to the "uploads" base path, creating a folder
+      // whose stored path had no name and whose parent did not exist.
       const [parent] = await db
         .select()
         .from(mediaFolders)
         .where(eq(mediaFolders.id, parentId))
         .limit(1);
-      if (parent) {
-        folderPath = `${parent.path}/${data.name}`;
+      if (!parent) {
+        return c.json({ error: "Parent folder not found" }, 400);
       }
+      folderPath = `${parent.path}/${name}`;
     } else {
-      folderPath = `${R2_FOLDERS.base}/${data.name}`;
+      folderPath = `${R2_FOLDERS.base}/${name}`;
     }
     const [created] = await db
       .insert(mediaFolders)
       .values({
-        name: data.name,
+        name,
         parentId: parentId || null,
         path: folderPath,
       })
@@ -138,6 +144,28 @@ app.get("/folders/:id", async (c) => {
   }
 });
 
+// Keep descendant folder paths consistent after a rename: without this,
+// renaming a parent leaves every child pointing at the old prefix, so a
+// deep tree's stored paths go stale the moment a folder above it moves.
+async function repathDescendants(
+  db: ApiDb,
+  folderId: string,
+  folderPath: string,
+): Promise<void> {
+  const children = await db
+    .select()
+    .from(mediaFolders)
+    .where(eq(mediaFolders.parentId, folderId));
+  for (const child of children) {
+    const childPath = `${folderPath}/${child.name || ""}`;
+    await db
+      .update(mediaFolders)
+      .set({ path: childPath })
+      .where(eq(mediaFolders.id, child.id));
+    await repathDescendants(db, child.id, childPath);
+  }
+}
+
 async function renameFolderHandler(c: Context<Env>) {
   try {
     const user = await requireAuth(c);
@@ -151,7 +179,8 @@ async function renameFolderHandler(c: Context<Env>) {
     // Server-managed fields in the partial schema (id, createdAt) are
     // never read below, so they cannot be written.
     const data = v.data;
-    if (!data.name) {
+    const name = data.name?.trim();
+    if (!name) {
       return c.json({ error: "Folder name is required" }, 400);
     }
     const db = getApiDb();
@@ -172,11 +201,12 @@ async function renameFolderHandler(c: Context<Env>) {
         )[0]?.path
       : null;
     const basePath = parentPath || R2_FOLDERS.base;
-    const newPath = `${basePath}/${data.name}`;
+    const newPath = `${basePath}/${name}`;
     await db
       .update(mediaFolders)
-      .set({ name: data.name, path: newPath })
+      .set({ name, path: newPath })
       .where(eq(mediaFolders.id, id));
+    await repathDescendants(db, id, newPath);
     return c.json({ success: true });
   } catch (err) {
     if (err instanceof NotFoundError) {

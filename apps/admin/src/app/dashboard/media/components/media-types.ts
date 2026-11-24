@@ -70,14 +70,36 @@ export function isImageType(mimeType: string): boolean {
   return mimeType.startsWith("image/") && mimeType !== "image/svg+xml";
 }
 
+export interface FlatFolder {
+  id: string;
+  name: string;
+  depth: number;
+  /** Full "Parent / Child" path from the root — what a long folder list
+   *  and the parent picker show, so a nested folder is never ambiguous. */
+  displayPath: string;
+}
+
 /** Flatten a nested folder tree for <select> options. */
-export function flattenFolders(nodes: FolderNode[], depth = 0): Array<{ id: string; name: string; depth: number }> {
-  const out: Array<{ id: string; name: string; depth: number }> = [];
+export function flattenFolders(nodes: FolderNode[], depth = 0, parentPath = ""): FlatFolder[] {
+  const out: FlatFolder[] = [];
   for (const node of nodes) {
-    out.push({ id: node.id, name: node.name, depth });
-    out.push(...flattenFolders(node.children, depth + 1));
+    const displayPath = parentPath ? `${parentPath} / ${node.name}` : node.name;
+    out.push({ id: node.id, name: node.name, depth, displayPath });
+    out.push(...flattenFolders(node.children, depth + 1, displayPath));
   }
   return out;
+}
+
+/** Ancestor chain from the root down to the folder with `id` (inclusive),
+ *  or null when the id is not in the tree. Used for the breadcrumb and
+ *  for auto-expanding the path to the selected folder. */
+export function findFolderPath(nodes: FolderNode[], id: string): FolderNode[] | null {
+  for (const node of nodes) {
+    if (node.id === id) return [node];
+    const childPath = findFolderPath(node.children, id);
+    if (childPath) return [node, ...childPath];
+  }
+  return null;
 }
 
 /** Slug suggestion from a display name (mirrors the server slugify). */
