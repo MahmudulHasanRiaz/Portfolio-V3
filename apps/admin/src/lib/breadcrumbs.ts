@@ -16,6 +16,8 @@ export const breadcrumbLabels: Record<string, string> = {
   "/dashboard/platforms/new": "New Platform",
   "/dashboard/technologies": "Technologies",
   "/dashboard/technologies/new": "New Technology",
+  "/dashboard/education": "Education",
+  "/dashboard/education/new": "New Education Entry",
   "/dashboard/clients": "Clients",
   "/dashboard/clients/new": "New Client",
   "/dashboard/media": "Media",
@@ -82,6 +84,7 @@ const editLabels: Record<string, string> = {
   "/dashboard/ventures": "Edit Venture",
   "/dashboard/platforms": "Edit Platform",
   "/dashboard/technologies": "Edit Technology",
+  "/dashboard/education": "Edit Education Entry",
   "/dashboard/clients": "Edit Client",
   "/dashboard/content/case-studies": "Edit Case Study",
 };

@@ -53,7 +53,8 @@ type LiveCollectionName =
 	| "liveServices"
 	| "livePlatforms"
 	| "liveTechnologies"
-	| "liveClients";
+	| "liveClients"
+	| "liveEducation";
 
 function byDateDesc<T extends { data: { publishedAt?: string } }>(a: T, b: T) {
 	return (b.data.publishedAt ?? "").localeCompare(a.data.publishedAt ?? "");
@@ -474,6 +475,25 @@ function asDisplayMode(v: unknown): "logo" | "name_logo" | undefined {
 	return v === "logo" || v === "name_logo" ? v : undefined;
 }
 
+/** Journey stage from a live row: only the three known stages
+ *  survive; anything else (incl. NULL) means "software". */
+function asJourneyStage(
+	v: unknown,
+): "software" | "graphic_design" | "digital_marketing" | undefined {
+	return v === "software" ||
+		v === "graphic_design" ||
+		v === "digital_marketing"
+		? v
+		: undefined;
+}
+
+/** Proficiency from a live row: a finite number clamped to 0–100,
+ *  or undefined (no bar) when absent / not a number. */
+function asProficiency(v: unknown): number | undefined {
+	if (typeof v !== "number" || !Number.isFinite(v)) return undefined;
+	return Math.min(100, Math.max(0, Math.round(v)));
+}
+
 /** Build-time slug candidates for a platform (slug is secondary). */
 function platformSlugs(p: Platform): string[] {
 	const slugs = [slugify(p.name)];
@@ -659,6 +679,18 @@ export async function getTechnologies(): Promise<StackTech[]> {
 			else if (icon === null) t.icon = null;
 			const use = asString(liveField(d, "use"));
 			if (use) t.use = use;
+			// Skills page (0039): proficiency, journey stage and
+			// visibility ride along on the same merged row.
+			const proficiency = asProficiency(
+				liveField(d, "proficiency"),
+			);
+			if (proficiency !== undefined) t.proficiency = proficiency;
+			const journeyStage = asJourneyStage(
+				liveField(d, "journey_stage", "journeyStage"),
+			);
+			if (journeyStage) t.journeyStage = journeyStage;
+			const isVisible = asBool(liveField(d, "is_visible", "isVisible"));
+			if (isVisible !== undefined) t.isVisible = isVisible;
 			mergeRowBn(t, bn);
 			existing.sortOrder = sortOrder;
 		} else {
@@ -677,6 +709,16 @@ export async function getTechnologies(): Promise<StackTech[]> {
 			};
 			const use = asString(liveField(d, "use"));
 			if (use) t.use = use;
+			const proficiency = asProficiency(
+				liveField(d, "proficiency"),
+			);
+			if (proficiency !== undefined) t.proficiency = proficiency;
+			const journeyStage = asJourneyStage(
+				liveField(d, "journey_stage", "journeyStage"),
+			);
+			if (journeyStage) t.journeyStage = journeyStage;
+			const isVisible = asBool(liveField(d, "is_visible", "isVisible"));
+			if (isVisible !== undefined) t.isVisible = isVisible;
 			mergeRowBn(t, bn);
 			const entry = { tech: t, sortOrder };
 			byName.set(normName(name), entry);
@@ -686,6 +728,71 @@ export async function getTechnologies(): Promise<StackTech[]> {
 	return [...byName.values()]
 		.sort((a, b) => a.sortOrder - b.sortOrder)
 		.map((x) => x.tech);
+}
+
+export interface EducationEntry {
+	/** Stable row id (the API uses it as the slug — there is no
+	 *  detail page). */
+	id: string;
+	degree: string;
+	degreeBn?: string;
+	institution?: string;
+	institutionBn?: string;
+	fieldOfStudy?: string;
+	/** ISO date strings ("2020-01-01T00:00:00.000Z"); endDate
+	 *  undefined = ongoing / present. */
+	startDate?: string;
+	endDate?: string;
+	grade?: string;
+	description?: string;
+	descriptionBn?: string;
+	sortOrder?: number;
+}
+
+/**
+ * Education entries, live-only (0039, PR #22): there are no
+ * build-time rows, so when the API is unreachable the page renders
+ * its honest empty state. The API already returns visible rows only,
+ * newest first by start_date; the sort here is a backstop so a
+ * different payload order can never scramble the timeline.
+ */
+export async function getEducation(): Promise<EducationEntry[]> {
+	const live = await getLiveRows("liveEducation");
+	const entries: EducationEntry[] = [];
+	for (const item of live) {
+		const d = item.data;
+		const degree = asString(liveField(d, "title", "degree"));
+		if (!degree) continue;
+		const id = asString(d.slug) ?? "";
+		if (!id) continue;
+		const isVisible = asBool(liveField(d, "is_visible", "isVisible"));
+		if (isVisible === false) continue;
+		entries.push({
+			id,
+			degree,
+			degreeBn: asString(liveField(d, "degree_bn", "degreeBn")),
+			institution: asString(liveField(d, "institution")),
+			institutionBn: asString(
+				liveField(d, "institution_bn", "institutionBn"),
+			),
+			fieldOfStudy: asString(
+				liveField(d, "field_of_study", "fieldOfStudy"),
+			),
+			startDate: asString(liveField(d, "start_date", "startDate")),
+			endDate: asString(liveField(d, "end_date", "endDate")),
+			grade: asString(liveField(d, "grade")),
+			description: asString(liveField(d, "description")),
+			descriptionBn: asString(
+				liveField(d, "description_bn", "descriptionBn"),
+			),
+			sortOrder: asNumber(liveField(d, "sort_order", "sortOrder")),
+		});
+	}
+	return entries.sort((a, b) => {
+		const byStart = (b.startDate ?? "").localeCompare(a.startDate ?? "");
+		if (byStart !== 0) return byStart;
+		return (a.sortOrder ?? 99) - (b.sortOrder ?? 99);
+	});
 }
 
 /**

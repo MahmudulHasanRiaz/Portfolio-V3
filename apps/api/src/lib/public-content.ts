@@ -50,8 +50,9 @@ import {
 } from "./integrations";
 import { asc, desc, eq } from "drizzle-orm";
 import { getApiDb } from "../db";
-import { ensureClientsLogoDisplayMode, ensurePerItemIndexing } from "./ensure-schema";
+import { ensureClientsLogoDisplayMode, ensureEducationSkills, ensurePerItemIndexing } from "./ensure-schema";
 import {
+  educationEntries,
   homepageSections,
   posts,
   postTags,
@@ -84,7 +85,8 @@ export type PublicContentType =
   | "services"
   | "platforms"
   | "technologies"
-  | "clients";
+  | "clients"
+  | "education";
 
 export const PUBLIC_CONTENT_TYPES: readonly PublicContentType[] = [
   "posts",
@@ -96,6 +98,7 @@ export const PUBLIC_CONTENT_TYPES: readonly PublicContentType[] = [
   "platforms",
   "technologies",
   "clients",
+  "education",
 ];
 
 export function isPublicContentType(value: string): value is PublicContentType {
@@ -1035,8 +1038,14 @@ async function listPlatforms(db: Db): Promise<PublicContentItem[]> {
 /** Technologies / stack globe (0026): all 44 rows, STACK order. No
  * status column exists on this table, so nothing is filtered. The bn
  * overlay (0032) carries the Bangla name / use where set; empty falls
- * back to English via bnOf. */
+ * back to English via bnOf. Skills-page fields (0039): proficiency
+ * (NULL = no bar), journey_stage (NULL = 'software'), is_visible
+ * (NULL = visible) — emitted flat so the Skills page can group by
+ * category and stage without an extra call. */
 async function listTechnologies(db: Db): Promise<PublicContentItem[]> {
+  // 0039 auto-apply: create the new columns before the first query
+  // that selects them (no manual migration).
+  await ensureEducationSkills(db);
   const rows = await db
     .select()
     .from(technologies)
@@ -1053,7 +1062,46 @@ async function listTechnologies(db: Db): Promise<PublicContentItem[]> {
         icon: r.icon ?? undefined,
         use: r.use ?? undefined,
         sortOrder: r.sortOrder ?? undefined,
+        proficiency: r.proficiency ?? undefined,
+        journeyStage: r.journeyStage ?? undefined,
+        isVisible: r.isVisible ?? undefined,
         bn: bnOf({ name: r.nameBn, use: r.useBn }),
+      } satisfies PublicContentItem;
+    });
+}
+
+/** Education entries (0039): visible rows only, newest first by
+ * start_date (then sort_order). The table starts empty — the user
+ * enters his real entries in the admin — so an empty list renders the
+ * page's honest empty state. No detail page exists, so the slug is
+ * the stable row id. */
+async function listEducation(db: Db): Promise<PublicContentItem[]> {
+  // 0039 auto-apply: create the table before the first query that
+  // selects from it (no manual migration).
+  await ensureEducationSkills(db);
+  const rows = await db
+    .select()
+    .from(educationEntries)
+    .orderBy(desc(educationEntries.startDate), asc(educationEntries.sortOrder));
+  return rows
+    .filter((r) => r.isVisible !== false && r.degree)
+    .map((r) => {
+      const degree = r.degree as string;
+      return {
+        slug: r.id,
+        title: degree,
+        degree,
+        degreeBn: r.degreeBn ?? undefined,
+        institution: r.institution ?? undefined,
+        institutionBn: r.institutionBn ?? undefined,
+        fieldOfStudy: r.fieldOfStudy ?? undefined,
+        startDate: toISO(r.startDate) ?? undefined,
+        endDate: toISO(r.endDate) ?? undefined,
+        grade: r.grade ?? undefined,
+        description: r.description ?? undefined,
+        descriptionBn: r.descriptionBn ?? undefined,
+        sortOrder: r.sortOrder ?? undefined,
+        isVisible: r.isVisible ?? undefined,
       } satisfies PublicContentItem;
     });
 }
@@ -1111,6 +1159,8 @@ export async function listPublicContent(
       return listTechnologies(db);
     case "clients":
       return listClients(db);
+    case "education":
+      return listEducation(db);
   }
 }
 

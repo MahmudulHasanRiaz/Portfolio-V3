@@ -124,6 +124,12 @@ export default defineConfig({
 		"/bn/case-studies": { maxAge: 3600, swr: 300, tags: ["case-studies"] },
 		"/bn/ventures": { maxAge: 3600, swr: 300, tags: ["ventures"] },
 		"/bn/releases": { maxAge: 3600, swr: 300, tags: ["releases"] },
+		// Skills + Education pages (0039, PR #22): purged by the
+		// "skills" / "education" tags on technology / education saves.
+		"/skills": { maxAge: 3600, swr: 300, tags: ["skills"] },
+		"/education": { maxAge: 3600, swr: 300, tags: ["education"] },
+		"/bn/skills": { maxAge: 3600, swr: 300, tags: ["skills"] },
+		"/bn/education": { maxAge: 3600, swr: 300, tags: ["education"] },
 		"/": {
 			maxAge: 3600,
 			swr: 300,

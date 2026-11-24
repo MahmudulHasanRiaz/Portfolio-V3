@@ -94,6 +94,57 @@ export function ensureVentureCategories(db: ApiDb): Promise<void> {
   return ventureCategoriesTables;
 }
 
+// 0039 (packages/database/drizzle/0039_education_skills.sql):
+// `proficiency` / `journey_stage` / `is_visible` on `technologies`
+// (Skills page) + the new `education_entries` table (Education
+// page). All nullable / additive only; existing technology rows keep
+// NULL (proficiency unset, journey_stage = 'software', visible).
+// The education table starts EMPTY — no seed rows, the user enters
+// his real entries in the admin. Await this before any query that
+// reads or writes the new columns or the new table.
+let educationSkillsSchema: Promise<void> | null = null;
+
+export function ensureEducationSkills(db: ApiDb): Promise<void> {
+  if (!educationSkillsSchema) {
+    educationSkillsSchema = (async () => {
+      try {
+        await db.execute(
+          sql`ALTER TABLE "technologies" ADD COLUMN IF NOT EXISTS "proficiency" integer`,
+        );
+        await db.execute(
+          sql`ALTER TABLE "technologies" ADD COLUMN IF NOT EXISTS "journey_stage" varchar(30)`,
+        );
+        await db.execute(
+          sql`ALTER TABLE "technologies" ADD COLUMN IF NOT EXISTS "is_visible" boolean`,
+        );
+        await db.execute(sql`CREATE TABLE IF NOT EXISTS "education_entries" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+          "degree" text,
+          "degree_bn" text,
+          "institution" text,
+          "institution_bn" text,
+          "field_of_study" text,
+          "start_date" date,
+          "end_date" date,
+          "grade" text,
+          "description" text,
+          "description_bn" text,
+          "sort_order" integer,
+          "is_visible" boolean DEFAULT true,
+          "created_at" timestamp with time zone DEFAULT now(),
+          "updated_at" timestamp with time zone DEFAULT now()
+        )`);
+      } catch (err) {
+        // A transient failure must not poison the isolate: clear the
+        // guard so the next request retries.
+        educationSkillsSchema = null;
+        throw err;
+      }
+    })();
+  }
+  return educationSkillsSchema;
+}
+
 // 0038 (packages/database/drizzle/0038_per_item_indexing.sql):
 // `indexable` on `case_studies`, `ventures` and `releases` — the
 // per-item search-indexing toggle. Projects / posts / services

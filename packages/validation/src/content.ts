@@ -256,6 +256,14 @@ export const technologySchema = z.object({
   useBn: z.string().nullable().optional(),
   icon: z.string().nullable().optional(),
   sortOrder: z.coerce.number().int().nullable().optional(),
+  // Skills page (0039, PR #22): proficiency 0–100 (NULL = no bar),
+  // journey_stage (NULL = 'software'), is_visible (NULL = visible).
+  proficiency: z.coerce.number().int().min(0).max(100).nullable().optional(),
+  journeyStage: z
+    .enum(["software", "graphic_design", "digital_marketing"])
+    .nullable()
+    .optional(),
+  isVisible: z.boolean().nullable().optional(),
 });
 
 export const createTechnologySchema = z.object({
@@ -266,9 +274,43 @@ export const createTechnologySchema = z.object({
   useBn: z.string().nullable().optional(),
   icon: z.string().nullable().optional(),
   sortOrder: z.coerce.number().int().nullable().optional(),
+  proficiency: z.coerce.number().int().min(0).max(100).nullable().optional(),
+  journeyStage: z
+    .enum(["software", "graphic_design", "digital_marketing"])
+    .nullable()
+    .optional(),
+  isVisible: z.boolean().nullable().optional(),
 });
 
 export const updateTechnologySchema = technologySchema.partial();
+
+// ─── Education entries ───────────────────────────────────────────────────────
+// Dedicated Education page (0039, PR #22). Dates are plain "YYYY-MM-DD"
+// calendar-date strings (a NULL endDate means ongoing / present).
+// All display fields are nullable — the admin sends null for every
+// empty optional field (PR #11 lesson).
+
+export const educationEntrySchema = z.object({
+  id: uuidSchema,
+  degree: z.string().nullable().optional(),
+  degreeBn: z.string().nullable().optional(),
+  institution: z.string().nullable().optional(),
+  institutionBn: z.string().nullable().optional(),
+  fieldOfStudy: z.string().nullable().optional(),
+  startDate: z.string().nullable().optional(),
+  endDate: z.string().nullable().optional(),
+  grade: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  descriptionBn: z.string().nullable().optional(),
+  sortOrder: z.coerce.number().int().nullable().optional(),
+  isVisible: z.boolean().nullable().optional(),
+});
+
+export const createEducationEntrySchema = educationEntrySchema.omit({
+  id: true,
+});
+
+export const updateEducationEntrySchema = educationEntrySchema.partial();
 
 // ─── Project Technologies (junction) ─────────────────────────────────────────
 

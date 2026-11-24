@@ -5,11 +5,11 @@ Generated from the route definitions in `apps/api/src/routes/`. Every entry belo
 ## How the API is organized
 
 - `src/index.ts` mounts three top-level routers: `/api/public` (public content), `/api/admin` (admin CRUD, authenticated), `/api/auth` (Better Auth).
-- `src/routes/admin/index.ts` mounts 27 sub-routers by resource (one per resource). Each resource is a directory (e.g. `routes/admin/finance/`) with focused files per sub-resource plus a `helpers.ts` and an `index.ts` that mounts them at `/`. The import `"./finance"` resolves to `finance/index.ts`, so the mount in `admin/index.ts` never changes when a resource is split.
+- `src/routes/admin/index.ts` mounts 28 sub-routers by resource (one per resource). Each resource is a directory (e.g. `routes/admin/finance/`) with focused files per sub-resource plus a `helpers.ts` and an `index.ts` that mounts them at `/`. The import `"./finance"` resolves to `finance/index.ts`, so the mount in `admin/index.ts` never changes when a resource is split.
 - Shared logic lives in `src/lib/` (`admin-auth`, `errors`, `rate-limit`, `side-effects`, `validate`, `public-content`, `integrations`, `default-language`, `shared`).
 - Auth: every `/api/admin/*` route calls `requireAuth` (a valid Better Auth session) unless marked "Public (no auth)" below. `/api/public/*` uses the content token (env token or per-integration token). `/api/auth/*` is the Better Auth handler.
 
-**Total: 259 routes.**
+**Total: 264 routes.**
 
 ## public (4 routes)
 
@@ -100,6 +100,16 @@ Generated from the route definitions in `apps/api/src/routes/`. Every entry belo
 | DELETE | `/api/admin/directory/technologies/:id` | Authenticated | Delete technologie | `admin/directory/technologies.ts` |
 | GET | `/api/admin/directory/technologies/:id` | Authenticated | Get technologie by id | `admin/directory/technologies.ts` |
 | PUT | `/api/admin/directory/technologies/:id` | Authenticated | Update technologie | `admin/directory/technologies.ts` |
+
+## education (5 routes)
+
+| Method | Path | Auth | What it does | File |
+|---|---|---|---|---|
+| GET | `/api/admin/education` | Authenticated | List education entries | `admin/education.ts` |
+| POST | `/api/admin/education` | Authenticated | Create education entry | `admin/education.ts` |
+| DELETE | `/api/admin/education/:id` | Authenticated | Delete education entry | `admin/education.ts` |
+| GET | `/api/admin/education/:id` | Authenticated | Get education entry by id | `admin/education.ts` |
+| PUT | `/api/admin/education/:id` | Authenticated | Update education entry | `admin/education.ts` |
 
 ## entity-tags (2 routes)
 

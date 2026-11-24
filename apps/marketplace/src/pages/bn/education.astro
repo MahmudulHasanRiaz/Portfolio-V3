@@ -1,0 +1,126 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { getEducation, type EducationEntry } from "../../lib/content";
+import { applySiteCopy, getDict, langUrl } from "../../lib/i18n";
+import { getSiteSettings } from "../../lib/settings";
+
+// Education page (0039, PR #22) — Bangla twin of /education. Same
+// timeline, newest first; degree / institution / description come
+// from the Bangla fields where set, English otherwise.
+const lang = "bn" as const;
+const t = applySiteCopy(getDict(lang), lang, await getSiteSettings());
+
+const entries = (await getEducation()).map((entry) => ({
+	...entry,
+	degree: entry.degreeBn || entry.degree,
+	institution: entry.institutionBn || entry.institution,
+	description: entry.descriptionBn || entry.description,
+}));
+
+function monthYear(iso: string | undefined): string {
+	if (!iso) return "";
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return "";
+	return d.toLocaleDateString("bn-BD", { month: "short", year: "numeric" });
+}
+
+function periodLabel(entry: EducationEntry): string {
+	const start = monthYear(entry.startDate);
+	const end = monthYear(entry.endDate);
+	if (!start && !end) return "";
+	if (!start) return end;
+	if (!end) return `${start} – ${t.educationPresent}`;
+	return `${start} – ${end}`;
+}
+---
+
+<Layout
+	title={t.educationPageTitle}
+	description={t.educationPageDescription}
+	lang={lang}
+>
+	<section class="glass">
+		<p style="margin:0 0 8px;">
+			<a class="back-link" href={langUrl("/", lang)}>{t.backHome}</a>
+		</p>
+		<h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;">{t.allEducation}</h1>
+		{
+			entries.length === 0 ? (
+				<p class="empty-state">{t.emptyEducation}</p>
+			) : (
+				<ol class="edu-timeline">
+					{entries.map((entry) => (
+						<li class="edu-item">
+							<h2 class="edu-degree">{entry.degree}</h2>
+							{entry.institution && (
+								<p class="edu-institution">
+									{entry.institution}
+									{entry.fieldOfStudy ? ` · ${entry.fieldOfStudy}` : ""}
+								</p>
+							)}
+							{periodLabel(entry) && (
+								<p class="edu-period">{periodLabel(entry)}</p>
+							)}
+							{entry.grade && (
+								<p class="edu-grade">{entry.grade}</p>
+							)}
+							{entry.description && (
+								<p class="edu-description">{entry.description}</p>
+							)}
+						</li>
+					))}
+				</ol>
+			)
+		}
+	</section>
+</Layout>
+
+<style>
+	.edu-timeline {
+		list-style: none;
+		margin: 8px 0 0;
+		padding: 0 0 0 20px;
+		border-left: 2px solid var(--accent-wash);
+	}
+	.edu-item {
+		position: relative;
+		padding: 0 0 24px;
+	}
+	.edu-item:last-child {
+		padding-bottom: 0;
+	}
+	.edu-item::before {
+		content: "";
+		position: absolute;
+		left: -26px;
+		top: 6px;
+		width: 10px;
+		height: 10px;
+		border-radius: 50%;
+		background: var(--accent);
+	}
+	.edu-degree {
+		font-size: 18px;
+		line-height: 1.35;
+		margin: 0;
+	}
+	.edu-institution {
+		margin: 4px 0 0;
+		font-weight: 600;
+	}
+	.edu-period {
+		margin: 2px 0 0;
+		font-size: 13px;
+		color: var(--ink-dim);
+	}
+	.edu-grade {
+		margin: 8px 0 0;
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--accent-strong);
+	}
+	.edu-description {
+		margin: 8px 0 0;
+		color: var(--ink-dim);
+	}
+</style>

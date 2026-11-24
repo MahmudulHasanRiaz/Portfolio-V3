@@ -23,6 +23,16 @@ const PLATFORM_GROUPS: { value: PlatformGroup; label: string }[] = [
   { value: "professional", label: "Professional / Code" },
 ];
 
+// Journey stages for the Skills page (0039, PR #22) — kept here (not
+// imported from @/actions/directory) because that module is
+// "use server" and cannot export runtime constants to a client
+// component. Keep in sync with JOURNEY_STAGES there.
+const JOURNEY_STAGE_OPTIONS: { value: string; label: string }[] = [
+  { value: "software", label: "Software Development" },
+  { value: "graphic_design", label: "Graphic Design" },
+  { value: "digital_marketing", label: "Digital Marketing" },
+];
+
 export interface DirectoryFormProps {
   entity: DirectoryEntity;
   initial?: Record<string, unknown> | null;
@@ -46,6 +56,11 @@ export function DirectoryForm({
   );
   const [category, setCategory] = useState<string>(
     (initial?.category as string) || "",
+  );
+  // Journey stage (0039, PR #22): which stage of his skill journey
+  // this technology belongs to. NULL/empty in the DB means 'software'.
+  const [journeyStage, setJourneyStage] = useState<string>(
+    (initial?.journeyStage as string) || "software",
   );
   const logoRef = useRef<HTMLInputElement>(null);
   const [logoPickerOpen, setLogoPickerOpen] = useState(false);
@@ -88,6 +103,18 @@ export function DirectoryForm({
         subtitleBn: form.get("subtitleBn"),
       });
     } else if (entity === "technologies") {
+      // Proficiency (0039): a whole number 0–100, or empty (no bar).
+      const proficiencyRaw = String(form.get("proficiency") || "").trim();
+      const proficiency =
+        proficiencyRaw === "" ? null : parseInt(proficiencyRaw, 10);
+      if (
+        proficiencyRaw !== "" &&
+        (!Number.isInteger(proficiency) || proficiency < 0 || proficiency > 100)
+      ) {
+        setError("Proficiency must be a whole number from 0 to 100");
+        setLoading(false);
+        return;
+      }
       Object.assign(data, {
         name: form.get("name"),
         nameBn: form.get("nameBn"),
@@ -95,6 +122,9 @@ export function DirectoryForm({
         icon: form.get("icon"),
         use: form.get("use"),
         useBn: form.get("useBn"),
+        proficiency,
+        journeyStage,
+        isVisible: form.get("isVisible") === "on",
       });
     } else {
       Object.assign(data, {
@@ -197,6 +227,28 @@ export function DirectoryForm({
             <div>
               <label style={labelStyle}>Use (Bangla) — বাংলা</label>
               <Input name="useBn" defaultValue={(initial?.useBn as string) || ""} placeholder="বাংলা ব্যবহার (optional — empty shows the English use)" />
+            </div>
+            <div>
+              <label style={labelStyle}>Proficiency (0–100)</label>
+              <Input name="proficiency" type="number" min={0} max={100} defaultValue={initial?.proficiency !== null && initial?.proficiency !== undefined ? String(initial.proficiency) : ""} placeholder="Optional — empty shows no proficiency bar on the Skills page" />
+            </div>
+            <div>
+              <label style={labelStyle}>Journey stage</label>
+              <Select value={journeyStage} onValueChange={setJourneyStage}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {JOURNEY_STAGE_OPTIONS.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
+                Software Development skills show prominently on top of the Skills page; Graphic Design and Digital Marketing skills show in the Journey section below, in a smaller style.
+              </p>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input type="checkbox" id="isVisible" name="isVisible" defaultChecked={initial?.isVisible !== false} />
+              <label htmlFor="isVisible" style={{ fontSize: 14, color: "var(--text-primary)" }}>Visible on the Skills page — uncheck to hide this skill without deleting it</label>
             </div>
           </>
         )}

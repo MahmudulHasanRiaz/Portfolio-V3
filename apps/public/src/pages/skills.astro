@@ -1,0 +1,187 @@
+---
+import Layout from "../layouts/Layout.astro";
+import BrandIcon from "../components/BrandIcon.astro";
+import { getTechnologies } from "../lib/content";
+import { STACK_CATEGORIES, type StackTech } from "../data/site";
+import { applySiteCopy, getDict, langUrl } from "../lib/i18n";
+import { getSiteSettings } from "../lib/settings";
+
+// Skills page (0039, PR #22) — dedicated page for the full skill
+// set. Software-development skills are the main section on top,
+// grouped by category; the journey (Graphic Design → Digital
+// Marketing → Software Development) sits below in a smaller, muted
+// style. A proficiency bar renders ONLY when the admin set one —
+// never invented. Hidden skills (is_visible = false) never render.
+// No client-side script: nothing here needs re-wiring after a
+// language switch (PR #16 lesson).
+const lang = "en" as const;
+const t = applySiteCopy(getDict(lang), lang, await getSiteSettings());
+
+const visible = (await getTechnologies()).filter(
+	(tech) => tech.isVisible !== false,
+);
+const software = visible.filter(
+	(tech) => (tech.journeyStage ?? "software") === "software",
+);
+
+// Main section: group software skills by category, in the site's
+// canonical category order; any other category sorts last,
+// alphabetically.
+const byCategory = new Map<string, StackTech[]>();
+for (const tech of software) {
+	const list = byCategory.get(tech.category) ?? [];
+	list.push(tech);
+	byCategory.set(tech.category, list);
+}
+const categories = [...byCategory.keys()].sort((a, b) => {
+	const ia = (STACK_CATEGORIES as readonly string[]).indexOf(a);
+	const ib = (STACK_CATEGORIES as readonly string[]).indexOf(b);
+	if (ia !== -1 && ib !== -1) return ia - ib;
+	if (ia !== -1) return -1;
+	if (ib !== -1) return 1;
+	return a.localeCompare(b);
+});
+
+// Journey section: the three stages in journey order. A stage
+// renders ONLY when it has at least one skill.
+const JOURNEY_STAGES = [
+	{ stage: "graphic_design", label: t.stageGraphicDesign },
+	{ stage: "digital_marketing", label: t.stageDigitalMarketing },
+	{ stage: "software", label: t.stageSoftware },
+] as const;
+const journey = JOURNEY_STAGES.map(({ stage, label }) => ({
+	label,
+	skills: visible.filter((tech) => tech.journeyStage === stage),
+})).filter((s) => s.skills.length > 0);
+---
+
+<Layout
+	title={t.skillsPageTitle}
+	description={t.skillsPageDescription}
+	lang={lang}
+>
+	<section class="glass">
+		<p style="margin:0 0 8px;">
+			<a class="back-link" href={langUrl("/", lang)}>{t.backHome}</a>
+		</p>
+		<h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;">{t.allSkills}</h1>
+		{
+			visible.length === 0 ? (
+				<p class="empty-state">{t.emptySkills}</p>
+			) : (
+				<>
+					{software.length > 0 && (
+						<section aria-label={t.skillsMainTitle}>
+							<h2 class="detail-h2">{t.skillsMainTitle}</h2>
+							<p style="margin:0 0 16px;color:var(--ink-dim);">{t.skillsMainIntro}</p>
+							{categories.map((category) => (
+								<div style="margin-bottom:20px;">
+									<h3 class="skills-h3">{category}</h3>
+									<div class="skill-grid">
+										{byCategory.get(category)!.map((tech) => (
+											<div class="skill-card">
+												<div class="skill-name">
+													<BrandIcon icon={tech.icon} name={tech.name} size={16} decorative />
+													<span>{tech.name}</span>
+												</div>
+												{tech.use && <p class="skill-use">{tech.use}</p>}
+												{tech.proficiency !== undefined && (
+													<div class="skill-proficiency">
+														<div class="skill-bar">
+															<span style={`width:${tech.proficiency}%`} />
+														</div>
+														<span class="skill-pct">{tech.proficiency}%</span>
+													</div>
+												)}
+											</div>
+										))}
+									</div>
+								</div>
+							))}
+						</section>
+					)}
+					{journey.length > 0 && (
+						<section aria-label={t.skillsJourneyTitle} style="margin-top:32px;">
+							<h2 class="detail-h2">{t.skillsJourneyTitle}</h2>
+							<p style="margin:0 0 16px;color:var(--ink-dim);">{t.skillsJourneyIntro}</p>
+							{journey.map((stage) => (
+								<div style="margin-bottom:16px;">
+									<h3 class="skills-h3 skills-h3-muted">{stage.label}</h3>
+									<div class="tag-row">
+										{stage.skills.map((tech) => (
+											<span class="tag tag-muted" style="display:inline-flex;align-items:center;gap:6px;">
+												<BrandIcon icon={tech.icon} name={tech.name} size={14} decorative />
+												{tech.name}
+											</span>
+										))}
+									</div>
+								</div>
+							))}
+						</section>
+					)}
+				</>
+			)
+		}
+	</section>
+</Layout>
+
+<style>
+	.skills-h3 {
+		font-size: 16px;
+		line-height: 1.35;
+		margin: 0 0 10px;
+	}
+	.skills-h3-muted {
+		color: var(--ink-dim);
+		font-weight: 600;
+	}
+	.skill-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+		gap: 10px;
+	}
+	.skill-card {
+		border: 1px solid var(--card-border);
+		border-radius: 12px;
+		padding: 12px 14px;
+		background: var(--card);
+	}
+	.skill-name {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-weight: 600;
+	}
+	.skill-use {
+		margin: 6px 0 0;
+		font-size: 13px;
+		color: var(--ink-dim);
+	}
+	.skill-proficiency {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-top: 10px;
+	}
+	.skill-bar {
+		flex: 1;
+		height: 6px;
+		border-radius: 3px;
+		background: var(--accent-wash);
+		overflow: hidden;
+	}
+	.skill-bar span {
+		display: block;
+		height: 100%;
+		border-radius: 3px;
+		background: var(--accent);
+	}
+	.skill-pct {
+		font-size: 12px;
+		color: var(--ink-dim);
+		font-variant-numeric: tabular-nums;
+	}
+	.tag-muted {
+		opacity: 0.85;
+	}
+</style>
