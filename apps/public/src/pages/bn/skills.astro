@@ -41,7 +41,7 @@ const JOURNEY_STAGES = [
 ] as const;
 const journey = JOURNEY_STAGES.map(({ stage, label }) => ({
 	label,
-	skills: visible.filter((tech) => tech.journeyStage === stage),
+	skills: visible.filter((tech) => (tech.journeyStage ?? "software") === stage),
 })).filter((s) => s.skills.length > 0);
 ---
 
