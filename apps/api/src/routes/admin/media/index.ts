@@ -9,7 +9,14 @@ import type { Env } from "./helpers";
 
 const app = new Hono<Env>();
 
-app.route("/", itemsRoutes);
+// folders BEFORE items: Hono matches routes in registration order, and
+// items' GET /:id catch-all would swallow the static /folders collection
+// path ("folders" is not a UUID → "Invalid id"). Same lesson as
+// routes/admin/content.ts and routes/admin/ventures/index.ts — static
+// routes must mount before /:param routers. Safe: folders' routes only
+// match /folders* paths, so item routes (GET /:id, POST /upload,
+// /:id/restore, …) still resolve after the folders router passes.
 app.route("/", foldersRoutes);
+app.route("/", itemsRoutes);
 
 export default app;
