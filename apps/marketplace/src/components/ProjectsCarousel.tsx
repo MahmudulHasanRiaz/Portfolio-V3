@@ -318,9 +318,16 @@ export default function ProjectsCarousel({ projects, lang = "en", dict }: Props)
 							{project.tags.length > 0 && (
 								<div className="tag-row">
 									{project.tags.map((tag) => (
-										<span key={tag} className="tag">
+										<button
+											key={tag}
+											type="button"
+											className="tag"
+											data-filter-link
+											data-filter-href={langUrl("/projects/", lang)}
+											data-filter-value={tag}
+										>
 											{tag}
-										</span>
+										</button>
 									))}
 								</div>
 							)}
@@ -501,9 +508,16 @@ export default function ProjectsCarousel({ projects, lang = "en", dict }: Props)
 						{current.tags.length > 0 && (
 							<div className="tag-row">
 								{current.tags.map((tag) => (
-									<span key={tag} className="tag">
+									<button
+										key={tag}
+										type="button"
+										className="tag"
+										data-filter-link
+										data-filter-href={langUrl("/projects/", lang)}
+										data-filter-value={tag}
+									>
 										{tag}
-									</span>
+									</button>
 								))}
 							</div>
 						)}

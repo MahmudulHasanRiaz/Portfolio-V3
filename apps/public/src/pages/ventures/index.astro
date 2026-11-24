@@ -11,11 +11,19 @@ const lang = "en" as const;
 const t = getDict(lang);
 
 const ventures = await getVentures();
-// Per-tag counts for the shared archive filter (ArchiveFilter.astro).
+// Filter facet: the industry tag when the venture has one (the API
+// ships tags=[industry]); otherwise the stage. No venture carries an
+// industry in the DB today, so stage is what makes the filter render
+// at all — when industries are set in the admin, the chips become
+// industry-based automatically. Counts for the shared archive filter
+// (ArchiveFilter.astro).
+const facetOf = (v: (typeof ventures)[number]) =>
+	(v.data.tags?.[0] ?? v.data.stage ?? "").trim();
 const tagCounts = new Map<string, number>();
-for (const v of ventures)
-	for (const tag of v.data.tags ?? [])
-		tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+for (const v of ventures) {
+	const facet = facetOf(v);
+	if (facet) tagCounts.set(facet, (tagCounts.get(facet) ?? 0) + 1);
+}
 const filterItems = [...tagCounts.entries()].map(([value, count]) => ({
 	value,
 	label: value,
@@ -69,7 +77,7 @@ const sizedThumb = (url: string | null | undefined, w = 800) =>
 							class="grid-card"
 							href={langUrl(`/ventures/${venture.data.slug}`, lang)}
 							data-astro-prefetch="hover"
-							data-tags={(venture.data.tags ?? []).join(",")}
+							data-tags={facetOf(venture)}
 						>
 							<div class="grid-thumb">
 								{venture.data.thumbnailType === "video" &&

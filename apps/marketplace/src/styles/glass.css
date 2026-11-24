@@ -2100,16 +2100,20 @@ html[lang="bn"] .hero-name {
 	scroll-behavior: smooth;
 	/* Fade the right edge by default (the row starts at the left, so
 	   there is more to the right when it overflows). The inline
-	   script toggles .scrolled / .at-end / .no-scroll so the fades
-	   stay truthful as the user swipes. */
+	   script toggles .scrolled / .at-end / .no-scroll so the fade
+	   stays truthful as the user swipes. 40px, not 28px — the old
+	   fade was too subtle to read as "there is more". The left edge
+	   is never faded: the "All" chip is pinned there (sticky, below),
+	   so the left side always shows a reachable reset instead of a
+	   fade. */
 	-webkit-mask-image: linear-gradient(
 		to right,
-		#000 calc(100% - 28px),
+		#000 calc(100% - 40px),
 		transparent 100%
 	);
 	mask-image: linear-gradient(
 		to right,
-		#000 calc(100% - 28px),
+		#000 calc(100% - 40px),
 		transparent 100%
 	);
 }
@@ -2118,38 +2122,25 @@ html[lang="bn"] .hero-name {
 	display: none;
 }
 
-/* Mid-scroll: more on both sides — fade both edges. */
+/* Mid-scroll: still more to the right — same right fade as the
+   default. No left fade: the pinned "All" chip is the left edge. */
 .chip-row[data-archive-filter].scrolled {
 	-webkit-mask-image: linear-gradient(
 		to right,
-		transparent 0,
-		#000 28px,
-		#000 calc(100% - 28px),
+		#000 calc(100% - 40px),
 		transparent 100%
 	);
 	mask-image: linear-gradient(
 		to right,
-		transparent 0,
-		#000 28px,
-		#000 calc(100% - 28px),
+		#000 calc(100% - 40px),
 		transparent 100%
 	);
 }
 
-/* At the far right: only the left edge has more — fade it. */
+/* At the far right: nothing more to the right — no fade at all. */
 .chip-row[data-archive-filter].at-end {
-	-webkit-mask-image: linear-gradient(
-		to right,
-		transparent 0,
-		#000 28px,
-		#000 100%
-	);
-	mask-image: linear-gradient(
-		to right,
-		transparent 0,
-		#000 28px,
-		#000 100%
-	);
+	-webkit-mask-image: none;
+	mask-image: none;
 }
 
 /* Everything fits: no fade at all. */
@@ -2163,6 +2154,27 @@ html[lang="bn"] .hero-name {
 .chip-row[data-archive-filter] .chip {
 	flex: none;
 	white-space: nowrap;
+}
+
+/* The "All" chip is pinned to the left edge of the row (position:
+   sticky) so it stays reachable after a right-side chip is picked —
+   the row used to scroll it out of view, hiding the reset. It gets
+   an opaque page background (the row sits on --bg on some pages and
+   inside a translucent glass panel on others; --bg reads as a solid
+   pill on both) and a soft right shadow while scrolled, so the chips
+   sliding underneath read as passing behind it. The active chip
+   keeps its accent background (opaque already). */
+.chip-row[data-archive-filter] .chip:first-child {
+	position: sticky;
+	left: 0;
+	z-index: 2;
+}
+.chip-row[data-archive-filter] .chip:first-child:not(.active) {
+	background: var(--bg);
+}
+.chip-row[data-archive-filter].scrolled .chip:first-child,
+.chip-row[data-archive-filter].at-end .chip:first-child {
+	box-shadow: 8px 0 12px -8px rgb(0 0 0 / 0.3);
 }
 
 /* Per-category item count on each chip (the counts used to live in
@@ -2553,6 +2565,19 @@ html[lang="bn"] .hero-name {
 	background: var(--accent-wash);
 	color: var(--accent-strong);
 	white-space: nowrap;
+}
+
+/* Tag pills that filter (card tags): a <button> inside the card
+   link, so the button defaults are reset to read as the plain .tag
+   pill — same size, same padding, just clickable, with a hover
+   affordance. */
+button.tag {
+	font-family: inherit;
+	border: 0;
+	cursor: pointer;
+}
+button.tag:hover {
+	background: var(--accent-soft);
 }
 
 /* ---------- Grids (archive / ventures / posts / case studies) ---------- */
