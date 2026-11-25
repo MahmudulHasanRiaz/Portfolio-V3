@@ -66,16 +66,15 @@ function releaseYear(publishedAt?: string): string {
 	description={t.releasesPageDescription}
 	lang={lang}
 >
-	<p>
+	<section class="glass">
+	<p style="margin:0 0 8px;">
 		<a href={langUrl("/", lang)} class="back-link">{t.backHome}</a>
 	</p>
 	<h1 style="margin:0 0 8px;font-size:26px;line-height:1.25;">{t.allReleases}</h1>
 
 	{
 		releases.length === 0 ? (
-			<section class="glass section">
-				<p class="empty-state">{t.emptyReleases}</p>
-			</section>
+			<p class="empty-state">{t.emptyReleases}</p>
 		) : (
 			<>
 				{filterItems.length > 0 ? (
@@ -97,7 +96,7 @@ function releaseYear(publishedAt?: string): string {
 				     aspect-video thumbnail + title, type · year, platform
 				     icons opposite the title, audio pill for audio-only.
 				     No description in the card — it lives on the detail page. -->
-				<ul class="release-grid" id="release-list">
+				<ul class="release-grid" id="release-list" style="margin-top:16px;">
 					{releases.map((release) => {
 						const type = (
 							release.data.releaseType ?? "other"
@@ -227,5 +226,6 @@ function releaseYear(publishedAt?: string): string {
 			</>
 		)
 	}
+	</section>
 </Layout>
 

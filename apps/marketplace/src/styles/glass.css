@@ -71,13 +71,13 @@
 		--bg: #050807;
 		--bg-wash: #08110d;
 		--ink: #eef5f2;
-		--ink-dim: #93a89e;
+		--ink-dim: #a7bcb1;
 		/* A11y (2026-11-09): --ink-faint was #6b8078 = 4.77:1 on the
 		   page bg but 4.19:1 on a dark glass card (~#141a17), where
 		   .grid-meta sits. #7d948a = 6.20:1 on bg, 5.44:1 on glass. */
-		--ink-faint: #7d948a;
-		--card: rgba(255, 255, 255, 0.06);
-		--card-border: rgba(255, 255, 255, 0.09);
+		--ink-faint: #9db3a7;
+		--card: rgba(21, 54, 43, 0.5);
+		--card-border: rgba(94, 234, 212, 0.15);
 		--accent: #2dd4bf;
 		--accent-strong: #5eead4;
 		--accent-soft: rgba(45, 212, 191, 0.12);
@@ -110,11 +110,11 @@
 	--bg: #050807;
 	--bg-wash: #08110d;
 	--ink: #eef5f2;
-	--ink-dim: #93a89e;
+	--ink-dim: #a7bcb1;
 	/* A11y (2026-11-09): see prefers-color-scheme dark :root above. */
-	--ink-faint: #7d948a;
-	--card: rgba(255, 255, 255, 0.06);
-	--card-border: rgba(255, 255, 255, 0.09);
+	--ink-faint: #9db3a7;
+	--card: rgba(21, 54, 43, 0.5);
+	--card-border: rgba(94, 234, 212, 0.15);
 	--accent: #2dd4bf;
 	--accent-strong: #5eead4;
 	--accent-soft: rgba(45, 212, 191, 0.12);
@@ -150,6 +150,32 @@ body {
 	font-family: var(--font);
 	line-height: 1.6;
 	-webkit-font-smoothing: antialiased;
+}
+
+/* Dark mode (PR #39): site-wide atmosphere — the footer-grade luminous
+   wash, extended to every page. Three bright-teal radial glows with
+   tight falloffs fading to transparent, fixed to the viewport so every
+   page and every scroll position carries the same feel. NEVER a flat
+   low-alpha tint over black (PR #37 lesson: that reads murky/dusty).
+   Light mode untouched — this rule is dark-only, both mirrors. */
+[data-theme="dark"] body {
+	background:
+		radial-gradient(60% 45% at 50% 0%, rgba(45, 212, 191, 0.14) 0%, rgba(45, 212, 191, 0.05) 45%, transparent 70%),
+		radial-gradient(45% 40% at 88% 55%, rgba(45, 212, 191, 0.06) 0%, transparent 70%),
+		radial-gradient(50% 45% at 8% 95%, rgba(45, 212, 191, 0.07) 0%, transparent 70%),
+		var(--bg);
+	background-attachment: fixed;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) body {
+		background:
+			radial-gradient(60% 45% at 50% 0%, rgba(45, 212, 191, 0.14) 0%, rgba(45, 212, 191, 0.05) 45%, transparent 70%),
+			radial-gradient(45% 40% at 88% 55%, rgba(45, 212, 191, 0.06) 0%, transparent 70%),
+			radial-gradient(50% 45% at 8% 95%, rgba(45, 212, 191, 0.07) 0%, transparent 70%),
+			var(--bg);
+		background-attachment: fixed;
+	}
 }
 
 a {
@@ -220,6 +246,28 @@ main {
 	padding: 24px;
 }
 
+/* Dark mode (PR #39): every glass card carries a faint top wash so
+   cards separate from the page background with a visible trace of
+   teal — the dusty flat-grey-on-black read is gone. The wash is a
+   tight-falloff radial (PR #37 lesson), never a flat tint. The
+   footer and contact panel keep their own stronger rules (later in
+   the file / higher specificity). */
+[data-theme="dark"] .glass {
+	background:
+		radial-gradient(120% 90% at 50% 0%, rgba(45, 212, 191, 0.09) 0%, rgba(45, 212, 191, 0.02) 45%, transparent 65%),
+		var(--card);
+	border-color: rgba(94, 234, 212, 0.18);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .glass {
+		background:
+			radial-gradient(120% 90% at 50% 0%, rgba(45, 212, 191, 0.09) 0%, rgba(45, 212, 191, 0.02) 45%, transparent 65%),
+			var(--card);
+		border-color: rgba(94, 234, 212, 0.18);
+	}
+}
+
 /* Dark mode (PR #37 + PR #38): the homepage contact panel is a plain
    glass card whose faint wash reads dirty-green in dark mode. PR #37
    gave it a top glow, but the browser saw none: the rule IS live in
@@ -231,6 +279,11 @@ main {
    the inset top edge sells the light source. */
 [data-theme="dark"] #contact.glass {
 	background:
+		radial-gradient(
+			70% 80% at 88% 100%,
+			rgba(45, 212, 191, 0.12) 0%,
+			transparent 65%
+		),
 		radial-gradient(
 			90% 100% at 18% 0%,
 			rgba(45, 212, 191, 0.55) 0%,
@@ -252,6 +305,11 @@ main {
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme="light"]) #contact.glass {
 		background:
+			radial-gradient(
+				70% 80% at 88% 100%,
+				rgba(45, 212, 191, 0.12) 0%,
+				transparent 65%
+			),
 			radial-gradient(
 				90% 100% at 18% 0%,
 				rgba(45, 212, 191, 0.55) 0%,
@@ -3932,6 +3990,25 @@ button.tag:hover {
 	}
 }
 
+/* Dark mode (PR #39): the skills page renders the globe in iconOnly
+   mode, which skipped the sphere — so the page had no luminous ball
+   while the homepage globe glows. The ball now renders in iconOnly
+   too (StackGlobe.tsx); it stays hidden in LIGHT mode (light mode
+   untouched) and shows in dark. Icons-only monochrome unchanged. */
+.globe-icon-only .globe-ball {
+	display: none;
+}
+
+[data-theme="dark"] .globe-icon-only .globe-ball {
+	display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .globe-icon-only .globe-ball {
+		display: block;
+	}
+}
+
 .globe-orbit {
 	position: absolute;
 	border: 1px solid var(--card-border);
@@ -4434,6 +4511,32 @@ button.tag:hover {
 	}
 }
 
+/* Dark mode (PR #39): both halves identically tinted — the "tinted
+   left + flat-grey right" split is gone. */
+[data-theme="dark"] .combined-half + .combined-half {
+	background: var(--bg-wash);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .combined-half + .combined-half {
+		background: var(--bg-wash);
+	}
+}
+
+/* Dark mode (PR #39): mini-rows are flat black on the tinted half —
+   give them a teal-dark fill + teal edge so they read as cards. */
+[data-theme="dark"] .mini-row {
+	background: #0b1a14;
+	border-color: rgba(94, 234, 212, 0.14);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .mini-row {
+		background: #0b1a14;
+		border-color: rgba(94, 234, 212, 0.14);
+	}
+}
+
 .combined-half h3 {
 	margin: 0 0 4px;
 	font-size: 16px;
@@ -4906,15 +5009,15 @@ button.tag:hover {
 	mask-image: linear-gradient(
 		to right,
 		transparent,
-		black 8%,
-		black 92%,
+		black 4%,
+		black 96%,
 		transparent
 	);
 	-webkit-mask-image: linear-gradient(
 		to right,
 		transparent,
-		black 8%,
-		black 92%,
+		black 4%,
+		black 96%,
 		transparent
 	);
 }

@@ -1107,7 +1107,12 @@ export default function StackGlobe({
 					onPointerCancel={onPointerCancel}
 					style={{ touchAction: "none", cursor: "grab" }}
 				>
-					{!iconOnly && <div className="globe-ball" aria-hidden="true" />}
+					{/* PR #39: the sphere renders in iconOnly mode too —
+					    the skills page had no luminous ball while the
+					    homepage globe glows. Light mode hides it via CSS
+					    (.globe-icon-only .globe-ball); dark shows it.
+					    Orbit ring + connector lines stay off in iconOnly. */}
+					<div className="globe-ball" aria-hidden="true" />
 					{!ready ? (
 						<div
 							className="globe-skeleton-shimmer"

@@ -43,16 +43,15 @@ const sizedThumb = (url: string | null | undefined, w = 800) =>
 	description={t.postsPageDescription}
 	lang={lang}
 >
-	<p>
+	<section class="glass">
+	<p style="margin:0 0 8px;">
 		<a href={langUrl("/", lang)} class="back-link">{t.backHome}</a>
 	</p>
 	<h1 style="margin:0 0 8px;font-size:26px;line-height:1.25;">{t.allPosts}</h1>
 
 	{
 		posts.length === 0 ? (
-			<section class="glass section">
-				<p class="empty-state">{t.emptyPosts}</p>
-			</section>
+			<p class="empty-state">{t.emptyPosts}</p>
 		) : (
 			<>
 				{filterItems.length > 0 ? (
@@ -70,7 +69,7 @@ const sizedThumb = (url: string | null | undefined, w = 800) =>
 				<p class="count-line" id="post-count" data-count-template={t.showingPosts}>
 					{showingLabel(t.showingPosts, posts.length, posts.length)}
 				</p>
-				<section class="card-grid section" id="post-grid">
+				<div class="card-grid" id="post-grid" style="margin-top:16px;">
 					{posts.map((post) => {
 						// Reading time is COMPUTED from the actual post text —
 						// same as the homepage cards — never the stored value
@@ -137,9 +136,10 @@ const sizedThumb = (url: string | null | undefined, w = 800) =>
 							</a>
 						);
 					})}
-				</section>
+				</div>
 			</>
 		)
 	}
+	</section>
 </Layout>
 
