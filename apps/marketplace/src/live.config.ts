@@ -63,6 +63,15 @@ const baseSchema = z.object({
 	// Layout hardcodes noindex on every page, so this flag can never
 	// enable indexing here.
 	indexable: z.boolean().optional(),
+	// Admin SEO overrides (Dashboard → SEO): the API emits the row's own
+	// meta columns on every public item. Zod strips undeclared live
+	// fields, so these must be declared here or the values never reach
+	// the detail pages.
+	metaTitle: z.string().optional(),
+	metaDescription: z.string().optional(),
+	ogImage: z.string().optional(),
+	canonicalUrl: z.string().optional(),
+	keywords: z.string().optional(),
 });
 
 const livePosts = defineLiveCollection({
