@@ -75,6 +75,16 @@ export function DirectoryForm({
       ? "name_logo"
       : "logo",
   );
+  // Client logo tone (0040, PR #34) — which the logo IS. "dark"
+  // (default) is a dark logo (black text / dark shapes) rendered on
+  // a LIGHT tile in both themes; "light" is a white/light logo
+  // rendered on a DARK tile in both themes. A fixed tile colour
+  // cannot serve both, so the tone is recorded per client — the
+  // general mechanism for every client, present and future, not a
+  // per-brand special case in code.
+  const [logoTone, setLogoTone] = useState<string>(
+    (initial?.logoTone as string) === "light" ? "light" : "dark",
+  );
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -132,6 +142,8 @@ export function DirectoryForm({
         logoUrl: form.get("logoUrl"),
         // No logo = no mode (NULL = the "logo" default server-side).
         logoDisplayMode: logoUrlValue.trim() ? logoDisplayMode : null,
+        // No logo = no tone (NULL = the "dark" default server-side).
+        logoTone: logoUrlValue.trim() ? logoTone : null,
         website: form.get("website"),
         nameBn: form.get("nameBn"),
       });
@@ -264,30 +276,51 @@ export function DirectoryForm({
               <MediaUrlPreview
                 url={logoUrlValue}
                 kind="image"
+                tone={logoTone as "dark" | "light"}
                 onRemove={() => setLogoUrlValue("")}
               />
               <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
                 Recommended: transparent PNG or SVG preferred (WebP also ok) — upload close to the display size,
                 don&apos;t upload an oversized file. No manual resizing needed — images are automatically
                 optimized for the public site.
+                {logoDisplayMode === "name_logo"
+                  ? " Square icon: 1:1, e.g. 512×512 — the icon shows beside the client name."
+                  : " Wide logo: about 3:1, e.g. 1200×400 — the logo already contains the name."}
               </p>
             </div>
             {logoUrlValue.trim() !== "" && (
-              <div>
-                <label style={labelStyle}>Logo display</label>
-                <Select value={logoDisplayMode} onValueChange={setLogoDisplayMode}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="logo">Logo only — show just the logo image</SelectItem>
-                    <SelectItem value="name_logo">Name + Logo — square icon beside the name</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
-                  {logoDisplayMode === "name_logo"
-                    ? "For square / 1:1 icon-style logos (favicon-like, round or square) that do NOT have the name in them — the icon shows beside the client name."
-                    : "For wide logos (wider than tall) that already contain the name — only the logo image shows. This is the default."}
-                </p>
-              </div>
+              <>
+                <div>
+                  <label style={labelStyle}>Logo display</label>
+                  <Select value={logoDisplayMode} onValueChange={setLogoDisplayMode}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="logo">Logo only — show just the logo image</SelectItem>
+                      <SelectItem value="name_logo">Name + Logo — square icon beside the name</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
+                    {logoDisplayMode === "name_logo"
+                      ? "For square / 1:1 icon-style logos (favicon-like, round or square) that do NOT have the name in them — the icon shows beside the client name."
+                      : "For wide logos (wider than tall) that already contain the name — only the logo image shows. This is the default."}
+                  </p>
+                </div>
+                <div>
+                  <label style={labelStyle}>Logo tone</label>
+                  <Select value={logoTone} onValueChange={setLogoTone}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="dark">Dark logo — black text / dark shapes</SelectItem>
+                      <SelectItem value="light">Light logo — white / light shapes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
+                    {logoTone === "light"
+                      ? "A white/light logo renders on a DARK tile in both themes, so it never vanishes on a light background."
+                      : "A dark logo renders on a LIGHT tile in both themes, so black text and dark shapes never blend into dark mode."}
+                  </p>
+                </div>
+              </>
             )}
             <div>
               <label style={labelStyle}>Website</label>

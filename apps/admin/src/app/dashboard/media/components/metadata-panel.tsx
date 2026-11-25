@@ -124,11 +124,16 @@ export function MetadataPanel({ item, folders, onClose, onUpdate, onDelete, onRe
               <div style={{
                 borderRadius: 14, overflow: "hidden",
                 border: "1px solid var(--border-color)",
+                // Neutral surface + padding (0040, PR #34): a
+                // transparent SVG/PNG stays fully visible, and a wide
+                // logo is never cropped (contain, not cover).
+                background: "var(--surface-muted)",
+                padding: 12,
               }}>
                 <img
                   src={item.variants?.medium_webp || item.variants?.medium_jpeg || item.url}
                   alt={item.altText || item.originalName}
-                  style={{ width: "100%", display: "block" }}
+                  style={{ width: "100%", display: "block", objectFit: "contain" }}
                 />
               </div>
             )}

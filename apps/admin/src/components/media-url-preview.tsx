@@ -72,7 +72,10 @@ function PreviewThumb({ url, kind }: { url: string; kind: MediaUrlKind }) {
         src={url}
         alt={fileNameFromUrl(url)}
         onError={() => setBroken(true)}
-        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        // Contain, never cover (0040, PR #34): the client-logo
+        // preview used to cut a wide logo mid-word ("Fligh").
+        // Nothing is ever cropped anywhere.
+        style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", padding: 4 }}
       />
     );
   }
@@ -84,7 +87,7 @@ function PreviewThumb({ url, kind }: { url: string; kind: MediaUrlKind }) {
           muted
           playsInline
           preload="metadata"
-          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", padding: 4 }}
         />
         <span
           style={{
@@ -116,16 +119,27 @@ export function MediaUrlPreview({
   url,
   kind = "all",
   onRemove,
+  tone,
 }: {
   url: string;
   /** "image" | "video" forces that preview; "all" (default) detects from the extension. */
   kind?: MediaUrlKind;
   /** Shown as an X — clears the selection in the parent form. */
   onRemove?: () => void;
+  /** Logo tone (0040, PR #34): when set, the thumb box is the same
+   *  contrasting tile the public wall renders — a dark logo on a
+   *  LIGHT tile, a light logo on a DARK tile — so what the admin
+   *  sees matches the site. Absent = the neutral surface. */
+  tone?: "dark" | "light";
 }) {
   const trimmed = url.trim();
   if (!trimmed) return null;
   const effective = resolveKind(trimmed, kind);
+  // The tile follows the LOGO, not the theme — same colours as the
+  // public ClientsWall tile, so the preview is truthful in both
+  // admin themes.
+  const tileBackground =
+    tone === "light" ? "#171717" : tone === "dark" ? "#ffffff" : undefined;
   return (
     <div
       style={{
@@ -138,7 +152,7 @@ export function MediaUrlPreview({
         style={{
           width: 96, height: 72, flexShrink: 0, borderRadius: 6,
           overflow: "hidden", border: "1px solid var(--border)",
-          background: "var(--surface)",
+          background: tileBackground ?? "var(--surface)",
         }}
       >
         <PreviewThumb url={trimmed} kind={kind} />

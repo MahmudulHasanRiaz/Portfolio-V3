@@ -76,7 +76,10 @@ export function getTypeColor(mimeType: string): string {
 }
 
 export function isImageType(mimeType: string): boolean {
-  return mimeType.startsWith("image/") && mimeType !== "image/svg+xml";
+  // SVGs ARE images: an SVG loaded through <img> cannot run scripts,
+  // so it previews exactly like a raster image (0040, PR #34). The
+  // old exclusion showed every SVG as a generic file icon.
+  return mimeType.startsWith("image/");
 }
 
 export interface FlatFolder {

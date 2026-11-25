@@ -78,7 +78,14 @@ export function MediaItemCard({ item, selected, onSelect, onClick }: Props) {
             style={{
               width: "100%",
               height: "100%",
-              objectFit: "cover",
+              // Contain, never cover (0040, PR #34): a wide logo in
+              // this square tile used to lose its sides. Photos
+              // letterbox slightly; truthful thumbnails beat
+              // cropped ones. Padding keeps the image off the tile
+              // edge, and the muted surface behind it keeps a
+              // transparent SVG/PNG fully visible.
+              objectFit: "contain",
+              padding: 8,
             }}
             loading="lazy"
           />

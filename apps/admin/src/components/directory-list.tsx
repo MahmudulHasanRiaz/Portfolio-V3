@@ -46,19 +46,34 @@ function RowCard({
   badges,
   editHref,
   thumb,
+  thumbTone,
 }: {
   title: string;
   sub: string;
   badges: string[];
   editHref: string;
   thumb?: string | null;
+  /** Logo tone (0040, PR #34): the thumb box is the same
+   *  contrasting tile the public wall renders — a dark logo on a
+   *  LIGHT tile, a light logo on a DARK tile. Absent = neutral. */
+  thumbTone?: string | null;
 }) {
   return (
     <Card>
       <CardContent style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", gap: 12 }}>
         {thumb ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={thumb} alt="" style={{ width: 56, height: 40, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} />
+          <img
+            src={thumb}
+            alt=""
+            style={{
+              width: 56, height: 40, objectFit: "contain", padding: 4,
+              borderRadius: 6, flexShrink: 0,
+              // Contain, never cover (0040, PR #34): a wide logo in
+              // this box used to lose its sides.
+              background: thumbTone === "light" ? "#171717" : thumbTone === "dark" ? "#ffffff" : "var(--surface)",
+            }}
+          />
         ) : null}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>{title}</div>
@@ -140,6 +155,7 @@ export async function DirectoryList({
           badges={[...(row.sortOrder !== null ? [`order ${row.sortOrder}`] : [])]}
           editHref={`${meta.editBase}/${row.id}`}
           thumb={row.logoUrl}
+          thumbTone={row.logoTone}
         />
       ))}
       {rows.length === 0 && <EmptyState singular={meta.singular} />}

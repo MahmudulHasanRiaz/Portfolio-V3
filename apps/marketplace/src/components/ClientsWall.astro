@@ -18,6 +18,11 @@ const t = applySiteCopy(getDict(lang), lang, await getSiteSettings());
 //     (for 1:1 icon-style logos that do NOT contain the name).
 //   - logo + mode "logo" (or no mode — the default): just the logo
 //     image (for wide logos that already contain the name).
+//   - logo tone (0040): a transparent logo can be dark OR light, so
+//     the logo always sits on a tile that contrasts with IT, not
+//     with the theme — a dark logo on a LIGHT tile, a light/white
+//     logo on a DARK tile, in both themes. NULL/absent = "dark".
+//     The tile never crops: the img keeps object-fit contain.
 // A files.riaz.com.bd logo goes through /api/image at width 144
 // (clamped to the 360 minimum — a 36px logo never needs more);
 // any other logo URL renders unchanged. The cell links out only
@@ -72,33 +77,43 @@ const duration = `${clients.length * 6}s`;
 										client.logo_url &&
 										client.logo_display_mode ===
 											"name_logo";
+									const tileClass =
+										client.logo_tone === "light"
+											? "client-logo-tile client-logo-tile--light"
+											: "client-logo-tile client-logo-tile--dark";
 									const inner = nameLogo ? (
 										<>
-											<img
-												class="client-logo-icon"
-												src={optimizedImageUrl(
-													client.logo_url,
-													144,
-												)}
-												alt=""
-												loading="lazy"
-												decoding="async"
-											/>
+											<span
+												class={`${tileClass} client-logo-tile--icon`}
+											>
+												<img
+													class="client-logo-icon"
+													src={optimizedImageUrl(
+														client.logo_url,
+														144,
+													)}
+													alt=""
+													loading="lazy"
+													decoding="async"
+												/>
+											</span>
 											<span class="client-wordmark">
 												{client.name}
 											</span>
 										</>
 									) : client.logo_url ? (
 										<>
-											<img
-												src={optimizedImageUrl(
-													client.logo_url,
-													144,
-												)}
-												alt={client.name}
-												loading="lazy"
-												decoding="async"
-											/>
+											<span class={tileClass}>
+												<img
+													src={optimizedImageUrl(
+														client.logo_url,
+														144,
+													)}
+													alt={client.name}
+													loading="lazy"
+													decoding="async"
+												/>
+											</span>
 											<span class="client-wordmark client-wordmark--fallback">
 												{client.name}
 											</span>

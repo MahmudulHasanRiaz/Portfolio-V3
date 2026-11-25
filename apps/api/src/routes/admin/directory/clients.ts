@@ -17,7 +17,7 @@ import { z } from "zod";
 import { asc, eq, ilike } from "drizzle-orm";
 import { clients } from "@repo/database/schema";
 import { getApiDb } from "../../../db";
-import { ensureClientsLogoDisplayMode } from "../../../lib/ensure-schema";
+import { ensureClientsLogoDisplayMode, ensureClientsLogoTone } from "../../../lib/ensure-schema";
 import { requireAuth, unauthorized } from "../../../lib/admin-auth";
 import { isRecord, readJsonBody, validateBody } from "../../../lib/validate";
 import { purgePublicCache, waitUntilOf } from "../../../lib/side-effects";
@@ -52,6 +52,12 @@ const createClientSchema = z.object({
   // because the admin sends null for an unset field (its asText);
   // any other value is rejected, never stored.
   logoDisplayMode: z.enum(["logo", "name_logo"]).nullable().optional(),
+  // "dark" = dark logo (black text / dark shapes) on a LIGHT tile in
+  // both themes (the default, also what NULL means); "light" = a
+  // white/light logo on a DARK tile in both themes. Nullable because
+  // the admin sends null for an unset field (its asText); any other
+  // value is rejected, never stored.
+  logoTone: z.enum(["dark", "light"]).nullable().optional(),
   website: z.string().url().nullable().optional(),
   nameBn: z.string().nullable().optional(),
   sortOrder: z.coerce.number().int().nullable().optional(),
@@ -69,6 +75,8 @@ export interface ClientRow {
   logoUrl: string | null;
   /** "logo" | "name_logo" | null (null = "logo" default). */
   logoDisplayMode: string | null;
+  /** "dark" | "light" | null (null = "dark" default). */
+  logoTone: string | null;
   website: string | null;
   sortOrder: number | null;
   nameBn: string | null;
@@ -80,6 +88,7 @@ function toClientRow(r: typeof clients.$inferSelect): ClientRow {
     name: r.name ?? "",
     logoUrl: r.logoUrl,
     logoDisplayMode: r.logoDisplayMode,
+    logoTone: r.logoTone,
     website: r.website,
     sortOrder: r.sortOrder,
     nameBn: r.nameBn,
@@ -90,6 +99,7 @@ export interface ClientInput {
   name: string;
   logoUrl?: string | null;
   logoDisplayMode?: string | null;
+  logoTone?: string | null;
   website?: string | null;
   sortOrder?: number | null;
   nameBn?: string | null;
@@ -101,6 +111,12 @@ function asDisplayMode(value: unknown): "logo" | "name_logo" | null {
   return value === "logo" || value === "name_logo" ? value : null;
 }
 
+/** Only the two known tones survive; anything else stores as NULL
+ *  (the "dark" default) instead of failing the save. */
+function asTone(value: unknown): "dark" | "light" | null {
+  return value === "dark" || value === "light" ? value : null;
+}
+
 function clientValues(data: ClientInput) {
   const name = asText(data.name);
   if (!name) throw new ApiError(400, "Name is required");
@@ -108,6 +124,7 @@ function clientValues(data: ClientInput) {
     name,
     logoUrl: asText(data.logoUrl),
     logoDisplayMode: asDisplayMode(data.logoDisplayMode),
+    logoTone: asTone(data.logoTone),
     website: asText(data.website),
     sortOrder: asSortOrder(data.sortOrder),
     nameBn: asText(data.nameBn),
@@ -122,6 +139,8 @@ app.get("/clients", async (c) => {
     // 0036 auto-apply: create `logo_display_mode` before the first
     // query that selects it (no manual migration).
     await ensureClientsLogoDisplayMode(db);
+    // 0040 auto-apply: same for `logo_tone`.
+    await ensureClientsLogoTone(db);
     const search = (c.req.query("search") ?? "").trim();
     if (search.length > 255) {
       return c.json({ error: "search must be at most 255 characters" }, 400);
@@ -147,6 +166,8 @@ app.get("/clients/:id", async (c) => {
     const db = getApiDb();
     // 0036 auto-apply (see GET /clients).
     await ensureClientsLogoDisplayMode(db);
+    // 0040 auto-apply (see GET /clients).
+    await ensureClientsLogoTone(db);
     const [row] = await db
       .select()
       .from(clients)
@@ -172,6 +193,8 @@ app.post("/clients", async (c) => {
     const db = getApiDb();
     // 0036 auto-apply (see GET /clients).
     await ensureClientsLogoDisplayMode(db);
+    // 0040 auto-apply (see GET /clients).
+    await ensureClientsLogoTone(db);
     const [row] = await db
       .insert(clients)
       .values(clientValues(data))
@@ -199,6 +222,8 @@ app.put("/clients/:id", async (c) => {
     const db = getApiDb();
     // 0036 auto-apply (see GET /clients).
     await ensureClientsLogoDisplayMode(db);
+    // 0040 auto-apply (see GET /clients).
+    await ensureClientsLogoTone(db);
     const [row] = await db
       .update(clients)
       .set({ ...clientValues(data), updatedAt: new Date() })

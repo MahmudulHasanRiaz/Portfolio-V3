@@ -475,6 +475,15 @@ function asDisplayMode(v: unknown): "logo" | "name_logo" | undefined {
 	return v === "logo" || v === "name_logo" ? v : undefined;
 }
 
+/**
+ * Logo tone from a live row: only the two known tones survive;
+ * anything else (incl. NULL) means "dark" — the caller treats an
+ * undefined return as the dark default.
+ */
+function asLogoTone(v: unknown): "dark" | "light" | undefined {
+	return v === "dark" || v === "light" ? v : undefined;
+}
+
 /** Journey stage from a live row: only the three known stages
  *  survive; anything else (incl. NULL) means "software". */
 function asJourneyStage(
@@ -840,6 +849,10 @@ export async function getClients(): Promise<Client[]> {
 				liveField(d, "logo_display_mode", "logoDisplayMode"),
 			);
 			if (mode) c.logo_display_mode = mode;
+			const tone = asLogoTone(
+				liveField(d, "logo_tone", "logoTone"),
+			);
+			if (tone) c.logo_tone = tone;
 			const website = asString(liveField(d, "website", "url"));
 			if (website) c.website = website;
 			const liveSort = asNumber(liveField(d, "sort_order", "sortOrder"));
@@ -857,6 +870,10 @@ export async function getClients(): Promise<Client[]> {
 				liveField(d, "logo_display_mode", "logoDisplayMode"),
 			);
 			if (mode) c.logo_display_mode = mode;
+			const tone = asLogoTone(
+				liveField(d, "logo_tone", "logoTone"),
+			);
+			if (tone) c.logo_tone = tone;
 			const website = asString(liveField(d, "website", "url"));
 			if (website) c.website = website;
 			const liveSort = asNumber(liveField(d, "sort_order", "sortOrder"));

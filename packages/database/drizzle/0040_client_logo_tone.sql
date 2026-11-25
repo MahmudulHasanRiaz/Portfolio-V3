@@ -1,0 +1,14 @@
+-- Clients: logo tone (0040).
+--
+-- A transparent logo can be dark OR light, and neither a fixed light
+-- tile nor a fixed dark tile keeps both visible: a dark logo blends
+-- into dark mode, a white logo vanishes on a light tile. `logo_tone`
+-- records, per client, which the logo is:
+--   "dark"  — dark logo (black text / dark shapes); renders on a
+--             LIGHT tile in both themes (also what NULL means)
+--   "light" — light/white logo; renders on a DARK tile in both themes
+-- The column is nullable with no default: existing rows keep NULL
+-- and render exactly as before (dark-logo tile). No seed values, no
+-- backfill, no other table touched.
+-- Re-runnable (IF NOT EXISTS) and additive only.
+ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "logo_tone" text;
