@@ -340,6 +340,22 @@ button:focus-visible {
 	scroll-margin-top: 96px;
 }
 
+/* Desktop section rhythm (PR #31, 2026-11-25): on desktop the
+   homepage sections sat 16px apart and looked stuck together
+   ("lege lege"). At >=1024px every stacked section gets one
+   generous, consistent 64px gap so the page breathes. Mobile
+   and tablet keep the 16px rhythm — the complaint was
+   desktop-only. Archive grids (.card-grid.section) are
+   header → content, not stacked sections, so they keep 16px. */
+@media (min-width: 1024px) {
+	.section {
+		margin-top: 64px;
+	}
+	.card-grid.section {
+		margin-top: 16px;
+	}
+}
+
 .section-head {
 	display: flex;
 	align-items: baseline;
