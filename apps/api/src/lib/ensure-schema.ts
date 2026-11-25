@@ -210,3 +210,46 @@ export function ensureClientsLogoTone(db: ApiDb): Promise<void> {
   }
   return clientsLogoTone;
 }
+
+// 0041 (packages/database/drizzle/0041_experience_entries.sql):
+// The new `experience_entries` table (Experience page, PR #35) —
+// one river timeline weaving role entries (job at an organisation)
+// and project entries (project-basis engagement for a client, linked
+// to the live project detail page via project_slug). The table starts
+// EMPTY — the user's work history has not been supplied, so no rows
+// are ever seeded; he enters his real entries in the admin. A NULL
+// end_date means ongoing / present. Await this before any query that
+// reads or writes the table.
+let experienceEntriesTable: Promise<void> | null = null;
+
+export function ensureExperienceEntries(db: ApiDb): Promise<void> {
+  if (!experienceEntriesTable) {
+    experienceEntriesTable = (async () => {
+      try {
+        await db.execute(sql`CREATE TABLE IF NOT EXISTS "experience_entries" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+          "type" varchar(20),
+          "title" text,
+          "title_bn" text,
+          "organisation" text,
+          "organisation_bn" text,
+          "start_date" date,
+          "end_date" date,
+          "description" text,
+          "description_bn" text,
+          "project_slug" text,
+          "sort_order" integer,
+          "is_visible" boolean DEFAULT true,
+          "created_at" timestamp with time zone DEFAULT now(),
+          "updated_at" timestamp with time zone DEFAULT now()
+        )`);
+      } catch (err) {
+        // A transient failure must not poison the isolate: clear the
+        // guard so the next request retries.
+        experienceEntriesTable = null;
+        throw err;
+      }
+    })();
+  }
+  return experienceEntriesTable;
+}

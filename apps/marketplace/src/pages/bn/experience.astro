@@ -1,0 +1,563 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { getExperience, type ExperienceEntry } from "../../lib/content";
+import { applySiteCopy, getDict, langUrl } from "../../lib/i18n";
+import { getSiteSettings } from "../../lib/settings";
+
+// Experience page (0041, PR #35) — Bangla version: same "one
+// river" timeline as /experience, with Bangla fields where the
+// user entered them and English fallback where he did not.
+const lang = "bn" as const;
+const t = applySiteCopy(getDict(lang), lang, await getSiteSettings());
+
+const entries = await getExperience();
+const roleEntries = entries.filter((e) => e.type === "role");
+const projectEntries = entries.filter((e) => e.type === "project");
+
+// Stats — computed from the entries only, shown only when at least
+// one stat is non-zero. Years span the earliest start to the latest
+// end (or today while anything is ongoing); any dated work counts
+// as at least one year in progress.
+const dated = entries.filter((e) => e.startDate);
+let years: number | undefined;
+if (dated.length > 0) {
+	const start = Math.min(
+		...dated.map((e) => new Date(e.startDate as string).getTime()),
+	);
+	const ongoing = entries.some((e) => !e.endDate);
+	const end = ongoing
+		? Date.now()
+		: Math.max(
+				...entries
+					.filter((e) => e.endDate)
+					.map((e) => new Date(e.endDate as string).getTime()),
+			);
+	years = Math.max(
+		1,
+		Math.floor((end - start) / (365.25 * 24 * 60 * 60 * 1000)),
+	);
+}
+const orgCount = new Set(
+	roleEntries.map((e) => e.organisation).filter(Boolean),
+).size;
+const clientCount = new Set(
+	projectEntries.map((e) => e.organisation).filter(Boolean),
+).size;
+const stats = [
+	years !== undefined
+		? { value: String(years), label: t.experienceStatsYears }
+		: null,
+	orgCount > 0
+		? { value: String(orgCount), label: t.experienceStatsOrganisations }
+		: null,
+	projectEntries.length > 0
+		? {
+				value: String(projectEntries.length),
+				label: t.experienceStatsProjects,
+			}
+		: null,
+	clientCount > 0
+		? { value: String(clientCount), label: t.experienceStatsClients }
+		: null,
+].filter((s): s is { value: string; label: string } => s !== null);
+
+function monthYear(iso: string | undefined): string {
+	if (!iso) return "";
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return "";
+	return d.toLocaleDateString("bn-BD", { month: "short", year: "numeric" });
+}
+
+function periodLabel(entry: ExperienceEntry): string {
+	const start = monthYear(entry.startDate);
+	const end = monthYear(entry.endDate);
+	if (!start && !end) return "";
+	if (!start) return end;
+	if (!end) return `${start} – ${t.educationPresent}`;
+	return `${start} – ${end}`;
+}
+function startYear(iso: string | undefined): string {
+	if (!iso) return "";
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return "";
+	return d.toLocaleDateString("bn-BD", { year: "numeric" });
+}
+---
+
+<Layout
+	title={t.experiencePageTitle}
+	description={t.experiencePageDescription}
+	lang={lang}
+>
+	<section class="glass">
+		<p style="margin:0 0 8px;">
+			<a class="back-link" href={langUrl("/", lang)}>{t.backHome}</a>
+		</p>
+		<h1 class="exp-title">{t.allExperience}</h1>
+		{
+			entries.length === 0 ? (
+				<p class="empty-state">{t.emptyExperience}</p>
+			) : (
+				<div data-exp-root data-exp-active="all">
+					{stats.length > 0 && (
+						<dl class="exp-stats">
+							{stats.map((s) => (
+								<div class="exp-stat">
+									<dt>{s.label}</dt>
+									<dd>{s.value}</dd>
+								</div>
+							))}
+						</dl>
+					)}
+					<div
+						class="exp-filter"
+						role="group"
+						aria-label="অভিজ্ঞতা ফিল্টার"
+					>
+						<button
+							type="button"
+							class="exp-chip"
+							data-exp-btn="all"
+							aria-pressed="true"
+						>
+							{t.experienceFilterAll} ({entries.length})
+						</button>
+						<button
+							type="button"
+							class="exp-chip"
+							data-exp-btn="roles"
+							aria-pressed="false"
+						>
+							{t.experienceFilterRoles} ({roleEntries.length})
+						</button>
+						<button
+							type="button"
+							class="exp-chip"
+							data-exp-btn="projects"
+							aria-pressed="false"
+						>
+							{t.experienceFilterProjects} ({projectEntries.length})
+						</button>
+					</div>
+					<ol class="exp-timeline">
+						{entries.map((entry) => (
+							<li
+								class={
+									entry.endDate
+										? "exp-item"
+										: "exp-item is-running"
+								}
+								data-type={entry.type}
+							>
+								<div
+									class={
+										entry.type === "project"
+											? "exp-card exp-card--project"
+											: "exp-card"
+									}
+								>
+									<span
+										class={
+											entry.type === "project"
+												? "exp-badge exp-badge--project"
+												: "exp-badge"
+										}
+									>
+										{entry.type === "project"
+											? t.experienceProject
+											: t.experienceRole}
+									</span>
+									<h2 class="exp-entry-title">{entry.titleBn ?? entry.title}</h2>
+									{entry.organisation && (
+										<p class="exp-org">
+											{entry.type === "project" ? "ক্লায়েন্ট: " : ""}
+											{entry.organisationBn ?? entry.organisation}
+										</p>
+									)}
+									{periodLabel(entry) && (
+										<p class="exp-period">
+											{periodLabel(entry)}
+										</p>
+									)}
+									{entry.description && (
+										<p class="exp-description">
+											{entry.descriptionBn ?? entry.description}
+										</p>
+									)}
+									{entry.type === "project" &&
+										entry.projectSlug && (
+											<p class="exp-link-row">
+												<a
+													class="exp-link"
+													href={langUrl(
+														`/projects/${entry.projectSlug}`,
+														lang,
+													)}
+												>
+													{t.experienceViewProject}
+												</a>
+											</p>
+										)}
+								</div>
+								{startYear(entry.startDate) && (
+									<span class="exp-year" aria-hidden="true">
+										{startYear(entry.startDate)}
+									</span>
+								)}
+							</li>
+						))}
+					</ol>
+				</div>
+			)
+		}
+	</section>
+</Layout>
+
+<script is:inline>
+	// Experience filter (0041, PR #35): three chips above the river
+	// timeline — All / Roles / Projects. One tiny inline script, no
+	// framework: the active value lives on the root's data-exp-active
+	// attribute and CSS hides the non-matching items. Bound on
+	// astro:page-load (ArchiveFilter pattern) so it survives View
+	// Transitions navigation; the data-exp-bound guard keeps it from
+	// binding twice.
+	(function () {
+		function initExpFilter() {
+			var root = document.querySelector("[data-exp-root]");
+			if (!root || root.hasAttribute("data-exp-bound")) return;
+			root.setAttribute("data-exp-bound", "");
+			var buttons = root.querySelectorAll("[data-exp-btn]");
+			for (var i = 0; i < buttons.length; i++) {
+				buttons[i].addEventListener("click", function () {
+					var value =
+						this.getAttribute("data-exp-btn") || "all";
+					root.setAttribute("data-exp-active", value);
+					for (var j = 0; j < buttons.length; j++) {
+						buttons[j].setAttribute(
+							"aria-pressed",
+							buttons[j] === this ? "true" : "false",
+						);
+					}
+				});
+			}
+		}
+		document.addEventListener("astro:page-load", initExpFilter);
+		initExpFilter();
+	})();
+</script>
+
+<style>
+	.exp-title {
+		margin: 0 0 16px;
+		font-size: 24px;
+		line-height: 1.25;
+	}
+	/* Stats strip — computed from the entries only. */
+	.exp-stats {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 12px;
+		margin: 0 0 20px;
+	}
+	.exp-stat {
+		background: var(--accent-wash);
+		border: 1px solid var(--card-border);
+		border-radius: 14px;
+		padding: 14px 16px;
+		text-align: center;
+	}
+	.exp-stat dt {
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--ink-dim);
+		margin: 0 0 4px;
+	}
+	.exp-stat dd {
+		font-size: 26px;
+		font-weight: 800;
+		line-height: 1;
+		color: var(--accent-strong);
+		margin: 0;
+	}
+	/* Filter chips. */
+	.exp-filter {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin: 0 0 20px;
+	}
+	.exp-chip {
+		font: inherit;
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--ink-dim);
+		background: var(--card);
+		border: 1px solid var(--card-border);
+		border-radius: 999px;
+		padding: 7px 14px;
+		cursor: pointer;
+		transition:
+			color 160ms ease,
+			border-color 160ms ease,
+			background 160ms ease;
+	}
+	.exp-chip[aria-pressed="true"] {
+		color: var(--accent-strong);
+		background: var(--accent-wash);
+		border-color: var(--accent);
+	}
+	/* The river — one vertical timeline. Mobile: plain left-border
+	   list; the dot differs by kind (role = solid, project = ring). */
+	.exp-timeline {
+		list-style: none;
+		margin: 8px 0 0;
+		padding: 0 0 0 20px;
+		border-left: 2px solid var(--accent-wash);
+	}
+	.exp-item {
+		position: relative;
+		padding: 0 0 24px;
+	}
+	.exp-item:last-child {
+		padding-bottom: 0;
+	}
+	.exp-item::before {
+		content: "";
+		position: absolute;
+		left: -26px;
+		top: 6px;
+		width: 10px;
+		height: 10px;
+		border-radius: 50%;
+		background: var(--accent);
+	}
+	.exp-item[data-type="project"]::before {
+		background: var(--bg);
+		border: 2px solid var(--accent);
+		width: 8px;
+		height: 8px;
+	}
+	/* Filtered-out items are hidden — the river re-flows. */
+	[data-exp-active="roles"] .exp-item[data-type="project"],
+	[data-exp-active="projects"] .exp-item[data-type="role"] {
+		display: none;
+	}
+	.exp-card {
+		background: var(--card);
+		border: 1px solid var(--card-border);
+		border-top: 3px solid var(--ink-faint);
+		border-radius: 16px;
+		box-shadow: var(--shadow-soft);
+		padding: 18px 20px;
+	}
+	/* Project cards are the hero: teal top accent, teal-tinted
+	   body, and a link row to the live project detail page. */
+	.exp-card--project {
+		border: 1px solid var(--accent);
+		border-top: 3px solid var(--accent);
+		background: linear-gradient(
+			180deg,
+			var(--accent-wash),
+			var(--card) 55%
+		);
+	}
+	.exp-badge {
+		display: inline-block;
+		font-size: 11px;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--ink-dim);
+		border: 1px solid var(--card-border);
+		border-radius: 999px;
+		padding: 3px 10px;
+		margin-bottom: 10px;
+	}
+	.exp-badge--project {
+		color: var(--accent-strong);
+		background: var(--accent-wash);
+		border-color: var(--accent);
+	}
+	.exp-entry-title {
+		font-size: 18px;
+		line-height: 1.35;
+		margin: 0;
+	}
+	.exp-org {
+		margin: 4px 0 0;
+		font-weight: 600;
+	}
+	.exp-period {
+		margin: 2px 0 0;
+		font-size: 13px;
+		color: var(--ink-dim);
+	}
+	.exp-description {
+		margin: 8px 0 0;
+		color: var(--ink-dim);
+	}
+	.exp-link-row {
+		margin: 12px 0 0;
+	}
+	.exp-link {
+		font-size: 14px;
+		font-weight: 700;
+		color: var(--accent-strong);
+		text-decoration: none;
+	}
+	.exp-link:hover {
+		text-decoration: underline;
+	}
+	/* Desktop-only ornaments — hidden below 1024px so the mobile
+	   layout stays clean. */
+	.exp-year {
+		display: none;
+	}
+	/* Desktop river (in the spirit of the Education desktop
+	   redesign, PR #27, but a distinct look): central spine with a
+	   flowing teal gradient, alternating cards, year pills on the
+	   spine. Everything in this block is desktop-only; below 1024px
+	   the plain left-border list above is untouched. */
+	@media (min-width: 1024px) {
+		.glass {
+			padding: 40px 48px;
+		}
+		.exp-title {
+			font-size: 32px;
+			text-align: center;
+		}
+		.exp-title::after {
+			content: "";
+			display: block;
+			width: 56px;
+			height: 3px;
+			margin: 14px auto 0;
+			border-radius: 2px;
+			background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+		}
+		.exp-stats {
+			grid-template-columns: repeat(4, 1fr);
+			max-width: 720px;
+			margin: 28px auto 8px;
+		}
+		.exp-filter {
+			justify-content: center;
+			margin: 20px 0 0;
+		}
+		.exp-timeline {
+			margin: 36px 0 0;
+			padding: 0;
+			border-left: 0;
+			position: relative;
+		}
+		/* The river itself — a flowing gradient spine. */
+		.exp-timeline::before {
+			content: "";
+			position: absolute;
+			left: 50%;
+			top: 8px;
+			bottom: 8px;
+			width: 2px;
+			transform: translateX(-50%);
+			background: linear-gradient(
+				180deg,
+				var(--accent),
+				var(--accent-strong) 45%,
+				var(--accent-wash)
+			);
+			border-radius: 2px;
+		}
+		.exp-item {
+			display: grid;
+			grid-template-columns: 1fr 96px 1fr;
+			align-items: start;
+			padding: 0 0 40px;
+		}
+		/* The mobile dot is replaced by the year pill on the spine. */
+		.exp-item::before {
+			display: none;
+		}
+		.exp-item:nth-child(odd) .exp-card {
+			grid-column: 1;
+			grid-row: 1;
+		}
+		.exp-item:nth-child(even) .exp-card {
+			grid-column: 3;
+			grid-row: 1;
+		}
+		.exp-card {
+			position: relative;
+			padding: 20px 22px;
+			transition:
+				transform 160ms ease,
+				border-color 160ms ease,
+				box-shadow 160ms ease;
+		}
+		/* Connector from the card edge to the spine. */
+		.exp-item:nth-child(odd) .exp-card::after,
+		.exp-item:nth-child(even) .exp-card::after {
+			content: "";
+			position: absolute;
+			top: 32px;
+			width: 48px;
+			height: 2px;
+			background: var(--accent);
+			opacity: 0.35;
+		}
+		.exp-item:nth-child(odd) .exp-card::after {
+			right: -48px;
+		}
+		.exp-item:nth-child(even) .exp-card::after {
+			left: -48px;
+		}
+		.exp-year {
+			display: block;
+			grid-column: 2;
+			grid-row: 1;
+			justify-self: center;
+			margin-top: 18px;
+			font-size: 13px;
+			font-weight: 700;
+			letter-spacing: 0.04em;
+			color: var(--accent-strong);
+			background: var(--bg);
+			border: 1.5px solid var(--accent);
+			border-radius: 999px;
+			padding: 4px 12px;
+			white-space: nowrap;
+			z-index: 1;
+		}
+		/* Ongoing entry — the year pill gently pulses. */
+		.exp-item.is-running .exp-year {
+			animation: exp-pulse 2.4s ease-out infinite;
+		}
+		@media (hover: hover) {
+			.exp-card:hover {
+				transform: translateY(-3px);
+				border-color: var(--accent);
+			}
+			.exp-card--project:hover {
+				box-shadow: var(--shadow);
+			}
+		}
+		@media (prefers-reduced-motion: reduce) {
+			.exp-item.is-running .exp-year {
+				animation: none;
+			}
+			.exp-card {
+				transition: none;
+			}
+		}
+	}
+	@keyframes exp-pulse {
+		0% {
+			box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.35);
+		}
+		70% {
+			box-shadow: 0 0 0 10px rgba(13, 148, 136, 0);
+		}
+		100% {
+			box-shadow: 0 0 0 0 rgba(13, 148, 136, 0);
+		}
+	}
+</style>

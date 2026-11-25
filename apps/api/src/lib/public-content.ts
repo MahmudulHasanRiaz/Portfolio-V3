@@ -50,9 +50,10 @@ import {
 } from "./integrations";
 import { asc, desc, eq } from "drizzle-orm";
 import { getApiDb } from "../db";
-import { ensureClientsLogoDisplayMode, ensureClientsLogoTone, ensureEducationSkills, ensurePerItemIndexing } from "./ensure-schema";
+import { ensureClientsLogoDisplayMode, ensureClientsLogoTone, ensureEducationSkills, ensureExperienceEntries, ensurePerItemIndexing } from "./ensure-schema";
 import {
   educationEntries,
+  experienceEntries,
   homepageSections,
   posts,
   postTags,
@@ -86,7 +87,8 @@ export type PublicContentType =
   | "platforms"
   | "technologies"
   | "clients"
-  | "education";
+  | "education"
+  | "experience";
 
 export const PUBLIC_CONTENT_TYPES: readonly PublicContentType[] = [
   "posts",
@@ -99,6 +101,7 @@ export const PUBLIC_CONTENT_TYPES: readonly PublicContentType[] = [
   "technologies",
   "clients",
   "education",
+  "experience",
 ];
 
 export function isPublicContentType(value: string): value is PublicContentType {
@@ -1143,6 +1146,44 @@ async function listClients(db: Db): Promise<PublicContentItem[]> {
     });
 }
 
+/** Experience entries (0041): visible rows only, newest first by
+ * start_date (then sort_order) — one river timeline weaving role
+ * entries (job at an organisation) and project entries (project-basis
+ * engagement for a client, linked to the live project detail page via
+ * project_slug). The table starts empty — the user enters his real
+ * entries in the admin — so an empty list renders the page's honest
+ * empty state. No detail page exists, so the slug is the stable row
+ * id. */
+async function listExperience(db: Db): Promise<PublicContentItem[]> {
+  // 0041 auto-apply: create the table before the first query that
+  // selects from it (no manual migration).
+  await ensureExperienceEntries(db);
+  const rows = await db
+    .select()
+    .from(experienceEntries)
+    .orderBy(desc(experienceEntries.startDate), asc(experienceEntries.sortOrder));
+  return rows
+    .filter((r) => r.isVisible !== false && r.title)
+    .map((r) => {
+      const title = r.title as string;
+      return {
+        slug: r.id,
+        title,
+        type: r.type ?? "role",
+        titleBn: r.titleBn ?? undefined,
+        organisation: r.organisation ?? undefined,
+        organisationBn: r.organisationBn ?? undefined,
+        startDate: toISO(r.startDate) ?? undefined,
+        endDate: toISO(r.endDate) ?? undefined,
+        description: r.description ?? undefined,
+        descriptionBn: r.descriptionBn ?? undefined,
+        projectSlug: r.projectSlug ?? undefined,
+        sortOrder: r.sortOrder ?? undefined,
+        isVisible: r.isVisible ?? undefined,
+      } satisfies PublicContentItem;
+    });
+}
+
 export async function listPublicContent(
   type: PublicContentType,
 ): Promise<PublicContentItem[]> {
@@ -1168,6 +1209,8 @@ export async function listPublicContent(
       return listClients(db);
     case "education":
       return listEducation(db);
+    case "experience":
+      return listExperience(db);
   }
 }
 

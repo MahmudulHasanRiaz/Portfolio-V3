@@ -237,6 +237,38 @@ const liveEducation = defineLiveCollection({
 	}),
 });
 
+// Experience entries (0041) are NOT a content collection — there
+// are no build-time rows; the live rows come from the Public Content
+// API (`experience` type). The API returns visible rows only, newest
+// first by start_date. `slug` is the stable row id (no detail page
+// exists). `type` is "role" (job at an organisation) or "project"
+// (project-basis engagement for a client); project entries link to
+// the live project detail page via `project_slug`.
+const liveExperience = defineLiveCollection({
+	loader: createPublicContentLoader(liveType("experience")),
+	schema: baseSchema.extend({
+		type: z.string().optional(),
+		title_bn: z.string().optional(),
+		titleBn: z.string().optional(),
+		organisation: z.string().optional(),
+		organisation_bn: z.string().optional(),
+		organisationBn: z.string().optional(),
+		start_date: z.string().optional(),
+		startDate: z.string().optional(),
+		end_date: z.string().optional(),
+		endDate: z.string().optional(),
+		description_bn: z.string().optional(),
+		descriptionBn: z.string().optional(),
+		project_slug: z.string().optional(),
+		projectSlug: z.string().optional(),
+		sort_order: z.number().optional(),
+		sortOrder: z.number().optional(),
+		is_visible: z.boolean().optional(),
+		isVisible: z.boolean().optional(),
+		meta: z.record(z.string(), z.unknown()).optional(),
+	}),
+});
+
 const liveClients = defineLiveCollection({
 	loader: createPublicContentLoader(liveType("clients")),
 	schema: baseSchema.extend({
@@ -262,4 +294,4 @@ const liveClients = defineLiveCollection({
 	}),
 });
 
-export const collections = { livePosts, liveProjects, liveCaseStudies, liveVentures, liveReleases, liveServices, livePlatforms, liveTechnologies, liveClients, liveEducation };
+export const collections = { livePosts, liveProjects, liveCaseStudies, liveVentures, liveReleases, liveServices, livePlatforms, liveTechnologies, liveClients, liveEducation, liveExperience };

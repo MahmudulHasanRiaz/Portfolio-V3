@@ -54,7 +54,8 @@ type LiveCollectionName =
 	| "livePlatforms"
 	| "liveTechnologies"
 	| "liveClients"
-	| "liveEducation";
+	| "liveEducation"
+	| "liveExperience";
 
 function byDateDesc<T extends { data: { publishedAt?: string } }>(a: T, b: T) {
 	return (b.data.publishedAt ?? "").localeCompare(a.data.publishedAt ?? "");
@@ -794,6 +795,81 @@ export async function getEducation(): Promise<EducationEntry[]> {
 			descriptionBn: asString(
 				liveField(d, "description_bn", "descriptionBn"),
 			),
+			sortOrder: asNumber(liveField(d, "sort_order", "sortOrder")),
+		});
+	}
+	return entries.sort((a, b) => {
+		const byStart = (b.startDate ?? "").localeCompare(a.startDate ?? "");
+		if (byStart !== 0) return byStart;
+		return (a.sortOrder ?? 99) - (b.sortOrder ?? 99);
+	});
+}
+
+export interface ExperienceEntry {
+	/** Stable row id (the API uses it as the slug — there is no
+	 *  detail page). */
+	id: string;
+	/** "role" = job at an organisation; "project" = project-basis
+	 *  engagement for a client. */
+	type: "role" | "project";
+	title: string;
+	titleBn?: string;
+	/** Organisation (role) or client (project). */
+	organisation?: string;
+	organisationBn?: string;
+	/** ISO date strings ("2020-01-01T00:00:00.000Z"); endDate
+	 *  undefined = ongoing / present. */
+	startDate?: string;
+	endDate?: string;
+	/** Summary (role) / outcome (project). */
+	description?: string;
+	descriptionBn?: string;
+	/** Project type only: slug of the live project detail page
+	 *  (/projects/<slug>). */
+	projectSlug?: string;
+	sortOrder?: number;
+}
+
+/** Entry type from a live row: only the two known values survive;
+ *  anything else (incl. NULL) means "role". */
+function asExperienceType(v: unknown): "role" | "project" {
+	return v === "project" ? "project" : "role";
+}
+
+/**
+ * Experience entries, live-only (0041, PR #35): there are no
+ * build-time rows, so when the API is unreachable the page renders
+ * its honest empty state. The API already returns visible rows only,
+ * newest first by start_date; the sort here is a backstop so a
+ * different payload order can never scramble the timeline.
+ */
+export async function getExperience(): Promise<ExperienceEntry[]> {
+	const live = await getLiveRows("liveExperience");
+	const entries: ExperienceEntry[] = [];
+	for (const item of live) {
+		const d = item.data;
+		const title = asString(liveField(d, "title"));
+		if (!title) continue;
+		const id = asString(d.slug) ?? "";
+		if (!id) continue;
+		const isVisible = asBool(liveField(d, "is_visible", "isVisible"));
+		if (isVisible === false) continue;
+		entries.push({
+			id,
+			type: asExperienceType(liveField(d, "type")),
+			title,
+			titleBn: asString(liveField(d, "title_bn", "titleBn")),
+			organisation: asString(liveField(d, "organisation")),
+			organisationBn: asString(
+				liveField(d, "organisation_bn", "organisationBn"),
+			),
+			startDate: asString(liveField(d, "start_date", "startDate")),
+			endDate: asString(liveField(d, "end_date", "endDate")),
+			description: asString(liveField(d, "description")),
+			descriptionBn: asString(
+				liveField(d, "description_bn", "descriptionBn"),
+			),
+			projectSlug: asString(liveField(d, "project_slug", "projectSlug")),
 			sortOrder: asNumber(liveField(d, "sort_order", "sortOrder")),
 		});
 	}

@@ -312,6 +312,36 @@ export const createEducationEntrySchema = educationEntrySchema.omit({
 
 export const updateEducationEntrySchema = educationEntrySchema.partial();
 
+// ─── Experience entries ──────────────────────────────────────────────────────
+// Dedicated Experience page (0041, PR #35). Two kinds of entries in
+// one timeline: type 'role' (job at an organisation) or 'project'
+// (project-basis engagement for a client, linked to the live project
+// detail page via projectSlug). Dates are plain "YYYY-MM-DD"
+// calendar-date strings (a NULL endDate means ongoing / present).
+// All display fields are nullable — the admin sends null for every
+// empty optional field (PR #11 lesson).
+export const experienceEntrySchema = z.object({
+  id: uuidSchema,
+  type: z.enum(["role", "project"]).nullable().optional(),
+  title: z.string().nullable().optional(),
+  titleBn: z.string().nullable().optional(),
+  organisation: z.string().nullable().optional(),
+  organisationBn: z.string().nullable().optional(),
+  startDate: z.string().nullable().optional(),
+  endDate: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  descriptionBn: z.string().nullable().optional(),
+  projectSlug: z.string().nullable().optional(),
+  sortOrder: z.coerce.number().int().nullable().optional(),
+  isVisible: z.boolean().nullable().optional(),
+});
+
+export const createExperienceEntrySchema = experienceEntrySchema.omit({
+  id: true,
+});
+
+export const updateExperienceEntrySchema = experienceEntrySchema.partial();
+
 // ─── Project Technologies (junction) ─────────────────────────────────────────
 
 export const projectTechnologySchema = z.object({
