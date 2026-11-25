@@ -294,15 +294,15 @@ main {
    Case-study detail gets the same class so all three detail pages
    share one container treatment. Cards inside the detail container
    get a solid step-up fill so they separate from the panel.
-   PR #50: the browser verify (2026-11-26) found the detail body's top half still fairly saturated — core 0.45→0.28, mid 0.14→0.08 with a tighter falloff, base #0b241c→#0a1f18; luminous top edge kept, CTA focal untouched. */
+   PR #50: the browser verify (2026-11-26) found the detail body's top half still fairly saturated — core 0.45→0.28, mid 0.14→0.08 with a tighter falloff, base #0b241c→#0a1f18; luminous top edge kept, CTA focal untouched.
+   PR #51: the top half was STILL green after PR #50 — the gradient's 100% vertical extent kept the whole top half inside the strong zone (title area composites to ~(14,53,44), verified by pixel sampling; the fix is spatial, not just alpha). Extent 90% 100%→70% 40% so the glow fades out before the title/meta area, core 0.28→0.14, mid 0.08→0.04. Base #0a1f18 and the luminous top edge are kept; the lower body is unchanged. */
 [data-theme="dark"] .glass.detail-glass {
 	background:
 		radial-gradient(
-			90% 100% at 18% 0%,
-			rgba(45, 212, 191, 0.28) 0%,
-			rgba(45, 212, 191, 0.08) 30%,
-			rgba(45, 212, 191, 0.02) 55%,
-			transparent 75%
+			70% 40% at 18% 0%,
+			rgba(45, 212, 191, 0.14) 0%,
+			rgba(45, 212, 191, 0.04) 35%,
+			transparent 65%
 		),
 		#0a1f18;
 	border-color: rgba(94, 234, 212, 0.28);
@@ -324,11 +324,10 @@ main {
 	:root:not([data-theme="light"]) .glass.detail-glass {
 		background:
 			radial-gradient(
-				90% 100% at 18% 0%,
-				rgba(45, 212, 191, 0.28) 0%,
-				rgba(45, 212, 191, 0.08) 30%,
-				rgba(45, 212, 191, 0.02) 55%,
-				transparent 75%
+				70% 40% at 18% 0%,
+				rgba(45, 212, 191, 0.14) 0%,
+				rgba(45, 212, 191, 0.04) 35%,
+				transparent 65%
 			),
 			#0a1f18;
 		border-color: rgba(94, 234, 212, 0.28);
