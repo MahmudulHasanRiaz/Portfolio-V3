@@ -220,6 +220,36 @@ main {
 	padding: 24px;
 }
 
+/* Dark mode (PR #37): the homepage contact panel is a plain glass
+   card whose faint wash reads dirty-green in dark mode. Same
+   top-anchored luminous glow as the other CTA panels — light from
+   the top, fading out — so the panel reads lit, not stained. */
+[data-theme="dark"] #contact.glass {
+	background:
+		radial-gradient(
+			120% 120% at 50% 0%,
+			rgba(45, 212, 191, 0.22) 0%,
+			rgba(45, 212, 191, 0.06) 45%,
+			transparent 75%
+		),
+		#081712;
+	border-color: rgba(45, 212, 191, 0.22);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) #contact.glass {
+		background:
+			radial-gradient(
+				120% 120% at 50% 0%,
+				rgba(45, 212, 191, 0.22) 0%,
+				rgba(45, 212, 191, 0.06) 45%,
+				transparent 75%
+			),
+			#081712;
+		border-color: rgba(45, 212, 191, 0.22);
+	}
+}
+
 .muted {
 	color: var(--ink-dim);
 }
@@ -730,6 +760,29 @@ button:focus-visible {
 	filter: drop-shadow(0 0 26px rgba(13, 148, 136, 0.35));
 }
 
+/* Dark mode (PR #37): the stuck pill's glow uses the LIGHT-mode teal
+   rgba(13,148,136) — over near-black it composites to a dirty dark
+   green smear that spills onto the panel below the header. Dark mode
+   gets the BRIGHT teal at a tighter spread, so the pill reads lit,
+   not stained. */
+[data-theme="dark"] .site-header.is-stuck .sticky-pill {
+	box-shadow:
+		var(--shadow),
+		inset 0 1px 0 rgba(94, 234, 212, 0.9),
+		0 0 20px rgba(45, 212, 191, 0.4);
+	filter: drop-shadow(0 0 18px rgba(45, 212, 191, 0.4));
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .site-header.is-stuck .sticky-pill {
+		box-shadow:
+			var(--shadow),
+			inset 0 1px 0 rgba(94, 234, 212, 0.9),
+			0 0 20px rgba(45, 212, 191, 0.4);
+		filter: drop-shadow(0 0 18px rgba(45, 212, 191, 0.4));
+	}
+}
+
 @keyframes pill-breathe {
 	0%,
 	100% {
@@ -743,6 +796,37 @@ button:focus-visible {
 			var(--shadow),
 			inset 0 1px 0 rgba(45, 212, 191, 0.85),
 			0 0 22px rgba(13, 148, 136, 0.35);
+	}
+}
+
+/* Dark mode (PR #37): the breathe glow's outer halo uses the
+   LIGHT-mode teal — the same dirty-green smear as the stuck pill.
+   Keyframes can't be scoped by theme, so dark mode swaps in its own
+   animation with the bright teal (the animation-name override below
+   keeps the 3s ease-in-out infinite timing from the shorthand). */
+@keyframes pill-breathe-dark {
+	0%,
+	100% {
+		box-shadow:
+			var(--shadow),
+			inset 0 1px 0 rgba(94, 234, 212, 0.6),
+			0 0 14px rgba(45, 212, 191, 0.22);
+	}
+	50% {
+		box-shadow:
+			var(--shadow),
+			inset 0 1px 0 rgba(94, 234, 212, 0.9),
+			0 0 24px rgba(45, 212, 191, 0.45);
+	}
+}
+
+[data-theme="dark"] .sticky-pill {
+	animation-name: pill-breathe-dark;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .sticky-pill {
+		animation-name: pill-breathe-dark;
 	}
 }
 
@@ -1721,6 +1805,18 @@ button:focus-visible {
 	filter: drop-shadow(0 0 3px rgba(13, 148, 136, 0.6));
 }
 
+/* Dark mode (PR #37): the trace glow's drop-shadow uses the
+   LIGHT-mode teal — murky over black. Bright teal here. */
+[data-theme="dark"] .hero-runlight .trace-glow {
+	filter: drop-shadow(0 0 3px rgba(45, 212, 191, 0.75));
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .hero-runlight .trace-glow {
+		filter: drop-shadow(0 0 3px rgba(45, 212, 191, 0.75));
+	}
+}
+
 @keyframes hero-runlight-travel {
 	to {
 		stroke-dashoffset: -400;
@@ -2067,6 +2163,32 @@ html[lang="bn"] .hero-name {
 		0 0 18px rgba(13, 148, 136, 0.28);
 }
 
+/* Dark mode (PR #37): the tile's flat accent-soft wash + dark-teal
+   glow read as grey-green murk over black. A solid clearly-teal
+   dark base with a brighter top wash and a luminous ring, so the
+   tile reads as dark teal, not murk. */
+[data-theme="dark"] .service-icon {
+	background:
+		linear-gradient(180deg, rgba(94, 234, 212, 0.32), rgba(45, 212, 191, 0.12)),
+		#0a211b;
+	border-color: rgba(94, 234, 212, 0.45);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.28),
+		0 0 16px rgba(45, 212, 191, 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .service-icon {
+		background:
+			linear-gradient(180deg, rgba(94, 234, 212, 0.32), rgba(45, 212, 191, 0.12)),
+			#0a211b;
+		border-color: rgba(94, 234, 212, 0.45);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.28),
+			0 0 16px rgba(45, 212, 191, 0.3);
+	}
+}
+
 .service-icon img {
 	width: 26px;
 	height: 26px;
@@ -2367,6 +2489,23 @@ html[lang="bn"] .hero-name {
 	font-weight: 800;
 	color: var(--accent);
 	background: var(--accent-wash);
+}
+
+/* Dark mode (PR #37): same murky-wash fix as the grid letter tiles. */
+[data-theme="dark"] .deck-card .deck-thumb .thumb-fallback {
+	background:
+		linear-gradient(160deg, rgba(94, 234, 212, 0.3), rgba(45, 212, 191, 0.08)),
+		#0a211b;
+	color: var(--accent-strong);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .deck-card .deck-thumb .thumb-fallback {
+		background:
+			linear-gradient(160deg, rgba(94, 234, 212, 0.3), rgba(45, 212, 191, 0.08)),
+			#0a211b;
+		color: var(--accent-strong);
+	}
 }
 
 .deck-card .deck-body {
@@ -2733,6 +2872,25 @@ button.tag:hover {
 	background: var(--accent-wash);
 }
 
+/* Dark mode (PR #37): the letter tile's flat wash reads grey-green
+   murk over black. Solid clearly-teal dark base + brighter top wash
+   + brighter letter, so the tile reads as dark teal. */
+[data-theme="dark"] .grid-card .grid-thumb .thumb-fallback {
+	background:
+		linear-gradient(160deg, rgba(94, 234, 212, 0.3), rgba(45, 212, 191, 0.08)),
+		#0a211b;
+	color: var(--accent-strong);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .grid-card .grid-thumb .thumb-fallback {
+		background:
+			linear-gradient(160deg, rgba(94, 234, 212, 0.3), rgba(45, 212, 191, 0.08)),
+			#0a211b;
+		color: var(--accent-strong);
+	}
+}
+
 .grid-card .grid-body {
 	padding: 14px 16px;
 }
@@ -3093,6 +3251,45 @@ button.tag:hover {
 	font-size: 14px;
 	font-weight: 700;
 	border-radius: 999px;
+}
+
+/* Dark mode (PR #37): the flat accent-wash is a murky grey-green
+   panel over black, and the grey subtext washes out on it. Dark mode
+   gets a directional luminous glow — light from the top-left, fading
+   out — over a clearly-teal dark base, never a flat tint; the subtext
+   is lifted to stay crisp. */
+[data-theme="dark"] .detail-cta {
+	background:
+		radial-gradient(
+			120% 140% at 18% 0%,
+			rgba(45, 212, 191, 0.28) 0%,
+			rgba(45, 212, 191, 0.08) 45%,
+			transparent 75%
+		),
+		#081712;
+	border-color: rgba(45, 212, 191, 0.28);
+}
+
+[data-theme="dark"] .detail-cta p {
+	color: #c3d2c9;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .detail-cta {
+		background:
+			radial-gradient(
+				120% 140% at 18% 0%,
+				rgba(45, 212, 191, 0.28) 0%,
+				rgba(45, 212, 191, 0.08) 45%,
+				transparent 75%
+			),
+			#081712;
+		border-color: rgba(45, 212, 191, 0.28);
+	}
+
+	:root:not([data-theme="light"]) .detail-cta p {
+		color: #c3d2c9;
+	}
 }
 
 /* ---------- Detail pages — Run 13 ---------- */
@@ -3645,34 +3842,40 @@ button.tag:hover {
 	overflow: hidden;
 }
 
-/* Dark mode: the sphere needs its own stronger shading — the light
-   teal-on-white values wash out completely on a dark card. */
+/* Dark mode (PR #37): the sphere needs its own stronger shading — the light
+   teal-on-white values wash out completely on a dark card. Reworked
+   2026-11-25: the old dark ball was a flat murky grey-teal stain —
+   low-alpha dark teal over a near-black base. The new ball is a
+   LUMINOUS glow: a bright saturated teal core with a tight falloff,
+   a glossy top-left light, and a clearly-teal dark base, so the disc
+   reads as LIGHT, not a stain. */
 [data-theme="dark"] .globe-ball {
 	background:
 		radial-gradient(
 			circle at 32% 26%,
-			rgba(255, 255, 255, 0.28) 0%,
-			rgba(255, 255, 255, 0.08) 32%,
+			rgba(94, 234, 212, 0.55) 0%,
+			rgba(45, 212, 191, 0.22) 30%,
 			transparent 55%
 		),
 		radial-gradient(
 			circle at 50% 58%,
-			rgba(45, 212, 191, 0.28) 0%,
-			rgba(45, 212, 191, 0.1) 48%,
-			transparent 72%
+			rgba(45, 212, 191, 0.6) 0%,
+			rgba(45, 212, 191, 0.28) 42%,
+			transparent 70%
 		),
 		radial-gradient(
 			circle at 50% 50%,
 			transparent 58%,
-			rgba(0, 0, 0, 0.35) 88%,
-			rgba(0, 0, 0, 0.5) 100%
+			rgba(0, 0, 0, 0.28) 88%,
+			rgba(0, 0, 0, 0.4) 100%
 		),
-		#0a1a15;
-	border-color: rgba(45, 212, 191, 0.55);
+		#07302a;
+	border-color: rgba(94, 234, 212, 0.65);
 	box-shadow:
-		inset 0 0 60px rgba(45, 212, 191, 0.25),
-		inset -24px -28px 60px rgba(0, 0, 0, 0.5),
-		inset 18px 20px 40px rgba(255, 255, 255, 0.12),
+		inset 0 0 70px rgba(45, 212, 191, 0.35),
+		inset -24px -28px 60px rgba(0, 0, 0, 0.45),
+		inset 18px 20px 40px rgba(94, 234, 212, 0.22),
+		0 0 70px rgba(45, 212, 191, 0.32),
 		0 18px 45px rgba(0, 0, 0, 0.5);
 }
 
@@ -3681,28 +3884,29 @@ button.tag:hover {
 		background:
 			radial-gradient(
 				circle at 32% 26%,
-				rgba(255, 255, 255, 0.28) 0%,
-				rgba(255, 255, 255, 0.08) 32%,
+				rgba(94, 234, 212, 0.55) 0%,
+				rgba(45, 212, 191, 0.22) 30%,
 				transparent 55%
 			),
 			radial-gradient(
 				circle at 50% 58%,
-				rgba(45, 212, 191, 0.28) 0%,
-				rgba(45, 212, 191, 0.1) 48%,
-				transparent 72%
+				rgba(45, 212, 191, 0.6) 0%,
+				rgba(45, 212, 191, 0.28) 42%,
+				transparent 70%
 			),
 			radial-gradient(
 				circle at 50% 50%,
 				transparent 58%,
-				rgba(0, 0, 0, 0.35) 88%,
-				rgba(0, 0, 0, 0.5) 100%
+				rgba(0, 0, 0, 0.28) 88%,
+				rgba(0, 0, 0, 0.4) 100%
 			),
-			#0a1a15;
-		border-color: rgba(45, 212, 191, 0.55);
+			#07302a;
+		border-color: rgba(94, 234, 212, 0.65);
 		box-shadow:
-			inset 0 0 60px rgba(45, 212, 191, 0.25),
-			inset -24px -28px 60px rgba(0, 0, 0, 0.5),
-			inset 18px 20px 40px rgba(255, 255, 255, 0.12),
+			inset 0 0 70px rgba(45, 212, 191, 0.35),
+			inset -24px -28px 60px rgba(0, 0, 0, 0.45),
+			inset 18px 20px 40px rgba(94, 234, 212, 0.22),
+			0 0 70px rgba(45, 212, 191, 0.32),
 			0 18px 45px rgba(0, 0, 0, 0.5);
 	}
 }
@@ -3873,6 +4077,36 @@ button.tag:hover {
 		0 8px 20px rgba(12, 26, 21, 0.14);
 }
 
+/* Dark mode (PR #37): the front-tag halo uses the LIGHT-mode teal
+   (murky over black) and the pill itself is near-black on the murky
+   disc, so edge tags wash out. Bright halo + a clearly-teal dark
+   chip, so every pill stays a crisp chip against the luminous disc. */
+[data-theme="dark"] .globe-tag-pill {
+	background: #0d1f19;
+	border-color: rgba(45, 212, 191, 0.28);
+}
+
+[data-theme="dark"] .globe-tag.front .globe-tag-pill {
+	border-color: rgba(45, 212, 191, 0.35);
+	box-shadow:
+		0 0 24px rgba(45, 212, 191, 0.5),
+		0 8px 20px rgba(0, 0, 0, 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .globe-tag-pill {
+		background: #0d1f19;
+		border-color: rgba(45, 212, 191, 0.28);
+	}
+
+	:root:not([data-theme="light"]) .globe-tag.front .globe-tag-pill {
+		border-color: rgba(45, 212, 191, 0.35);
+		box-shadow:
+			0 0 24px rgba(45, 212, 191, 0.5),
+			0 8px 20px rgba(0, 0, 0, 0.4);
+	}
+}
+
 .globe-tag.front .globe-tag-pill .globe-tag-dot {
 	width: 8px;
 	height: 8px;
@@ -3944,6 +4178,19 @@ button.tag:hover {
 .globe-icon-only .globe-tag.front .globe-tag-pill {
 	border-color: transparent;
 	box-shadow: 0 0 22px rgba(13, 148, 136, 0.35);
+}
+
+/* Dark mode (PR #37): the centre halo uses the LIGHT-mode teal —
+   murky over black. Bright teal halo, so the spotlight icon glows
+   clean instead of sitting in a grey-green smudge. */
+[data-theme="dark"] .globe-icon-only .globe-tag.front .globe-tag-pill {
+	box-shadow: 0 0 22px rgba(45, 212, 191, 0.55);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .globe-icon-only .globe-tag.front .globe-tag-pill {
+		box-shadow: 0 0 22px rgba(45, 212, 191, 0.55);
+	}
 }
 
 @media (max-width: 639px) {
@@ -4924,6 +5171,41 @@ button.tag:hover {
 	margin: 4px 0 0;
 	font-size: 13px;
 	color: var(--ink-dim);
+}
+
+/* Dark mode (PR #37): the footer's flat accent-wash pools into the
+   same murky grey-green as the detail CTA, and the identity subtext
+   washes out on it. Same directional top glow + lifted subtext. */
+[data-theme="dark"] .site-footer {
+	background:
+		radial-gradient(
+			130% 160% at 50% 0%,
+			rgba(45, 212, 191, 0.2) 0%,
+			rgba(45, 212, 191, 0.05) 45%,
+			transparent 75%
+		),
+		#081712;
+}
+
+[data-theme="dark"] .site-footer .footer-sub {
+	color: #c3d2c9;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .site-footer {
+		background:
+			radial-gradient(
+				130% 160% at 50% 0%,
+				rgba(45, 212, 191, 0.2) 0%,
+				rgba(45, 212, 191, 0.05) 45%,
+				transparent 75%
+			),
+			#081712;
+	}
+
+	:root:not([data-theme="light"]) .site-footer .footer-sub {
+		color: #c3d2c9;
+	}
 }
 
 .footer-socials {
