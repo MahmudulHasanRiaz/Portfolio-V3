@@ -11,6 +11,7 @@ import {
 	X,
 } from "lucide-react";
 import {
+	enPath,
 	langUrl,
 	otherLangUrl,
 	SITE_LANG_KEY,
@@ -97,15 +98,48 @@ export default function SiteHeader({
 		},
 	];
 
+	// Active page (PR #32): which top-level nav item matches the page
+	// the visitor is on. Matched on the English path (currentPath may
+	// be /bn/...). Work covers the homepage (its link is /#projects)
+	// and the archive/detail routes; Contact is a same-page anchor and
+	// is never marked active off-home.
+	const enCurrent = enPath(currentPath);
+	const navIsActive = (
+		key: "work" | "ventures" | "releases" | "skills" | "education" | "about",
+	): boolean => {
+		switch (key) {
+			case "work":
+				return (
+					enCurrent === "/" ||
+					enCurrent.startsWith("/projects") ||
+					enCurrent.startsWith("/case-studies") ||
+					enCurrent.startsWith("/posts")
+				);
+			case "ventures":
+				return enCurrent === "/ventures" || enCurrent.startsWith("/ventures/");
+			case "releases":
+				return enCurrent === "/releases" || enCurrent.startsWith("/releases/");
+			case "skills":
+				return enCurrent === "/skills";
+			case "education":
+				return enCurrent === "/education";
+			case "about":
+				return enCurrent === "/know-me";
+		}
+	};
+
 	const NAV_LINKS: Array<{
 		label: string;
 		href: string;
 		/** Sub-menu items (desktop dropdown + nested mobile rows). */
 		children?: Array<{ label: string; href: string }>;
+		/** Current page (PR #32) — renders aria-current + .nav-active. */
+		active?: boolean;
 	}> = [
 		{
 			label: dict.navWork,
 			href: langUrl("/#projects", lang),
+			active: navIsActive("work"),
 			children: [
 				{ label: dict.navProjects, href: langUrl("/projects", lang) },
 				{
@@ -115,16 +149,17 @@ export default function SiteHeader({
 				{ label: dict.navPosts, href: langUrl("/posts", lang) },
 			],
 		},
-		{ label: dict.navVentures, href: langUrl("/ventures", lang) },
-		{ label: dict.navReleases, href: langUrl("/releases", lang) },
+		{ label: dict.navVentures, href: langUrl("/ventures", lang), active: navIsActive("ventures") },
+		{ label: dict.navReleases, href: langUrl("/releases", lang), active: navIsActive("releases") },
 		// Skills + Education are top-level nav items (PR #24): they
 		// were nested under About before, where the live verify found
 		// nobody could find them — the homepage never linked to them.
-		{ label: dict.navSkills, href: langUrl("/skills", lang) },
-		{ label: dict.navEducation, href: langUrl("/education", lang) },
+		{ label: dict.navSkills, href: langUrl("/skills", lang), active: navIsActive("skills") },
+		{ label: dict.navEducation, href: langUrl("/education", lang), active: navIsActive("education") },
 		{
 			label: dict.navAbout,
 			href: langUrl("/know-me", lang),
+			active: navIsActive("about"),
 			children: [
 				{ label: dict.profileKnowMe, href: langUrl("/know-me", lang) },
 			],
@@ -145,7 +180,24 @@ export default function SiteHeader({
 	const [panel, setPanel] = useState<"menu" | "picker" | null>(null);
 	const [panelShown, setPanelShown] = useState(false);
 	const closeTimer = useRef<number | null>(null);
-	const [theme, setTheme] = useState<"light" | "dark">("light");
+	// Initial theme from the RENDERED data-theme (PR #32): the head
+	// script sets data-theme before paint, so the toggle's icon/label
+	// match the page from the first client render. The old hardcoded
+	// "light" initial state made the button show the wrong icon/label
+	// (Moon + "Switch to dark mode" on a dark page) on every island
+	// re-mount — i.e. on every View Transitions navigation — until the
+	// mount effect corrected it a frame later, which the live verify
+	// read as the label/icon flipping on nearly every navigation.
+	// Server render has no document, so it still falls back to "light"
+	// there; the mount effect below stays as the backstop.
+	const [theme, setTheme] = useState<"light" | "dark">(() =>
+		typeof document === "undefined"
+			? "light"
+			: document.documentElement.getAttribute("data-theme") ===
+				  "dark"
+				? "dark"
+				: "light",
+	);
 	// FROZEN label (2026-11-13): the pill shows the active profile and
 	// never changes on its own — no displayed/prev profile state, no
 	// crossfade machinery, no rotation timer. The label below renders
@@ -290,6 +342,13 @@ export default function SiteHeader({
 	// Language switch: the button is a plain link to the same page in
 	// the other language. Store the explicit choice BEFORE navigating
 	// so the first-visit script never overrides it.
+	// PR #32: data-astro-reload — the View Transitions navigation to
+	// /bn/skills silently stalls (live verify 2026-11-25: EN→BN on
+	// /skills did nothing twice, 8s/20s waits, while BN→EN worked and
+	// /bn/skills loads fine directly; the hrefs are correct in the
+	// served HTML and no site handler intercepts the click). A full
+	// document load is proven working for these URLs, so the switcher
+	// bypasses View Transitions entirely instead of racing it.
 	const targetLang: Lang = lang === "en" ? "bn" : "en";
 	const switchHref = otherLangUrl(currentPath, lang);
 	const onLangClick = () => {
@@ -326,6 +385,7 @@ export default function SiteHeader({
 			className="corner-btn"
 			tabIndex={inert ? -1 : undefined}
 			href={switchHref}
+			data-astro-reload
 			onClick={onLangClick}
 			aria-label={langLabel}
 			title={langLabel}
@@ -633,7 +693,13 @@ export default function SiteHeader({
 							    (glass.css :hover + :focus-within) — no
 							    new button or icon in the pill, so the
 							    header stays thin and premium. */}
-							<a href={l.href}>{l.label}</a>
+							<a
+								href={l.href}
+								className={l.active ? "nav-active" : undefined}
+								aria-current={l.active ? "page" : undefined}
+							>
+								{l.label}
+							</a>
 							<span className="nav-dropdown-panel" role="menu">
 								{l.children.map((s) => (
 									<a
@@ -648,7 +714,12 @@ export default function SiteHeader({
 							</span>
 						</span>
 					) : (
-						<a key={l.label} href={l.href}>
+						<a
+							key={l.label}
+							href={l.href}
+							className={l.active ? "nav-active" : undefined}
+							aria-current={l.active ? "page" : undefined}
+						>
 							{l.label}
 						</a>
 					),
