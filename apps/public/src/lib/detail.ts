@@ -340,6 +340,41 @@ export function seoString(data: unknown, key: string): string | undefined {
 	return typeof v === "string" && v.trim() !== "" ? v : undefined;
 }
 
+/**
+ * Plain text for a meta/OG description: strips markdown syntax
+ * (heading markers, bullets, links, images, bold, code, blockquotes,
+ * HTML tags) and collapses whitespace/newlines to single spaces.
+ * Admin meta descriptions are plain text already, so this is a
+ * no-op for them; it only guards the fallback path where a
+ * description is derived from page content — a "## " heading marker
+ * must never leak into a <meta> tag (BN Jannat did exactly that).
+ * Returns undefined when nothing readable survives, so the caller
+ * falls through to the next default.
+ */
+export function stripMarkdown(
+	text: string | null | undefined,
+): string | undefined {
+	if (!text) return undefined;
+	const out = text
+		.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1") // images → alt text
+		.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1") // links → link text
+		.replace(/`/g, "") // code ticks
+		.replace(/^#{1,6}\s+/gm, "") // heading markers
+		.replace(/^>\s?/gm, "") // blockquotes
+		.replace(/^[-*+]\s+/gm, "") // bullets
+		.replace(/^\d+[.)]\s+/gm, "") // numbered lists
+		.replace(/^\s*[-*_]{3,}\s*$/gm, "") // horizontal rules
+		.replace(/\*\*([^*]+)\*\*/g, "$1") // bold **
+		.replace(/__([^_]+)__/g, "$1") // bold __
+		.replace(/(^|\s)\*([^*]+)\*(?=\s|$)/g, "$1$2") // italic *...*
+		.replace(/~~([^~]+)~~/g, "$1") // strikethrough
+		.replace(/<[^>]+>/g, "") // HTML tags
+		.replace(/\s*\n\s*/g, " ")
+		.replace(/\s{2,}/g, " ")
+		.trim();
+	return out === "" ? undefined : out;
+}
+
 /** Boolean from a merged detail record, or undefined when absent /
  *  not a boolean. Reads the per-item `indexable` flag (0038) the API
  *  emits on every public item — detail pages pass it to Layout so a

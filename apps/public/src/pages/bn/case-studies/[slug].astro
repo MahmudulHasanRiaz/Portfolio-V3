@@ -17,6 +17,7 @@ import {
 	absUrl,
 	dedupeBlocks,
 	mergeDetail,
+	seoString,
 	parseBodyBlocks,
 	seoBoolean,
 } from "../../../lib/detail";
@@ -92,6 +93,17 @@ const buildData = buildEntry?.data as unknown as
 const merged = mergeDetail(buildData, liveData) as unknown as
 	| CaseStudyData
 	| undefined;
+
+// Admin SEO overrides (Dashboard → SEO → Metadata) — the same
+// single fields EN uses. The BN page never had this wiring (PR #33
+// fixed EN only), so every BN detail page showed the fallback
+// title. Read from `merged` (unlocalized): the SEO fields are
+// locale-independent and the `bn` object never overrides them.
+const seoTitle = seoString(merged, "metaTitle");
+const seoDescription = seoString(merged, "metaDescription");
+const seoOgImage = seoString(merged, "ogImage");
+const seoCanonical = seoString(merged, "canonicalUrl");
+const seoKeywords = seoString(merged, "keywords");
 const d = merged
 	? (localizeCaseStudy(
 			merged as unknown as Record<string, unknown>,
@@ -209,14 +221,16 @@ const jsonLd = d
 
 <Layout
 	title={
-		d
+		seoTitle ??
+		(d
 			? `${d.title} — Mahmudul Hasan Riaz`
-			: `${t.notFoundCaseStudy} — Mahmudul Hasan Riaz`
+			: `${t.notFoundCaseStudy} — Mahmudul Hasan Riaz`)
 	}
-	description={d?.description}
+	description={seoDescription ?? d?.description}
 	ogType="article"
-	ogImage={coverImage ? absUrl(optimizedImageUrl(coverImage, 1200), siteBase) : null}
-	canonical={pageUrl}
+	ogImage={seoOgImage ?? (coverImage ? absUrl(optimizedImageUrl(coverImage, 1200), siteBase) : null)}
+	canonical={seoCanonical ?? pageUrl}
+	keywords={seoKeywords}
 	// Per-item search indexing (0038): false = this page stays
 	// noindex even when the global switch is on.
 	indexable={seoBoolean(d, "indexable")}
