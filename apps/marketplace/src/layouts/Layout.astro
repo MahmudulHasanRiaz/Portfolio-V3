@@ -16,7 +16,7 @@ import SiteFooter from "../components/SiteFooter.astro";
 import HomeButton from "../components/HomeButton.astro";
 import { getSiteSettings } from "../lib/settings";
 import { applySiteCopy, enPath, getDict, langUrl, pickDict, SITE_HEADER_DICT_KEYS, type Lang } from "../lib/i18n";
-import { resolveCanonicalBase, absUrl } from "../lib/detail";
+import { resolveCanonicalBase, absUrl, stripMarkdown } from "../lib/detail";
 import { optimizedImageUrl } from "../lib/images";
 import { type Service } from "../data/site";
 
@@ -68,9 +68,13 @@ const settings = await getSiteSettings();
 // API is unset or unreachable. Pages that pass their own title /
 // description are unaffected — these only fill the defaults.
 const pageTitle = title ?? settings.siteName ?? "Mahmudul Hasan Riaz";
+// Meta/OG descriptions are plain text: strip any markdown a
+// content-derived fallback carries ("## " headings, bullets,
+// links) so it can never leak into a <meta> tag (BN Jannat did
+// exactly that). Admin meta descriptions are plain text already,
+// so this is a no-op for them.
 const pageDescription =
-	description ??
-	settings.siteTagline ??
+	stripMarkdown(description ?? settings.siteTagline) ??
 	"Software Engineer, Entrepreneur and Nasheed Artist — Dhaka, Bangladesh.";
 const siteName = settings.siteName ?? "Mahmudul Hasan Riaz";
 
