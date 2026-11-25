@@ -537,6 +537,94 @@ const isHome =
 					});
 				}
 
+				// Scroll-reveal + education spine (PR #29). Transform +
+				// opacity only; skipped entirely under
+				// prefers-reduced-motion. Re-runs on every
+				// astro:page-load: View Transitions swaps <body>, so
+				// the observed sections and the timeline are fresh
+				// each time. The scroll listener registers ONCE
+				// (window flag) and looks the timeline up fresh on
+				// every tick, so a client navigation to/from
+				// /education needs no re-registration.
+				var reduceMotion = window.matchMedia(
+					"(prefers-reduced-motion: reduce)",
+				).matches;
+				var revealObserver = null;
+				function initReveal() {
+					if (reduceMotion) return;
+					if (revealObserver) revealObserver.disconnect();
+					if (!("IntersectionObserver" in window)) {
+						// Very old browser: leave everything visible.
+						return;
+					}
+					revealObserver = new IntersectionObserver(
+						function (entries) {
+							entries.forEach(function (entry) {
+								if (!entry.isIntersecting) return;
+								var el = entry.target;
+								el.style.opacity = "";
+								el.style.transform = "";
+								revealObserver.unobserve(el);
+							});
+						},
+						{ rootMargin: "0px 0px -8% 0px", threshold: 0 },
+					);
+					// The hidden state is an inline style only — no-JS
+					// keeps everything visible, and the CSS transition
+					// on main > section animates the clear.
+					document.querySelectorAll("main > section").forEach(function (el) {
+						el.style.opacity = "0";
+						el.style.transform = "translateY(14px)";
+						revealObserver.observe(el);
+					});
+					// Safety net: if the observer never fires for an
+					// IN-VIEW section (e.g. a detached tree), reveal
+					// just that one after 1.5s so content can never
+					// stay hidden. Below-fold sections are untouched —
+					// they still reveal on scroll.
+					window.setTimeout(function () {
+						document.querySelectorAll("main > section").forEach(function (el) {
+							if (el.style.opacity !== "0") return;
+							var r = el.getBoundingClientRect();
+							if (r.top < window.innerHeight && r.bottom > 0) {
+								el.style.opacity = "";
+								el.style.transform = "";
+							}
+						});
+					}, 1500);
+				}
+				var eduTicking = false;
+				function updateEduSpine() {
+					eduTicking = false;
+					var tl = document.querySelector(".edu-timeline");
+					if (!tl) return;
+					if (reduceMotion) {
+						tl.style.setProperty("--edu-progress", "1");
+						return;
+					}
+					var rect = tl.getBoundingClientRect();
+					var vh = window.innerHeight || 0;
+					// Fill follows the viewport's 75% line travelling
+					// through the timeline: 0 when the timeline top
+					// reaches that line, 1 when its bottom passes it.
+					var p = (vh * 0.75 - rect.top) / (rect.height || 1);
+					p = Math.max(0, Math.min(1, p));
+					tl.style.setProperty("--edu-progress", p.toFixed(3));
+				}
+				function onEduScroll() {
+					if (eduTicking) return;
+					eduTicking = true;
+					window.requestAnimationFrame(updateEduSpine);
+				}
+				function initEduSpine() {
+					updateEduSpine();
+					if (!window.__eduSpineScroll) {
+						window.__eduSpineScroll = true;
+						window.addEventListener("scroll", onEduScroll, { passive: true });
+						window.addEventListener("resize", onEduScroll);
+					}
+				}
+
 				// Runs on the initial load AND after every View
 				// Transition navigation (astro:page-load). Idempotent.
 				function onPageLoad() {
@@ -545,6 +633,8 @@ const isHome =
 					applyTheme();
 					watchImages(document);
 					resetObserver();
+					initReveal();
+					initEduSpine();
 				}
 
 				// Register once: this IIFE re-runs on the 1st client

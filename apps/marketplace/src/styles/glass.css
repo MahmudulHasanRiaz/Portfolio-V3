@@ -5351,3 +5351,110 @@ button.tag:hover {
 		transition-duration: 0.01ms !important;
 	}
 }
+
+/* ---------- Site animation pass (PR #29) ---------- */
+/* Hover + scroll motion across the site. Rules: transform + opacity
+   ONLY (no layout/paint-heavy animation), ≤300ms, fast and subtle.
+   Every hover effect is gated on (hover: hover) and (pointer: fine)
+   so touch devices never see a stuck hover state; tap feedback comes
+   from :active instead. prefers-reduced-motion kills all of it — the
+   kill-switch above sets transition-duration to 0.01ms, and the
+   reveal/edu-fill JS in Layout.astro checks it too. The globe keeps
+   its existing rotation — no hover labels/tooltips (icon-only rule,
+   PR #28). Page transitions are untouched (PR #25 ghost fix). */
+
+/* --- Card hover: image zoom + arrow slide --- */
+/* .grid-card already lifts on hover (translateY(-2px) + shadow above);
+   this adds the thumb zoom and the title arrow. */
+@media (hover: hover) and (pointer: fine) {
+	.grid-card .grid-thumb img,
+	.grid-card .grid-thumb video {
+		transition: transform 300ms ease;
+	}
+	.grid-card:hover .grid-thumb img,
+	.grid-card:hover .grid-thumb video {
+		transform: scale(1.06);
+	}
+	.grid-card h3::after {
+		content: "→";
+		display: inline-block;
+		margin-left: 6px;
+		color: var(--accent-strong);
+		opacity: 0;
+		transform: translateX(-4px);
+		transition:
+			opacity 200ms ease,
+			transform 200ms ease;
+	}
+	.grid-card:hover h3::after {
+		opacity: 1;
+		transform: translateX(0);
+	}
+	/* Mobile carousel card: same lift + zoom as the grid card. */
+	.deck-card {
+		transition:
+			transform 200ms ease,
+			box-shadow 200ms ease;
+	}
+	.deck-card:hover {
+		transform: translateY(-2px);
+		box-shadow: var(--shadow);
+	}
+	.deck-card .deck-thumb img,
+	.deck-card .deck-thumb video {
+		transition: transform 300ms ease;
+	}
+	.deck-card:hover .deck-thumb img,
+	.deck-card:hover .deck-thumb video {
+		transform: scale(1.06);
+	}
+	/* Release card: lift + thumb zoom (it only changed background before). */
+	.release-card {
+		transition:
+			transform 200ms ease,
+			box-shadow 200ms ease,
+			background-color 200ms ease;
+	}
+	.release-card:hover {
+		transform: translateY(-2px);
+		box-shadow: var(--shadow);
+	}
+	.release-card-thumb img {
+		transition: transform 300ms ease;
+	}
+	.release-card:hover .release-card-thumb img {
+		transform: scale(1.05);
+	}
+	/* Service card: icon pops with the existing lift. */
+	.service-icon {
+		transition: transform 200ms ease;
+	}
+	.service-card:hover .service-icon {
+		transform: scale(1.08);
+	}
+	/* Section "View all" links nudge forward on hover. */
+	.view-all {
+		display: inline-block;
+		transition: transform 200ms ease;
+	}
+	.view-all:hover {
+		transform: translateX(3px);
+	}
+}
+
+/* --- Buttons: tap/press feedback (touch has no hover) --- */
+.btn:active,
+.btn-ghost:active,
+.btn-quiet:active {
+	transform: translateY(0) scale(0.97);
+}
+
+/* --- Scroll-reveal: top-level sections fade/slide in once --- */
+/* The hidden state is applied by JS (inline style) only — no-JS keeps
+   everything visible. The transition lives here so the JS only has to
+   clear the inline style. Once per element, ≤300ms, no stagger. */
+main > section {
+	transition:
+		opacity 280ms ease,
+		transform 280ms ease;
+}
