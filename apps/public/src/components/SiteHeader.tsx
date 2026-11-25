@@ -190,14 +190,32 @@ export default function SiteHeader({
 	// read as the label/icon flipping on nearly every navigation.
 	// Server render has no document, so it still falls back to "light"
 	// there; the mount effect below stays as the backstop.
-	const [theme, setTheme] = useState<"light" | "dark">(() =>
-		typeof document === "undefined"
-			? "light"
-			: document.documentElement.getAttribute("data-theme") ===
-				  "dark"
+	// PR #36: data-theme may be ABSENT when this initializer runs —
+	// View Transitions' swapRootAttributes() strips it on navigation
+	// and Layout's applyTheme() (astro:page-load) re-applies it, but
+	// the island can hydrate in between. Falling back to "light"
+	// then rendered the wrong label/icon on a dark page for a frame —
+	// observed live on /skills. So the initializer resolves the same
+	// way the mount effect does: rendered attribute first, then the
+	// stored choice, then the system preference.
+	const [theme, setTheme] = useState<"light" | "dark">(() => {
+		if (typeof document === "undefined") return "light";
+		const dom = document.documentElement.getAttribute("data-theme");
+		if (dom === "dark" || dom === "light") return dom;
+		try {
+			const saved = localStorage.getItem("theme");
+			if (saved === "dark" || saved === "light") return saved;
+		} catch {
+			/* storage unavailable */
+		}
+		try {
+			return window.matchMedia("(prefers-color-scheme: dark)").matches
 				? "dark"
-				: "light",
-	);
+				: "light";
+		} catch {
+			return "light";
+		}
+	});
 	// FROZEN label (2026-11-13): the pill shows the active profile and
 	// never changes on its own — no displayed/prev profile state, no
 	// crossfade machinery, no rotation timer. The label below renders
@@ -399,6 +417,11 @@ export default function SiteHeader({
 		<button
 			type="button"
 			className="corner-btn"
+			// PR #36: hook for Layout's syncThemeToggle() — it patches
+			// the server-rendered label/icon on every astro:page-load
+			// (before this client:idle island hydrates) so the toggle
+			// never shows the "light" fallback on a dark page.
+			data-theme-toggle
 			tabIndex={inert ? -1 : undefined}
 			onClick={toggleTheme}
 			aria-label={theme === "dark" ? dict.switchToLight : dict.switchToDark}
@@ -406,10 +429,10 @@ export default function SiteHeader({
 			{/* Crossfading icon swap: both icons stay mounted and swap
 			    with a 300ms rotate/scale/opacity transition. */}
 			<span className="theme-icon-wrap" aria-hidden="true">
-				<span className={`theme-icon${theme === "dark" ? " active" : ""}`}>
+				<span data-theme-icon="sun" className={`theme-icon${theme === "dark" ? " active" : ""}`}>
 					<Sun size={16} />
 				</span>
-				<span className={`theme-icon${theme === "light" ? " active" : ""}`}>
+				<span data-theme-icon="moon" className={`theme-icon${theme === "light" ? " active" : ""}`}>
 					<Moon size={16} />
 				</span>
 			</span>
