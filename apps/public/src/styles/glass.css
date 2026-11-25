@@ -276,10 +276,11 @@ main {
    detail-glass and footer were top-center (50% 0%) while contact/CTA
    were top-left, so the glow direction varied section to section on
    wide desktop screens. Only the anchor changed; strengths, falloffs
-   and bases are untouched. */
+   and bases are untouched.
+   PR #50: wash 0.05→0.03 — the homepage section containers (Case studies, Stack, Clients, Latest posts) still carried a muted green gradient; this step takes the green edge off every panel. */
 [data-theme="dark"] .glass {
 	background:
-		radial-gradient(120% 90% at 18% 0%, rgba(45, 212, 191, 0.05) 0%, rgba(45, 212, 191, 0.01) 45%, transparent 65%),
+		radial-gradient(120% 90% at 18% 0%, rgba(45, 212, 191, 0.03) 0%, rgba(45, 212, 191, 0.005) 45%, transparent 65%),
 		var(--card);
 	border-color: rgba(94, 234, 212, 0.18);
 }
@@ -292,18 +293,19 @@ main {
    same treatment that makes the footer/contact read finished.
    Case-study detail gets the same class so all three detail pages
    share one container treatment. Cards inside the detail container
-   get a solid step-up fill so they separate from the panel. */
+   get a solid step-up fill so they separate from the panel.
+   PR #50: the browser verify (2026-11-26) found the detail body's top half still fairly saturated — core 0.45→0.28, mid 0.14→0.08 with a tighter falloff, base #0b241c→#0a1f18; luminous top edge kept, CTA focal untouched. */
 [data-theme="dark"] .glass.detail-glass {
 	background:
 		radial-gradient(
 			90% 100% at 18% 0%,
-			rgba(45, 212, 191, 0.45) 0%,
-			rgba(45, 212, 191, 0.14) 35%,
-			rgba(45, 212, 191, 0.04) 60%,
-			transparent 80%
+			rgba(45, 212, 191, 0.28) 0%,
+			rgba(45, 212, 191, 0.08) 30%,
+			rgba(45, 212, 191, 0.02) 55%,
+			transparent 75%
 		),
-		#0b241c;
-	border-color: rgba(94, 234, 212, 0.35);
+		#0a1f18;
+	border-color: rgba(94, 234, 212, 0.28);
 	box-shadow:
 		inset 0 1px 0 rgba(94, 234, 212, 0.4),
 		var(--shadow);
@@ -313,8 +315,8 @@ main {
 [data-theme="dark"] .glass.detail-glass .author-card,
 [data-theme="dark"] .glass.detail-glass .prev-next a {
 	background:
-		radial-gradient(120% 90% at 18% 0%, rgba(45, 212, 191, 0.09) 0%, transparent 65%),
-		#123026;
+		radial-gradient(120% 90% at 18% 0%, rgba(45, 212, 191, 0.06) 0%, transparent 65%),
+		#0f2a21;
 	border-color: rgba(94, 234, 212, 0.2);
 }
 
@@ -323,13 +325,13 @@ main {
 		background:
 			radial-gradient(
 				90% 100% at 18% 0%,
-				rgba(45, 212, 191, 0.45) 0%,
-				rgba(45, 212, 191, 0.14) 35%,
-				rgba(45, 212, 191, 0.04) 60%,
-				transparent 80%
+				rgba(45, 212, 191, 0.28) 0%,
+				rgba(45, 212, 191, 0.08) 30%,
+				rgba(45, 212, 191, 0.02) 55%,
+				transparent 75%
 			),
-			#0b241c;
-		border-color: rgba(94, 234, 212, 0.35);
+			#0a1f18;
+		border-color: rgba(94, 234, 212, 0.28);
 		box-shadow:
 			inset 0 1px 0 rgba(94, 234, 212, 0.4),
 			var(--shadow);
@@ -339,8 +341,8 @@ main {
 	:root:not([data-theme="light"]) .glass.detail-glass .author-card,
 	:root:not([data-theme="light"]) .glass.detail-glass .prev-next a {
 		background:
-			radial-gradient(120% 90% at 18% 0%, rgba(45, 212, 191, 0.09) 0%, transparent 65%),
-			#123026;
+			radial-gradient(120% 90% at 18% 0%, rgba(45, 212, 191, 0.06) 0%, transparent 65%),
+			#0f2a21;
 		border-color: rgba(94, 234, 212, 0.2);
 	}
 }
@@ -348,8 +350,31 @@ main {
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme="light"]) .glass {
 		background:
-			radial-gradient(120% 90% at 18% 0%, rgba(45, 212, 191, 0.05) 0%, rgba(45, 212, 191, 0.01) 45%, transparent 65%),
+			radial-gradient(120% 90% at 18% 0%, rgba(45, 212, 191, 0.03) 0%, rgba(45, 212, 191, 0.005) 45%, transparent 65%),
 			var(--card);
+		border-color: rgba(94, 234, 212, 0.18);
+	}
+}
+
+/* Dark mode (PR #50): the projects archive is one tall .glass panel, so
+   the fixed body top glow bleeds through its 0.5-alpha --card and the
+   panel reads as a broad teal-green gradient, darkest at the bottom.
+   The archive panel gets a solid dark base (no bleed-through) with
+   only a faint top wash, so it reads like the neighbouring dark-first
+   containers. Border matches .glass; filter pills and cards inside
+   keep their own treatments. Focal points untouched. */
+[data-theme="dark"] .glass.archive-panel {
+	background:
+		radial-gradient(120% 90% at 18% 0%, rgba(45, 212, 191, 0.02) 0%, transparent 65%),
+		#081712;
+	border-color: rgba(94, 234, 212, 0.18);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .glass.archive-panel {
+		background:
+			radial-gradient(120% 90% at 18% 0%, rgba(45, 212, 191, 0.02) 0%, transparent 65%),
+			#081712;
 		border-color: rgba(94, 234, 212, 0.18);
 	}
 }
