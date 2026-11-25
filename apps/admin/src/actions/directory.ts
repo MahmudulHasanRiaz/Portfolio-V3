@@ -320,6 +320,8 @@ export interface ClientRow {
   logoUrl: string | null;
   /** "logo" | "name_logo" | null (null = "logo" default). */
   logoDisplayMode: string | null;
+  /** "dark" | "light" | null (null = "dark" default). */
+  logoTone: string | null;
   website: string | null;
   sortOrder: number | null;
   nameBn: string | null;
@@ -347,6 +349,7 @@ export interface ClientInput {
   name: string;
   logoUrl?: string | null;
   logoDisplayMode?: string | null;
+  logoTone?: string | null;
   website?: string | null;
   sortOrder?: number | null;
   nameBn?: string | null;
@@ -358,6 +361,12 @@ function asDisplayMode(value: unknown): "logo" | "name_logo" | null {
   return value === "logo" || value === "name_logo" ? value : null;
 }
 
+/** Only the two known tones survive; anything else stores as NULL
+ *  (the "dark" default) instead of failing the save. */
+function asTone(value: unknown): "dark" | "light" | null {
+  return value === "dark" || value === "light" ? value : null;
+}
+
 function clientValues(data: ClientInput) {
   const name = asText(data.name);
   if (!name) throw new Error("Name is required");
@@ -365,6 +374,7 @@ function clientValues(data: ClientInput) {
     name,
     logoUrl: asText(data.logoUrl),
     logoDisplayMode: asDisplayMode(data.logoDisplayMode),
+    logoTone: asTone(data.logoTone),
     website: asText(data.website),
     sortOrder: asSortOrder(data.sortOrder),
     nameBn: asText(data.nameBn),

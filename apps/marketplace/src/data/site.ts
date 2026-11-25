@@ -389,6 +389,10 @@ export interface Client {
 	/** How a set logo renders: "logo" (default) = logo image only;
 	 *  "name_logo" = square icon beside the name. Absent = "logo". */
 	logo_display_mode?: "logo" | "name_logo";
+	/** Which the logo IS: "dark" (default) = dark logo (black text /
+	 *  dark shapes) on a LIGHT tile in both themes; "light" = a
+	 *  white/light logo on a DARK tile in both themes. Absent = "dark". */
+	logo_tone?: "dark" | "light";
 	/** Live website URL. Present = the cell links out. */
 	website?: string;
 	sort_order?: number;

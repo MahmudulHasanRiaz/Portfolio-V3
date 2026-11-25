@@ -93,6 +93,7 @@ import { and, count, eq, isNull, ne } from "drizzle-orm";
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import {
   caseStudies,
+  clients,
   homepageSections,
   mediaAssets,
   mediaFolders,
@@ -533,6 +534,10 @@ export const USAGE_SOURCES: Array<{
   { table: ventures, label: "Venture", dashboardUrl: "/dashboard/ventures", titleField: "name", fields: ["logo", "coverImage", "thumbnailUrl", "thumbnailVideoUrl", "ogImage", "videos", "galleryImages"] },
   { table: personProfiles, label: "Profile", dashboardUrl: "/dashboard/settings/brand-identity", titleField: "fullName", fields: ["profileImage", "coverImage", "resumeUrl"] },
   { table: homepageSections, label: "Homepage Section", dashboardUrl: "/dashboard/homepage", titleField: "sectionKey", fields: ["content"] },
+  // Clients (0040, PR #34): a client logo is a media URL too — without
+  // this, a logo file wrongly reported "Not attached to any content
+  // yet" (Fixed Plus's 1.svg) and looked safe to delete.
+  { table: clients, label: "Client", dashboardUrl: "/dashboard/clients", titleField: "name", fields: ["logoUrl"] },
 ];
 
 export interface UsageRef {

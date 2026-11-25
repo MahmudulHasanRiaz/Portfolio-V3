@@ -376,7 +376,10 @@ export function MediaPicker({
                         <img
                           src={thumbUrl(item)}
                           alt={item.altText || item.originalName}
-                          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                          // Contain, never cover (0040, PR #34): a wide
+                          // logo in this square tile used to lose its
+                          // sides. Nothing is ever cropped anywhere.
+                          style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", padding: 6 }}
                           loading="lazy"
                         />
                       ) : isVideo(item) ? (
@@ -386,7 +389,7 @@ export function MediaPicker({
                             muted
                             playsInline
                             preload="metadata"
-                            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                            style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", padding: 6 }}
                           />
                           <span style={{
                             position: "absolute", inset: 0, display: "flex",
@@ -441,7 +444,9 @@ export function MediaPicker({
                     <img
                       src={thumbUrl(selected)}
                       alt={selected.altText || selected.originalName}
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                      // Contain, never cover (0040, PR #34) — same
+                      // reason as the grid tiles above.
+                      style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", padding: 6 }}
                     />
                   ) : isVideo(selected) ? (
                     <video
@@ -450,7 +455,7 @@ export function MediaPicker({
                       muted
                       playsInline
                       preload="metadata"
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                      style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", padding: 6 }}
                     />
                   ) : (
                     <span style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>

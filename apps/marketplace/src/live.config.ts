@@ -251,6 +251,12 @@ const liveClients = defineLiveCollection({
 		// undeclared live fields.
 		logo_display_mode: z.enum(["logo", "name_logo"]).optional(),
 		logoDisplayMode: z.enum(["logo", "name_logo"]).optional(),
+		// Which the logo IS: "dark" = dark logo (black text / dark
+		// shapes) on a LIGHT tile in both themes (default);
+		// "light" = white/light logo on a DARK tile in both themes.
+		// Both spellings declared, same zod-stripping reason.
+		logo_tone: z.enum(["dark", "light"]).optional(),
+		logoTone: z.enum(["dark", "light"]).optional(),
 		website: z.string().optional(),
 		url: z.string().optional(),
 		sort_order: z.number().optional(),

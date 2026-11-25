@@ -181,3 +181,32 @@ export function ensurePerItemIndexing(db: ApiDb): Promise<void> {
   }
   return perItemIndexingColumns;
 }
+
+// 0040 (packages/database/drizzle/0040_client_logo_tone.sql):
+// `logo_tone` on `clients` — which the logo IS: "dark" (black text /
+// dark shapes, rendered on a LIGHT tile in both themes) or "light"
+// (white/light logo, rendered on a DARK tile in both themes).
+// Nullable, no default; existing rows keep NULL (= "dark"). Await
+// this before any query that reads or writes the column.
+let clientsLogoTone: Promise<void> | null = null;
+
+/** Create the `logo_tone` column if it does not exist yet.
+ *  Idempotent and safe under concurrency (IF NOT EXISTS). Await this
+ *  before any query that reads or writes the column. */
+export function ensureClientsLogoTone(db: ApiDb): Promise<void> {
+  if (!clientsLogoTone) {
+    clientsLogoTone = (async () => {
+      try {
+        await db.execute(
+          sql`ALTER TABLE "clients" ADD COLUMN IF NOT EXISTS "logo_tone" text`,
+        );
+      } catch (err) {
+        // A transient failure (e.g. DB unreachable) must not poison
+        // the isolate: clear the guard so the next request retries.
+        clientsLogoTone = null;
+        throw err;
+      }
+    })();
+  }
+  return clientsLogoTone;
+}

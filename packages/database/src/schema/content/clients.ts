@@ -8,12 +8,18 @@ import { pgTable, uuid, text, integer, timestamp } from "drizzle-orm/pg-core";
 // NULL) shows the logo image only, "name_logo" shows a square icon
 // beside the name. NULL means "logo": existing rows keep their
 // current rendering.
+// logo_tone (0040): which the logo IS — "dark" (default, NULL) is a
+// dark logo (black text / dark shapes) rendered on a LIGHT tile in
+// both themes; "light" is a white/light logo rendered on a DARK tile
+// in both themes. A fixed tile colour cannot serve both, so the tone
+// is recorded per client instead of per brand in code.
 export const clients = pgTable("clients", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   nameBn: text("name_bn"),
   logoUrl: text("logo_url"),
   logoDisplayMode: text("logo_display_mode"),
+  logoTone: text("logo_tone"),
   website: text("website"),
   sortOrder: integer("sort_order"),
   createdAt: timestamp("created_at").defaultNow(),

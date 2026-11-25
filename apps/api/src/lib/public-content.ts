@@ -50,7 +50,7 @@ import {
 } from "./integrations";
 import { asc, desc, eq } from "drizzle-orm";
 import { getApiDb } from "../db";
-import { ensureClientsLogoDisplayMode, ensureEducationSkills, ensurePerItemIndexing } from "./ensure-schema";
+import { ensureClientsLogoDisplayMode, ensureClientsLogoTone, ensureEducationSkills, ensurePerItemIndexing } from "./ensure-schema";
 import {
   educationEntries,
   homepageSections,
@@ -1112,6 +1112,8 @@ async function listClients(db: Db): Promise<PublicContentItem[]> {
   // 0036 auto-apply: create `logo_display_mode` before the first
   // query that selects it (no manual migration).
   await ensureClientsLogoDisplayMode(db);
+  // 0040 auto-apply: same for `logo_tone`.
+  await ensureClientsLogoTone(db);
   const rows = await db
     .select()
     .from(clients)
@@ -1129,6 +1131,11 @@ async function listClients(db: Db): Promise<PublicContentItem[]> {
         // default). The Astro loader declares both this camelCase key
         // and the snake_case twin, so either spelling reaches the page.
         logoDisplayMode: r.logoDisplayMode ?? undefined,
+        // "dark" | "light" | undefined (undefined = NULL = "dark"
+        // default): which the logo IS — a dark logo renders on a
+        // LIGHT tile in both themes, a light logo on a DARK tile.
+        // Same twin-spelling note as logoDisplayMode above.
+        logoTone: r.logoTone ?? undefined,
         website: r.website ?? undefined,
         sortOrder: r.sortOrder ?? undefined,
         bn: bnOf({ name: r.nameBn }),

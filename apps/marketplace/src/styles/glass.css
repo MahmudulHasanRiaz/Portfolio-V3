@@ -4716,6 +4716,35 @@ button.tag:hover {
 	}
 }
 
+/* Logo tone tile (0040): a transparent logo can be dark OR light,
+   so the logo always sits on a tile that contrasts with IT — not
+   with the theme. A dark logo gets a LIGHT tile, a light/white logo
+   a DARK tile, the same tile in both themes, so a logo never blends
+   into dark mode and never vanishes on a light tile. The img inside
+   keeps object-fit contain — the tile never crops. */
+.client-logo-tile {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 8px 12px;
+	border-radius: 12px;
+	flex: none;
+}
+.client-logo-tile--dark {
+	background: #ffffff;
+	border: 1px solid rgba(0, 0, 0, 0.08);
+}
+.client-logo-tile--light {
+	background: #171717;
+	border: 1px solid rgba(255, 255, 255, 0.14);
+}
+/* Icon tile ("Name + Logo" mode): the same contrasting tile, sized
+   to the 36px icon. */
+.client-logo-tile--icon {
+	padding: 4px;
+	border-radius: 10px;
+}
+
 .client-cell img {
 	max-height: 36px;
 	max-width: 100%;
@@ -4743,6 +4772,10 @@ button.tag:hover {
 }
 
 .client-cell:has(img.is-broken) img {
+	display: none;
+}
+
+.client-cell:has(img.is-broken) .client-logo-tile {
 	display: none;
 }
 
