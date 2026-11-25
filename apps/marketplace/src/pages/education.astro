@@ -187,6 +187,22 @@ function startYear(iso: string | undefined): string {
 			background: linear-gradient(180deg, var(--accent), var(--accent-wash));
 			border-radius: 2px;
 		}
+		/* Scroll progress fill (PR #29): a solid accent layer over the
+		   faded spine, grown from the top by --edu-progress (0..1, set
+		   from JS on scroll in Layout.astro). No-JS: the fill stays at
+		   0 and the base spine still shows — no regression. */
+		.edu-timeline::after {
+			content: "";
+			position: absolute;
+			left: 50%;
+			top: 8px;
+			bottom: 8px;
+			width: 2px;
+			transform: translateX(-50%) scaleY(var(--edu-progress, 0));
+			transform-origin: top;
+			background: var(--accent);
+			border-radius: 2px;
+		}
 		.edu-item {
 			display: grid;
 			grid-template-columns: 1fr 96px 1fr;
