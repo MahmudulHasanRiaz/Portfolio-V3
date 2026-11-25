@@ -23,6 +23,10 @@ const t = applySiteCopy(getDict(lang), lang, await getSiteSettings());
 //     with the theme — a dark logo on a LIGHT tile, a light/white
 //     logo on a DARK tile, in both themes. NULL/absent = "dark".
 //     The tile never crops: the img keeps object-fit contain.
+//   - ambient fill (0047): in a logo tile the same logo renders
+//     twice — a blurred cover copy fills the whole tile with the
+//     logo's own colours (no dead empty space on the sides) and
+//     the sharp logo sits on top, uncropped. Icon tiles get none.
 // A files.riaz.com.bd logo goes through /api/image at width 144
 // (clamped to the 360 minimum — a 36px logo never needs more);
 // any other logo URL renders unchanged. The cell links out only
@@ -105,6 +109,18 @@ const duration = `${clients.length * 6}s`;
 										<>
 											<span class={tileClass}>
 												<img
+													class="client-logo-ambient"
+													src={optimizedImageUrl(
+														client.logo_url,
+														144,
+													)}
+													alt=""
+													aria-hidden="true"
+													loading="lazy"
+													decoding="async"
+												/>
+												<img
+													class="client-logo-main"
 													src={optimizedImageUrl(
 														client.logo_url,
 														144,
