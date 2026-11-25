@@ -220,33 +220,54 @@ main {
 	padding: 24px;
 }
 
-/* Dark mode (PR #37): the homepage contact panel is a plain glass
-   card whose faint wash reads dirty-green in dark mode. Same
-   top-anchored luminous glow as the other CTA panels — light from
-   the top, fading out — so the panel reads lit, not stained. */
+/* Dark mode (PR #37 + PR #38): the homepage contact panel is a plain
+   glass card whose faint wash reads dirty-green in dark mode. PR #37
+   gave it a top glow, but the browser saw none: the rule IS live in
+   the deployed CSS (verified against the served stylesheet) — the
+   0.22 core over a 120% ellipse was simply too diffuse to perceive
+   on a ~450px panel, so the panel read flat charcoal. PR #38 raises
+   the core to 0.55 and tightens the falloff, anchored top-left, so
+   the light from one side is PLAINLY visible, fading to transparent;
+   the inset top edge sells the light source. */
 [data-theme="dark"] #contact.glass {
 	background:
 		radial-gradient(
-			120% 120% at 50% 0%,
-			rgba(45, 212, 191, 0.22) 0%,
-			rgba(45, 212, 191, 0.06) 45%,
-			transparent 75%
+			90% 100% at 18% 0%,
+			rgba(45, 212, 191, 0.55) 0%,
+			rgba(45, 212, 191, 0.18) 35%,
+			rgba(45, 212, 191, 0.04) 60%,
+			transparent 80%
 		),
 		#081712;
-	border-color: rgba(45, 212, 191, 0.22);
+	border-color: rgba(45, 212, 191, 0.35);
+	box-shadow:
+		inset 0 1px 0 rgba(94, 234, 212, 0.4),
+		var(--shadow);
+}
+
+[data-theme="dark"] #contact .muted {
+	color: #c3d2c9;
 }
 
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme="light"]) #contact.glass {
 		background:
 			radial-gradient(
-				120% 120% at 50% 0%,
-				rgba(45, 212, 191, 0.22) 0%,
-				rgba(45, 212, 191, 0.06) 45%,
-				transparent 75%
+				90% 100% at 18% 0%,
+				rgba(45, 212, 191, 0.55) 0%,
+				rgba(45, 212, 191, 0.18) 35%,
+				rgba(45, 212, 191, 0.04) 60%,
+				transparent 80%
 			),
 			#081712;
-		border-color: rgba(45, 212, 191, 0.22);
+		border-color: rgba(45, 212, 191, 0.35);
+		box-shadow:
+			inset 0 1px 0 rgba(94, 234, 212, 0.4),
+			var(--shadow);
+	}
+
+	:root:not([data-theme="light"]) #contact .muted {
+		color: #c3d2c9;
 	}
 }
 
@@ -5173,21 +5194,36 @@ button.tag:hover {
 	color: var(--ink-dim);
 }
 
-/* Dark mode (PR #37): the footer's flat accent-wash pools into the
-   same murky grey-green as the detail CTA, and the identity subtext
-   washes out on it. Same directional top glow + lifted subtext. */
+/* Dark mode (PR #37 + PR #38): the footer's flat accent-wash pools
+   into the same murky grey-green as the detail CTA, and the identity
+   subtext washes out on it. PR #37 gave it a top glow, but the
+   browser saw a uniform desaturated grey panel: the rule IS live in
+   the deployed CSS (verified against the served stylesheet) — the
+   0.20 core over a 130% x 160% ellipse was too diffuse to read as a
+   light source. PR #38 raises the core to 0.5 and tightens the
+   falloff, so the top light is PLAINLY visible fading out over the
+   clearly-teal base; the copyright line is lifted with the subtext. */
 [data-theme="dark"] .site-footer {
 	background:
 		radial-gradient(
-			130% 160% at 50% 0%,
-			rgba(45, 212, 191, 0.2) 0%,
-			rgba(45, 212, 191, 0.05) 45%,
-			transparent 75%
+			100% 130% at 50% 0%,
+			rgba(45, 212, 191, 0.5) 0%,
+			rgba(45, 212, 191, 0.16) 35%,
+			rgba(45, 212, 191, 0.04) 60%,
+			transparent 80%
 		),
 		#081712;
+	border-top-color: rgba(94, 234, 212, 0.45);
+	box-shadow:
+		inset 0 1px 0 rgba(94, 234, 212, 0.4),
+		var(--shadow);
 }
 
 [data-theme="dark"] .site-footer .footer-sub {
+	color: #c3d2c9;
+}
+
+[data-theme="dark"] .site-footer .footer-copyright {
 	color: #c3d2c9;
 }
 
@@ -5195,15 +5231,24 @@ button.tag:hover {
 	:root:not([data-theme="light"]) .site-footer {
 		background:
 			radial-gradient(
-				130% 160% at 50% 0%,
-				rgba(45, 212, 191, 0.2) 0%,
-				rgba(45, 212, 191, 0.05) 45%,
-				transparent 75%
+				100% 130% at 50% 0%,
+				rgba(45, 212, 191, 0.5) 0%,
+				rgba(45, 212, 191, 0.16) 35%,
+				rgba(45, 212, 191, 0.04) 60%,
+				transparent 80%
 			),
 			#081712;
+		border-top-color: rgba(94, 234, 212, 0.45);
+		box-shadow:
+			inset 0 1px 0 rgba(94, 234, 212, 0.4),
+			var(--shadow);
 	}
 
 	:root:not([data-theme="light"]) .site-footer .footer-sub {
+		color: #c3d2c9;
+	}
+
+	:root:not([data-theme="light"]) .site-footer .footer-copyright {
 		color: #c3d2c9;
 	}
 }
