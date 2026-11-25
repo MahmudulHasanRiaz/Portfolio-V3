@@ -164,14 +164,15 @@ body {
    the 0.14 top glow showed as a faint arc behind the nav. The cores
    are raised (top 0.20, sides 0.10–0.13) and a fourth mid-left glow
    is added so the gaps between sections and the side margins carry a
-   plainly visible trace of teal at any scroll position. Light mode
+   plainly visible trace of teal at any scroll position. PR #42: that was still not enough — 0.10–0.13 cores composite to ~rgb(10,33,30), invisible in the middle of gaps at 1920px. Cores raised again (top 0.30, sides 0.22–0.26) plus a centre wash (0.20); composites at the new cores are rgb(13–17, 47–69, 42–62), a plainly visible trace of teal. Light mode
    untouched — this rule is dark-only, both mirrors. */
 [data-theme="dark"] body {
 	background:
-		radial-gradient(70% 55% at 50% 0%, rgba(45, 212, 191, 0.20) 0%, rgba(45, 212, 191, 0.06) 45%, transparent 70%),
-		radial-gradient(55% 45% at 90% 50%, rgba(45, 212, 191, 0.12) 0%, transparent 70%),
-		radial-gradient(45% 40% at 5% 45%, rgba(45, 212, 191, 0.10) 0%, transparent 70%),
-		radial-gradient(55% 50% at 10% 95%, rgba(45, 212, 191, 0.13) 0%, transparent 70%),
+		radial-gradient(90% 65% at 50% 0%, rgba(45, 212, 191, 0.30) 0%, rgba(45, 212, 191, 0.10) 45%, transparent 75%),
+		radial-gradient(65% 55% at 92% 50%, rgba(45, 212, 191, 0.24) 0%, transparent 75%),
+		radial-gradient(60% 50% at 6% 45%, rgba(45, 212, 191, 0.22) 0%, transparent 75%),
+		radial-gradient(85% 65% at 50% 55%, rgba(45, 212, 191, 0.20) 0%, transparent 75%),
+		radial-gradient(65% 55% at 8% 96%, rgba(45, 212, 191, 0.26) 0%, transparent 75%),
 		var(--bg);
 	background-attachment: fixed;
 }
@@ -179,10 +180,11 @@ body {
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme="light"]) body {
 		background:
-			radial-gradient(70% 55% at 50% 0%, rgba(45, 212, 191, 0.20) 0%, rgba(45, 212, 191, 0.06) 45%, transparent 70%),
-			radial-gradient(55% 45% at 90% 50%, rgba(45, 212, 191, 0.12) 0%, transparent 70%),
-			radial-gradient(45% 40% at 5% 45%, rgba(45, 212, 191, 0.10) 0%, transparent 70%),
-			radial-gradient(55% 50% at 10% 95%, rgba(45, 212, 191, 0.13) 0%, transparent 70%),
+			radial-gradient(90% 65% at 50% 0%, rgba(45, 212, 191, 0.30) 0%, rgba(45, 212, 191, 0.10) 45%, transparent 75%),
+			radial-gradient(65% 55% at 92% 50%, rgba(45, 212, 191, 0.24) 0%, transparent 75%),
+			radial-gradient(60% 50% at 6% 45%, rgba(45, 212, 191, 0.22) 0%, transparent 75%),
+			radial-gradient(85% 65% at 50% 55%, rgba(45, 212, 191, 0.20) 0%, transparent 75%),
+			radial-gradient(65% 55% at 8% 96%, rgba(45, 212, 191, 0.26) 0%, transparent 75%),
 			var(--bg);
 		background-attachment: fixed;
 	}
@@ -276,7 +278,7 @@ main {
 	border-color: rgba(94, 234, 212, 0.18);
 }
 
-/* Dark mode (PR #40): detail pages need a container that reads as a
+/* Dark mode (PR #40, values fixed PR #42): detail pages need a container that reads as a
    teal panel on its own. The plain .glass token (0.5-alpha card over
    black) composites to near-black, so the project/post detail pages
    read bare even though they use .glass — only the CTA box showed.
@@ -287,33 +289,53 @@ main {
    get a solid step-up fill so they separate from the panel. */
 [data-theme="dark"] .glass.detail-glass {
 	background:
-		radial-gradient(110% 55% at 18% 0%, rgba(45, 212, 191, 0.22) 0%, rgba(45, 212, 191, 0.06) 45%, transparent 70%),
-		#0a211b;
+		radial-gradient(
+			90% 100% at 18% 0%,
+			rgba(45, 212, 191, 0.55) 0%,
+			rgba(45, 212, 191, 0.18) 35%,
+			rgba(45, 212, 191, 0.04) 60%,
+			transparent 80%
+		),
+		#0d2a20;
 	border-color: rgba(94, 234, 212, 0.35);
 	box-shadow:
-		inset 0 1px 0 rgba(94, 234, 212, 0.25),
+		inset 0 1px 0 rgba(94, 234, 212, 0.4),
 		var(--shadow);
 }
 
 [data-theme="dark"] .glass.detail-glass .grid-card,
-[data-theme="dark"] .glass.detail-glass .author-card {
-	background: #0d2a20;
+[data-theme="dark"] .glass.detail-glass .author-card,
+[data-theme="dark"] .glass.detail-glass .prev-next a {
+	background:
+		radial-gradient(120% 90% at 18% 0%, rgba(45, 212, 191, 0.12) 0%, transparent 65%),
+		#143829;
+	border-color: rgba(94, 234, 212, 0.2);
 }
 
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme="light"]) .glass.detail-glass {
 		background:
-			radial-gradient(110% 55% at 18% 0%, rgba(45, 212, 191, 0.22) 0%, rgba(45, 212, 191, 0.06) 45%, transparent 70%),
-			#0a211b;
+			radial-gradient(
+				90% 100% at 18% 0%,
+				rgba(45, 212, 191, 0.55) 0%,
+				rgba(45, 212, 191, 0.18) 35%,
+				rgba(45, 212, 191, 0.04) 60%,
+				transparent 80%
+			),
+			#0d2a20;
 		border-color: rgba(94, 234, 212, 0.35);
 		box-shadow:
-			inset 0 1px 0 rgba(94, 234, 212, 0.25),
+			inset 0 1px 0 rgba(94, 234, 212, 0.4),
 			var(--shadow);
 	}
 
 	:root:not([data-theme="light"]) .glass.detail-glass .grid-card,
-	:root:not([data-theme="light"]) .glass.detail-glass .author-card {
-		background: #0d2a20;
+	:root:not([data-theme="light"]) .glass.detail-glass .author-card,
+	:root:not([data-theme="light"]) .glass.detail-glass .prev-next a {
+		background:
+			radial-gradient(120% 90% at 18% 0%, rgba(45, 212, 191, 0.12) 0%, transparent 65%),
+			#143829;
+		border-color: rgba(94, 234, 212, 0.2);
 	}
 }
 
@@ -4569,6 +4591,14 @@ button.tag:hover {
 	.combined-half + .combined-half {
 		border-top: 0;
 		border-left: 1px solid var(--card-border);
+		/* PR #42: the grid stretches this half to the left half's
+		   height, so its short content left ~40% dead teal space at
+		   the bottom. Centre the content vertically instead — the
+		   dead space splits top/bottom and the column reads
+		   finished. No content change. */
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
 	}
 }
 
@@ -5074,10 +5104,19 @@ button.tag:hover {
 .clients-viewport {
 	overflow: hidden;
 	/* Soft fade at both edges so cells glide in and out of view.
-	   PR #40: 4% was still eating edge logos — the fade zone (~43px)
-	   overlapped the centred logo of the cell straddling the edge
-	   ("Flight Blu" half-faded, "FIXED" cut mid-word). At 2% (~22px)
-	   the fade only touches the cell's outer padding, never the logo. */
+	   GEOMETRY (PR #42 — read before narrowing this again): a cell
+	   is 320px wide with a CENTRED logo, and the marquee never
+	   stops — a cell always straddles each edge. A narrow fade only
+	   fades the cell's outer padding, so the centred logo stays
+	   fully visible while cut in half by overflow ("Flight Blu"
+	   half-faded, "FIXED" cut mid-word). PR #39 (8%) and PR #40
+	   (2%) both tried narrowing and the cut stayed. The fade must
+	   span ~one cell width so a straddling cell dissolves before
+	   its logo is ever seen cut — that is the wide desktop fade
+	   below (26% ≈ 300px at a ~1150px viewport). Below 1024px the
+	   2% fade stays: the viewport is too narrow for a cell-wide
+	   fade (it would hide the whole row), and on small screens the
+	   straddle reads far less. */
 	mask-image: linear-gradient(
 		to right,
 		transparent,
@@ -5092,6 +5131,29 @@ button.tag:hover {
 		black 98%,
 		transparent
 	);
+}
+
+@media (min-width: 1024px) {
+	/* Desktop edge fade: 26% each side (~300px at a ~1150px
+	   viewport ≈ one 320px cell), so a cell entering/leaving
+	   dissolves across its full width and its centred logo is never
+	   seen half-cut. The clear centre still shows ~2 cells crisp. */
+	.clients-viewport {
+		mask-image: linear-gradient(
+			to right,
+			transparent,
+			black 26%,
+			black 74%,
+			transparent
+		);
+		-webkit-mask-image: linear-gradient(
+			to right,
+			transparent,
+			black 26%,
+			black 74%,
+			transparent
+		);
+	}
 }
 
 .clients-track {
