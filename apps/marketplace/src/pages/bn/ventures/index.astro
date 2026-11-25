@@ -53,16 +53,15 @@ const sizedThumb = (url: string | null | undefined, w = 800) =>
 	description={t.venturesPageDescription}
 	lang={lang}
 >
-	<p>
+	<section class="glass">
+	<p style="margin:0 0 8px;">
 		<a href={langUrl("/", lang)} class="back-link">{t.backHome}</a>
 	</p>
 	<h1 style="margin:0 0 8px;font-size:26px;line-height:1.25;">{t.allVentures}</h1>
 
 	{
 		ventures.length === 0 ? (
-			<section class="glass section">
-				<p class="empty-state">{t.emptyVentures}</p>
-			</section>
+			<p class="empty-state">{t.emptyVentures}</p>
 		) : (
 			<>
 				{filterItems.length > 0 ? (
@@ -87,7 +86,7 @@ const sizedThumb = (url: string | null | undefined, w = 800) =>
 				<p class="count-line" id="venture-count" data-count-template={t.showingVentures}>
 					{showingLabel(t.showingVentures, ventures.length, ventures.length)}
 				</p>
-				<section class="card-grid section" id="venture-grid">
+				<div class="card-grid" id="venture-grid" style="margin-top:16px;">
 					{ventures.map((venture) => (
 						<a
 							class="grid-card"
@@ -133,9 +132,10 @@ const sizedThumb = (url: string | null | undefined, w = 800) =>
 							</div>
 						</a>
 					))}
-				</section>
+				</div>
 			</>
 		)
 	}
+	</section>
 </Layout>
 

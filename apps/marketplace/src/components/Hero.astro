@@ -19,7 +19,7 @@ const speakerFallback = Object.values(speakerModules)[0]?.default;
 import { PROFILE, STATS } from "../data/site";
 import { getStats } from "../lib/content";
 import { getSiteSettings, type SettingsBn } from "../lib/settings";
-import { applySiteCopy, displayName, getDict, type Lang } from "../lib/i18n";
+import { applySiteCopy, displayName, getDict, langUrl, type Lang } from "../lib/i18n";
 import HeroDesignation from "./HeroDesignation";
 
 interface Props {
@@ -177,7 +177,14 @@ const designations =
 					<p class="hero-headline">{heroHeadline}</p>
 					<p class="hero-desc">{heroDesc}</p>
 					<div class="hero-ctas">
-						<a class="btn" href="#releases">
+						{/* PR #39: the bare #releases anchor jumped nowhere
+						    visible — the Know Me page streams slowly and the
+						    target section arrives late, so the anchor has
+						    nothing to jump to when clicked. The nav already
+						    treats Releases as a route, so link to /releases
+						    (same destination, always works, both languages). */}
+						<a class="btn" href={langUrl("/releases", lang)}>
+
 							{t.listenReleases}
 						</a>
 						{/* MARKETPLACE COPY: the "Follow & Connect" button
