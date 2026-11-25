@@ -5272,7 +5272,11 @@ button.tag:hover {
    with the theme. A dark logo gets a LIGHT tile, a light/white logo
    a DARK tile, the same tile in both themes, so a logo never blends
    into dark mode and never vanishes on a light tile. The img inside
-   keeps object-fit contain — the tile never crops. */
+   keeps object-fit contain — the tile never crops. A logo tile (not
+   an icon tile) stretches to fill its cell, and a blurred cover copy
+   of the logo fills it as an ambient wash (0047) — the sides are the
+   logo's own colours, never dead space; the sharp logo on top stays
+   contain, uncropped. */
 .client-logo-tile {
 	display: inline-flex;
 	align-items: center;
@@ -5280,6 +5284,9 @@ button.tag:hover {
 	padding: 8px 12px;
 	border-radius: 12px;
 	flex: none;
+	/* Ambient fill (0047) needs a positioned, clipped tile. */
+	position: relative;
+	overflow: hidden;
 }
 .client-logo-tile--dark {
 	background: #ffffff;
@@ -5294,6 +5301,41 @@ button.tag:hover {
 .client-logo-tile--icon {
 	padding: 4px;
 	border-radius: 10px;
+}
+
+/* Ambient fill (0047): a logo tile stretches to fill its cell and
+   carries the same logo twice — a heavily blurred, slightly scaled
+   cover copy fills the whole tile with the logo's own colours (the
+   "lighting" on the sides, so no dead empty space), and the sharp
+   logo sits on top, uncropped and undistorted. The blur is the same
+   file as the sharp logo, so the browser reuses the cached image —
+   no extra download. Icon tiles get no ambient layer (sized to the
+   36px icon by design). In dark mode the wash is a touch dimmer so
+   it stays harmonious and the sharp logo stays legible. */
+.client-cell > .client-logo-tile:not(.client-logo-tile--icon) {
+	flex: 1 1 auto;
+	align-self: stretch;
+}
+.client-cell .client-logo-ambient {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	max-width: none;
+	max-height: none;
+	object-fit: cover;
+	transform: scale(1.2);
+	filter: blur(14px) saturate(1.4);
+	opacity: 0.5;
+	pointer-events: none;
+}
+.client-cell .client-logo-main {
+	position: relative;
+	z-index: 1;
+}
+[data-theme="dark"] .client-cell .client-logo-ambient {
+	opacity: 0.4;
+	filter: blur(14px) saturate(1.3) brightness(0.9);
 }
 
 .client-cell img {
