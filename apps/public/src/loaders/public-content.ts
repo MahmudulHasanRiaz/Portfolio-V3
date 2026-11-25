@@ -169,7 +169,15 @@ function normalizeMetrics(
 function toEntry(item: PublicContentItem, type: PublicContentType) {
 	// Case studies + ventures carry metrics: normalize to the Metric[]
 	// array the live schemas require (see normalizeMetrics).
-	const data: Record<string, unknown> = { ...item, type };
+	// The collection type is only the DEFAULT for `data.type`: an
+	// item's own `type` wins. The experience payload carries its own
+	// `type` — the entry kind ("role" | "project") — and overwriting
+	// it with the collection type ("experience") made every entry
+	// read as a role on /experience (PR #48: filters All (11) /
+	// Roles (11) / Projects (0), no project links). No other
+	// collection's payload carries a `type` key, so for them the
+	// default above is the value that lands.
+	const data: Record<string, unknown> = { type, ...item };
 	// Video-thumbnail autoplay: the API sends this as `autoplay`;
 	// the schemas declare it as `thumbnailAutoplay` (zod strips
 	// undeclared fields, so normalize before validation).

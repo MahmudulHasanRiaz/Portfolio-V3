@@ -68,6 +68,8 @@ export function ExperienceForm({
       description: form.get("description"),
       descriptionBn: form.get("descriptionBn"),
       projectSlug: isProject ? form.get("projectSlug") : null,
+      role: isProject ? form.get("role") : null,
+      roleBn: isProject ? form.get("roleBn") : null,
       sortOrder,
       isVisible: form.get("isVisible") === "on",
     };
@@ -123,6 +125,21 @@ export function ExperienceForm({
             <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
               The card links to /projects/&lt;slug&gt; — use the slug of the live project. Leave empty for no link.
             </p>
+          </div>
+        )}
+        {isProject && (
+          <div>
+            <label style={labelStyle}>Your role on this project</label>
+            <Input name="role" defaultValue={initial?.role || ""} placeholder="e.g. Lead Developer & Architect" />
+            <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
+              Shown on the project card, under the project name. Leave empty for no role line.
+            </p>
+          </div>
+        )}
+        {isProject && (
+          <div>
+            <label style={labelStyle}>Your role on this project (Bangla) — বাংলা</label>
+            <Input name="roleBn" defaultValue={initial?.roleBn || ""} placeholder="বাংলায় ভূমিকা (optional — empty shows the English role)" />
           </div>
         )}
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
