@@ -195,7 +195,7 @@ const jsonLd = data
 	lang={lang}
 >
 	{!entry || !data ? (
-		<section class="glass">
+		<section class="glass detail-glass">
 			<a href={langUrl("/posts", lang)} class="back-link">
 				{t.backAllPosts}
 			</a>
@@ -203,7 +203,7 @@ const jsonLd = data
 			<p class="empty-state">{t.notPublishedPost}</p>
 		</section>
 	) : (
-		<section class="glass">
+		<section class="glass detail-glass">
 			{jsonLd ? (
 				<script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
 			) : null}

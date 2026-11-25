@@ -152,17 +152,26 @@ body {
 	-webkit-font-smoothing: antialiased;
 }
 
-/* Dark mode (PR #39): site-wide atmosphere — the footer-grade luminous
-   wash, extended to every page. Three bright-teal radial glows with
-   tight falloffs fading to transparent, fixed to the viewport so every
-   page and every scroll position carries the same feel. NEVER a flat
-   low-alpha tint over black (PR #37 lesson: that reads murky/dusty).
-   Light mode untouched — this rule is dark-only, both mirrors. */
+/* Dark mode (PR #39, strengthened PR #40): site-wide atmosphere — the
+   footer-grade luminous wash, extended to every page. Four bright-teal
+   radial glows with tight falloffs fading to transparent, fixed to the
+   viewport so every page and every scroll position carries the same
+   feel. NEVER a flat low-alpha tint over black (PR #37 lesson: that
+   reads murky/dusty). DIAGNOSIS (PR #40): the body background was NOT
+   covered by any wrapper (Layout's .page/main carry no background) —
+   PR #39's glows were simply too weak at desktop widths: the side
+   cores (0.06/0.07) composite to ~rgb(8,20,19), invisible, and only
+   the 0.14 top glow showed as a faint arc behind the nav. The cores
+   are raised (top 0.20, sides 0.10–0.13) and a fourth mid-left glow
+   is added so the gaps between sections and the side margins carry a
+   plainly visible trace of teal at any scroll position. Light mode
+   untouched — this rule is dark-only, both mirrors. */
 [data-theme="dark"] body {
 	background:
-		radial-gradient(60% 45% at 50% 0%, rgba(45, 212, 191, 0.14) 0%, rgba(45, 212, 191, 0.05) 45%, transparent 70%),
-		radial-gradient(45% 40% at 88% 55%, rgba(45, 212, 191, 0.06) 0%, transparent 70%),
-		radial-gradient(50% 45% at 8% 95%, rgba(45, 212, 191, 0.07) 0%, transparent 70%),
+		radial-gradient(70% 55% at 50% 0%, rgba(45, 212, 191, 0.20) 0%, rgba(45, 212, 191, 0.06) 45%, transparent 70%),
+		radial-gradient(55% 45% at 90% 50%, rgba(45, 212, 191, 0.12) 0%, transparent 70%),
+		radial-gradient(45% 40% at 5% 45%, rgba(45, 212, 191, 0.10) 0%, transparent 70%),
+		radial-gradient(55% 50% at 10% 95%, rgba(45, 212, 191, 0.13) 0%, transparent 70%),
 		var(--bg);
 	background-attachment: fixed;
 }
@@ -170,9 +179,10 @@ body {
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme="light"]) body {
 		background:
-			radial-gradient(60% 45% at 50% 0%, rgba(45, 212, 191, 0.14) 0%, rgba(45, 212, 191, 0.05) 45%, transparent 70%),
-			radial-gradient(45% 40% at 88% 55%, rgba(45, 212, 191, 0.06) 0%, transparent 70%),
-			radial-gradient(50% 45% at 8% 95%, rgba(45, 212, 191, 0.07) 0%, transparent 70%),
+			radial-gradient(70% 55% at 50% 0%, rgba(45, 212, 191, 0.20) 0%, rgba(45, 212, 191, 0.06) 45%, transparent 70%),
+			radial-gradient(55% 45% at 90% 50%, rgba(45, 212, 191, 0.12) 0%, transparent 70%),
+			radial-gradient(45% 40% at 5% 45%, rgba(45, 212, 191, 0.10) 0%, transparent 70%),
+			radial-gradient(55% 50% at 10% 95%, rgba(45, 212, 191, 0.13) 0%, transparent 70%),
 			var(--bg);
 		background-attachment: fixed;
 	}
@@ -251,18 +261,66 @@ main {
    teal — the dusty flat-grey-on-black read is gone. The wash is a
    tight-falloff radial (PR #37 lesson), never a flat tint. The
    footer and contact panel keep their own stronger rules (later in
-   the file / higher specificity). */
+   the file / higher specificity).
+   ONE LIGHT SOURCE (PR #40 item 7): every section/panel glow in dark
+   mode comes from the TOP-LEFT (18% 0%) — the same direction as the
+   contact panel, the detail CTA and the globe light. The .glass wash,
+   detail-glass and footer were top-center (50% 0%) while contact/CTA
+   were top-left, so the glow direction varied section to section on
+   wide desktop screens. Only the anchor changed; strengths, falloffs
+   and bases are untouched. */
 [data-theme="dark"] .glass {
 	background:
-		radial-gradient(120% 90% at 50% 0%, rgba(45, 212, 191, 0.09) 0%, rgba(45, 212, 191, 0.02) 45%, transparent 65%),
+		radial-gradient(120% 90% at 18% 0%, rgba(45, 212, 191, 0.09) 0%, rgba(45, 212, 191, 0.02) 45%, transparent 65%),
 		var(--card);
 	border-color: rgba(94, 234, 212, 0.18);
+}
+
+/* Dark mode (PR #40): detail pages need a container that reads as a
+   teal panel on its own. The plain .glass token (0.5-alpha card over
+   black) composites to near-black, so the project/post detail pages
+   read bare even though they use .glass — only the CTA box showed.
+   A stronger top glow + luminous top edge + solid teal-dark base, the
+   same treatment that makes the footer/contact read finished.
+   Case-study detail gets the same class so all three detail pages
+   share one container treatment. Cards inside the detail container
+   get a solid step-up fill so they separate from the panel. */
+[data-theme="dark"] .glass.detail-glass {
+	background:
+		radial-gradient(110% 55% at 18% 0%, rgba(45, 212, 191, 0.22) 0%, rgba(45, 212, 191, 0.06) 45%, transparent 70%),
+		#0a211b;
+	border-color: rgba(94, 234, 212, 0.35);
+	box-shadow:
+		inset 0 1px 0 rgba(94, 234, 212, 0.25),
+		var(--shadow);
+}
+
+[data-theme="dark"] .glass.detail-glass .grid-card,
+[data-theme="dark"] .glass.detail-glass .author-card {
+	background: #0d2a20;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .glass.detail-glass {
+		background:
+			radial-gradient(110% 55% at 18% 0%, rgba(45, 212, 191, 0.22) 0%, rgba(45, 212, 191, 0.06) 45%, transparent 70%),
+			#0a211b;
+		border-color: rgba(94, 234, 212, 0.35);
+		box-shadow:
+			inset 0 1px 0 rgba(94, 234, 212, 0.25),
+			var(--shadow);
+	}
+
+	:root:not([data-theme="light"]) .glass.detail-glass .grid-card,
+	:root:not([data-theme="light"]) .glass.detail-glass .author-card {
+		background: #0d2a20;
+	}
 }
 
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme="light"]) .glass {
 		background:
-			radial-gradient(120% 90% at 50% 0%, rgba(45, 212, 191, 0.09) 0%, rgba(45, 212, 191, 0.02) 45%, transparent 65%),
+			radial-gradient(120% 90% at 18% 0%, rgba(45, 212, 191, 0.09) 0%, rgba(45, 212, 191, 0.02) 45%, transparent 65%),
 			var(--card);
 		border-color: rgba(94, 234, 212, 0.18);
 	}
@@ -2380,19 +2438,22 @@ html[lang="bn"] .hero-name {
 	/* Fade the right edge by default (the row starts at the left, so
 	   there is more to the right when it overflows). The inline
 	   script toggles .scrolled / .at-end / .no-scroll so the fade
-	   stays truthful as the user swipes. 40px, not 28px — the old
-	   fade was too subtle to read as "there is more". The left edge
+	   stays truthful as the user swipes. 24px, not 40px — the wider
+	   fade ate the last visible pill's label ("Fli…"). The left edge
 	   is never faded: the "All" chip is pinned there (sticky, below),
 	   so the left side always shows a reachable reset instead of a
-	   fade. */
+	   fade. End padding (PR #40) gives the last pill breathing room
+	   at max scroll, so it sits fully visible instead of flush
+	   against the clipped edge. */
+	padding-right: 16px;
 	-webkit-mask-image: linear-gradient(
 		to right,
-		#000 calc(100% - 40px),
+		#000 calc(100% - 24px),
 		transparent 100%
 	);
 	mask-image: linear-gradient(
 		to right,
-		#000 calc(100% - 40px),
+		#000 calc(100% - 24px),
 		transparent 100%
 	);
 }
@@ -2406,12 +2467,12 @@ html[lang="bn"] .hero-name {
 .chip-row[data-archive-filter].scrolled {
 	-webkit-mask-image: linear-gradient(
 		to right,
-		#000 calc(100% - 40px),
+		#000 calc(100% - 24px),
 		transparent 100%
 	);
 	mask-image: linear-gradient(
 		to right,
-		#000 calc(100% - 40px),
+		#000 calc(100% - 24px),
 		transparent 100%
 	);
 }
@@ -4511,15 +4572,22 @@ button.tag:hover {
 	}
 }
 
-/* Dark mode (PR #39): both halves identically tinted — the "tinted
-   left + flat-grey right" split is gone. */
+/* Dark mode (PR #40): the halves need a real teal-dark fill — --bg-wash
+   (#08110d) is essentially black, so PR #39's "identically tinted"
+   halves still read split: the left half only looked teal because its
+   mini-rows are filled, while the right half (text + chips only) read
+   as a black void below the platform pills. Both halves now get the
+   card token at 0.55 so they read as one teal panel; the mini-rows
+   stay darker (#0b1a14) and read as cards inside it. */
+[data-theme="dark"] .combined-half,
 [data-theme="dark"] .combined-half + .combined-half {
-	background: var(--bg-wash);
+	background: rgba(21, 54, 43, 0.55);
 }
 
 @media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .combined-half,
 	:root:not([data-theme="light"]) .combined-half + .combined-half {
-		background: var(--bg-wash);
+		background: rgba(21, 54, 43, 0.55);
 	}
 }
 
@@ -5005,19 +5073,23 @@ button.tag:hover {
    on hover. */
 .clients-viewport {
 	overflow: hidden;
-	/* Soft fade at both edges so cells glide in and out of view. */
+	/* Soft fade at both edges so cells glide in and out of view.
+	   PR #40: 4% was still eating edge logos — the fade zone (~43px)
+	   overlapped the centred logo of the cell straddling the edge
+	   ("Flight Blu" half-faded, "FIXED" cut mid-word). At 2% (~22px)
+	   the fade only touches the cell's outer padding, never the logo. */
 	mask-image: linear-gradient(
 		to right,
 		transparent,
-		black 4%,
-		black 96%,
+		black 2%,
+		black 98%,
 		transparent
 	);
 	-webkit-mask-image: linear-gradient(
 		to right,
 		transparent,
-		black 4%,
-		black 96%,
+		black 2%,
+		black 98%,
 		transparent
 	);
 }
@@ -5309,7 +5381,7 @@ button.tag:hover {
 [data-theme="dark"] .site-footer {
 	background:
 		radial-gradient(
-			100% 130% at 50% 0%,
+			100% 130% at 18% 0%,
 			rgba(45, 212, 191, 0.5) 0%,
 			rgba(45, 212, 191, 0.16) 35%,
 			rgba(45, 212, 191, 0.04) 60%,
@@ -5334,7 +5406,7 @@ button.tag:hover {
 	:root:not([data-theme="light"]) .site-footer {
 		background:
 			radial-gradient(
-				100% 130% at 50% 0%,
+				100% 130% at 18% 0%,
 				rgba(45, 212, 191, 0.5) 0%,
 				rgba(45, 212, 191, 0.16) 35%,
 				rgba(45, 212, 191, 0.04) 60%,
