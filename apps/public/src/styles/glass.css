@@ -4566,6 +4566,20 @@ button.tag:hover {
 @media (min-width: 640px) {
 	.combined-grid {
 		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		/* PR #43: do NOT stretch the halves to equal height. The
+		   grid's default stretch made the short right half as tall
+		   as the left half's four venture cards, so ~230px of dead
+		   teal sat inside its box (PR #42's vertical centring only
+		   split it top/bottom). align-items: start lets each half
+		   size to its own content — a shorter right card ending
+		   naturally is normal design; a blank band inside a teal
+		   box is not. The panel below the short half shows the
+		   grid's own --card background, which in dark mode is the
+		   same teal token at 0.50 vs the half's 0.55, so no seam;
+		   in light mode the half is transparent over the same
+		   --card, so no seam either. Mobile (single column) is
+		   unaffected: each half already sizes its own row. */
+		align-items: start;
 	}
 }
 
@@ -4591,14 +4605,11 @@ button.tag:hover {
 	.combined-half + .combined-half {
 		border-top: 0;
 		border-left: 1px solid var(--card-border);
-		/* PR #42: the grid stretches this half to the left half's
-		   height, so its short content left ~40% dead teal space at
-		   the bottom. Centre the content vertically instead — the
-		   dead space splits top/bottom and the column reads
-		   finished. No content change. */
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
+		/* PR #43: the PR #42 flex-centring lived here (display:flex;
+		   justify-content:center) but is removed — the grid now
+		   sizes each half to its own content (align-items: start
+		   above), so there is no extra space left to centre within
+		   and the dead band is gone rather than split top/bottom. */
 	}
 }
 
@@ -5104,19 +5115,23 @@ button.tag:hover {
 .clients-viewport {
 	overflow: hidden;
 	/* Soft fade at both edges so cells glide in and out of view.
-	   GEOMETRY (PR #42 — read before narrowing this again): a cell
-	   is 320px wide with a CENTRED logo, and the marquee never
-	   stops — a cell always straddles each edge. A narrow fade only
-	   fades the cell's outer padding, so the centred logo stays
-	   fully visible while cut in half by overflow ("Flight Blu"
-	   half-faded, "FIXED" cut mid-word). PR #39 (8%) and PR #40
-	   (2%) both tried narrowing and the cut stayed. The fade must
-	   span ~one cell width so a straddling cell dissolves before
-	   its logo is ever seen cut — that is the wide desktop fade
-	   below (26% ≈ 300px at a ~1150px viewport). Below 1024px the
-	   2% fade stays: the viewport is too narrow for a cell-wide
-	   fade (it would hide the whole row), and on small screens the
-	   straddle reads far less. */
+	   GEOMETRY (PR #42, corrected PR #43 — read before narrowing
+	   this again): a cell is 320px wide with a CENTRED logo, and
+	   the marquee never stops — a cell always straddles each edge.
+	   A narrow fade only fades the cell's outer padding, so the
+	   centred logo stays fully visible while cut in half by
+	   overflow ("Flight Blu" half-faded, "FIXED" cut mid-word).
+	   PR #39 (8%) and PR #40 (2%) both tried narrowing and the
+	   cut stayed. Widening alone did not fix it either: PR #42's
+	   26% LINEAR fade still left a half-out logo 40–60% bright —
+	   legible while clipped, a "ghost cut". A linear ramp gives a
+	   logo centred x inside the edge opacity ≈ x/F, so the fade
+	   must be SHAPED STEEPLY (see the desktop rule): opacity stays
+	   near 0 until well inside the fade zone, then rises fast, so
+	   a logo is unreadable before any part of it is cut. Below
+	   1024px the 2% fade stays: the viewport is too narrow for a
+	   cell-wide fade (it would hide the whole row), and on small
+	   screens the straddle reads far less. */
 	mask-image: linear-gradient(
 		to right,
 		transparent,
@@ -5135,22 +5150,53 @@ button.tag:hover {
 
 @media (min-width: 1024px) {
 	/* Desktop edge fade: 26% each side (~300px at a ~1150px
-	   viewport ≈ one 320px cell), so a cell entering/leaving
-	   dissolves across its full width and its centred logo is never
-	   seen half-cut. The clear centre still shows ~2 cells crisp. */
+	   viewport ≈ one 320px cell), shaped as a STEEP curve, not a
+	   linear ramp (PR #43). The stops approximate a quartic curve
+	   (opacity ≈ (x/26%)^4): a logo centred 75px inside the edge
+	   sits at ~1% opacity, 100px in at ~1.5%, and even a 280px-wide
+	   logo half-out at ~5% — unreadable before any part of it is
+	   cut. The visible rise (8% → full) spans ~140px of travel
+	   (~2.6s at marquee speed), so logos still glide in smoothly
+	   rather than popping; the clear centre still shows ~2 cells
+	   crisp. Do not "simplify" this back to a linear ramp — the
+	   ghost cut returns. */
 	.clients-viewport {
 		mask-image: linear-gradient(
 			to right,
 			transparent,
+			rgb(0 0 0 / 0.01) 8%,
+			rgb(0 0 0 / 0.03) 11%,
+			rgb(0 0 0 / 0.08) 14%,
+			rgb(0 0 0 / 0.18) 17%,
+			rgb(0 0 0 / 0.35) 20%,
+			rgb(0 0 0 / 0.6) 23%,
 			black 26%,
 			black 74%,
+			rgb(0 0 0 / 0.6) 77%,
+			rgb(0 0 0 / 0.35) 80%,
+			rgb(0 0 0 / 0.18) 83%,
+			rgb(0 0 0 / 0.08) 86%,
+			rgb(0 0 0 / 0.03) 89%,
+			rgb(0 0 0 / 0.01) 92%,
 			transparent
 		);
 		-webkit-mask-image: linear-gradient(
 			to right,
 			transparent,
+			rgb(0 0 0 / 0.01) 8%,
+			rgb(0 0 0 / 0.03) 11%,
+			rgb(0 0 0 / 0.08) 14%,
+			rgb(0 0 0 / 0.18) 17%,
+			rgb(0 0 0 / 0.35) 20%,
+			rgb(0 0 0 / 0.6) 23%,
 			black 26%,
 			black 74%,
+			rgb(0 0 0 / 0.6) 77%,
+			rgb(0 0 0 / 0.35) 80%,
+			rgb(0 0 0 / 0.18) 83%,
+			rgb(0 0 0 / 0.08) 86%,
+			rgb(0 0 0 / 0.03) 89%,
+			rgb(0 0 0 / 0.01) 92%,
 			transparent
 		);
 	}
