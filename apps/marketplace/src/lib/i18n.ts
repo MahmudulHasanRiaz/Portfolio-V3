@@ -143,6 +143,7 @@ export const SITE_HEADER_DICT_KEYS = [
 	"navPosts",
 	"navSkills",
 	"navEducation",
+	"navExperience",
 	"navAbout",
 	"navContact",
 	"navHome",

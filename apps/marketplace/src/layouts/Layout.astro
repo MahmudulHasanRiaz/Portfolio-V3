@@ -333,7 +333,7 @@ const isHome =
 		    buttons) — one deferred script, loaded here so no inline
 		    script ever sits inside <main>. */}
 		<script src="/js/detail.js" defer></script>
-		<script is:inline>
+		<script is:inline define:vars={{ switchToLight: t.switchToLight, switchToDark: t.switchToDark }}>
 			// Loading feedback + navigation repair (2026-11-09).
 			// The site is an MPA with <ClientRouter /> View Transitions,
 			// so a link click swaps the page WITHOUT a full reload — and
@@ -473,6 +473,64 @@ const isHome =
 							"data-theme",
 							resolved,
 						);
+					} catch (e) {}
+				}
+
+				// Theme toggle label/icon (PR #36): the header island
+				// hydrates on client:idle, so until then the toggle
+				// shows its server-rendered fallback (Moon + "Switch
+				// to dark mode") — wrong on a dark page, and observable
+				// on heavy pages like /skills. Patch the SSR buttons
+				// here (this runs on every astro:page-load, before
+				// idle hydration) so the aria-label and the Sun/Moon
+				// icon match the resolved theme from the first paint.
+				// The island re-renders the same values after
+				// hydration, so there is no conflict. Idempotent.
+				function syncThemeToggle() {
+					try {
+						var saved = null;
+						try {
+							saved = localStorage.getItem("theme");
+						} catch (e) {}
+						var resolved;
+						if (saved === "light" || saved === "dark") {
+							resolved = saved;
+						} else if (
+							window.matchMedia("(prefers-color-scheme: dark)")
+								.matches
+						) {
+							resolved = "dark";
+						} else {
+							resolved = "light";
+						}
+						var btns = document.querySelectorAll(
+							"[data-theme-toggle]",
+						);
+						for (var i = 0; i < btns.length; i++) {
+							var btn = btns[i];
+							btn.setAttribute(
+								"aria-label",
+								resolved === "dark"
+									? switchToLight
+									: switchToDark,
+							);
+							var sun = btn.querySelector(
+								'[data-theme-icon="sun"]',
+							);
+							var moon = btn.querySelector(
+								'[data-theme-icon="moon"]',
+							);
+							if (sun)
+								sun.classList.toggle(
+									"active",
+									resolved === "dark",
+								);
+							if (moon)
+								moon.classList.toggle(
+									"active",
+									resolved === "light",
+								);
+						}
 					} catch (e) {}
 				}
 				function onNavClick(e) {
@@ -631,6 +689,7 @@ const isHome =
 					finishNav();
 					ensureStylesheet();
 					applyTheme();
+					syncThemeToggle();
 					watchImages(document);
 					resetObserver();
 					initReveal();
