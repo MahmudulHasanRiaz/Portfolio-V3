@@ -11,6 +11,7 @@ export interface Dict {
 	navProjects: string;
 	navSkills: string;
 	navEducation: string;
+	navExperience: string;
 	navCaseStudies: string;
 	navPosts: string;
 	navAbout: string;
@@ -121,6 +122,7 @@ export interface Dict {
 	allCaseStudies: string;
 	allSkills: string;
 	allEducation: string;
+	allExperience: string;
 	allChip: string;
 	moreFilters: string;
 	showingProjects: string;
@@ -135,6 +137,7 @@ export interface Dict {
 	emptyReleases: string;
 	emptySkills: string;
 	emptyEducation: string;
+	emptyExperience: string;
 	releaseTypeNasheed: string;
 	releaseTypeTilawat: string;
 	releaseTypePodcast: string;
@@ -268,6 +271,8 @@ export interface Dict {
 	skillsPageDescription: string;
 	educationPageTitle: string;
 	educationPageDescription: string;
+	experiencePageTitle: string;
+	experiencePageDescription: string;
 	skillsMainTitle: string;
 	skillsMainIntro: string;
 	skillsJourneyTitle: string;
@@ -280,6 +285,16 @@ export interface Dict {
 	skillsJourneyTodayTitle: string;
 	skillsJourneyTodayNote: string;
 	educationPresent: string;
+	experienceFilterAll: string;
+	experienceFilterRoles: string;
+	experienceFilterProjects: string;
+	experienceRole: string;
+	experienceProject: string;
+	experienceViewProject: string;
+	experienceStatsYears: string;
+	experienceStatsOrganisations: string;
+	experienceStatsProjects: string;
+	experienceStatsClients: string;
 }
 
 export const bn: Dict = {
@@ -291,6 +306,7 @@ export const bn: Dict = {
 	navPosts: "পোস্ট",
 	navSkills: "স্কিল",
 	navEducation: "শিক্ষা",
+	navExperience: "অভিজ্ঞতা",
 	navAbout: "আমার সম্পর্কে",
 	navContact: "যোগাযোগ",
 	navHome: "হোম",
@@ -424,6 +440,7 @@ export const bn: Dict = {
 	allCaseStudies: "সব কেস স্টাডি",
 	allSkills: "সব স্কিল",
 	allEducation: "শিক্ষা",
+	allExperience: "অভিজ্ঞতা",
 	allChip: "সবগুলো",
 	moreFilters: "আরও",
 	showingProjects: "মোট {total}টি প্রজেক্টের মধ্যে {shown}টি দেখাচ্ছে",
@@ -438,6 +455,7 @@ export const bn: Dict = {
 	emptyReleases: "এখনো কোনো রিলিজ পাবলিশ হয়নি।",
 	emptySkills: "এখনও কোনো স্কিল যোগ করা হয়নি।",
 	emptyEducation: "এখনও কোনো শিক্ষাগত তথ্য যোগ করা হয়নি — অ্যাডমিন প্যানেল থেকে যোগ করুন।",
+	emptyExperience: "এখনও কোনো অভিজ্ঞতা যোগ করা হয়নি — অ্যাডমিন প্যানেল থেকে যোগ করুন।",
 	releaseTypeNasheed: "নাশিদ",
 	releaseTypeTilawat: "তিলাওয়াত",
 	releaseTypePodcast: "পডকাস্ট",
@@ -587,6 +605,9 @@ export const bn: Dict = {
 		"মাহমুদুল হাসান রিয়াজের Skills — software development, আর graphic design ও digital marketing-এর জার্নি।",
 	educationPageTitle: "শিক্ষা — মাহমুদুল হাসান রিয়াজ",
 	educationPageDescription: "মাহমুদুল হাসান রিয়াজের শিক্ষাজীবন।",
+	experiencePageTitle: "অভিজ্ঞতা — মাহমুদুল হাসান রিয়াজ",
+	experiencePageDescription:
+		"মাহমুদুল হাসান রিয়াজের কাজের অভিজ্ঞতা — প্রতিষ্ঠানে চাকরি আর প্রজেক্টভিত্তিক কাজ।",
 	skillsMainTitle: "Software Development",
 	skillsMainIntro: "প্রতিদিন যে tools আর technologies দিয়ে কাজ করি।",
 	skillsJourneyTitle: "এখানে আসার জার্নি",
@@ -601,4 +622,14 @@ export const bn: Dict = {
 	skillsJourneyTodayNote:
 		"উপরের স্কিলগুলো — Software Development-ই এই জার্নির শেষ ধাপ।",
 	educationPresent: "বর্তমান",
+	experienceFilterAll: "সব",
+	experienceFilterRoles: "চাকরি",
+	experienceFilterProjects: "প্রজেক্ট",
+	experienceRole: "চাকরি",
+	experienceProject: "প্রজেক্ট",
+	experienceViewProject: "প্রজেক্ট দেখুন →",
+	experienceStatsYears: "বছরের অভিজ্ঞতা",
+	experienceStatsOrganisations: "প্রতিষ্ঠান",
+	experienceStatsProjects: "ডেলিভার করা প্রজেক্ট",
+	experienceStatsClients: "ক্লায়েন্ট",
 };

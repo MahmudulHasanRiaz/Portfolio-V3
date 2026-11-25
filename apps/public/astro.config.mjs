@@ -126,10 +126,14 @@ export default defineConfig({
 		"/bn/releases": { maxAge: 3600, swr: 300, tags: ["releases"] },
 		// Skills + Education pages (0039, PR #22): purged by the
 		// "skills" / "education" tags on technology / education saves.
+		// Experience page (0041, PR #35): purged by the "experience"
+		// tag on experience-entry saves.
 		"/skills": { maxAge: 3600, swr: 300, tags: ["skills"] },
 		"/education": { maxAge: 3600, swr: 300, tags: ["education"] },
+		"/experience": { maxAge: 3600, swr: 300, tags: ["experience"] },
 		"/bn/skills": { maxAge: 3600, swr: 300, tags: ["skills"] },
 		"/bn/education": { maxAge: 3600, swr: 300, tags: ["education"] },
+		"/bn/experience": { maxAge: 3600, swr: 300, tags: ["experience"] },
 		"/": {
 			maxAge: 3600,
 			swr: 300,

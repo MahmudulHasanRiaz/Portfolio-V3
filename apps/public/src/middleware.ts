@@ -69,7 +69,7 @@ const DETAIL_ROUTE_RE =
 // ghosted the two pages together. Keep this regex in sync with the
 // routeRules; a route missing here silently loses browser caching.
 const LIST_ROUTE_RE =
-	/^\/(bn\/)?(posts|projects|case-studies|ventures|releases|know-me|platforms|skills|education)\/?$/;
+	/^\/(bn\/)?(posts|projects|case-studies|ventures|releases|know-me|platforms|skills|education|experience)\/?$/;
 const HOME_ROUTE_RE = /^\/(bn\/?)?$/;
 
 // Keep in sync with the routeRules in astro.config.mjs (all content

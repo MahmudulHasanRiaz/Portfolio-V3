@@ -105,7 +105,7 @@ export default function SiteHeader({
 	// is never marked active off-home.
 	const enCurrent = enPath(currentPath);
 	const navIsActive = (
-		key: "work" | "ventures" | "releases" | "skills" | "education" | "about",
+		key: "work" | "ventures" | "releases" | "skills" | "education" | "experience" | "about",
 	): boolean => {
 		switch (key) {
 			case "work":
@@ -123,6 +123,8 @@ export default function SiteHeader({
 				return enCurrent === "/skills";
 			case "education":
 				return enCurrent === "/education";
+			case "experience":
+				return enCurrent === "/experience";
 			case "about":
 				return enCurrent === "/know-me";
 		}
@@ -156,6 +158,7 @@ export default function SiteHeader({
 		// nobody could find them — the homepage never linked to them.
 		{ label: dict.navSkills, href: langUrl("/skills", lang), active: navIsActive("skills") },
 		{ label: dict.navEducation, href: langUrl("/education", lang), active: navIsActive("education") },
+		{ label: dict.navExperience, href: langUrl("/experience", lang), active: navIsActive("experience") },
 		{
 			label: dict.navAbout,
 			href: langUrl("/know-me", lang),
