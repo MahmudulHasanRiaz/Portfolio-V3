@@ -452,7 +452,11 @@ button:focus-visible {
 	   part of why the pill overlapped the buttons when stuck. */
 	padding: 0;
 	overflow: hidden;
-	transition: opacity 250ms ease;
+	/* PR #32: visibility joins the fade so the faded-out top row can
+	   never show double text. The delay lives in the STUCK rule (hide
+	   250ms after the fade starts); unsticking shows immediately, so
+	   the buttons fade back in instead of popping in late. */
+	transition: opacity 250ms ease, visibility 0s;
 }
 
 @media (min-width: 640px) {
@@ -479,6 +483,11 @@ button:focus-visible {
    SiteHeader.tsx). */
 .site-header.is-stuck .header-top {
 	opacity: 0;
+	/* PR #32: the faded-out row and the stuck-corners copies sit in the
+	   same spot — without visibility they crossfade for 250ms and the
+	   EN/BN label reads as two overlapping texts on every stick. */
+	visibility: hidden;
+	transition: opacity 250ms ease, visibility 0s linear 250ms;
 }
 
 .site-header.is-stuck .header-top .corner-btn {
@@ -1255,11 +1264,17 @@ button:focus-visible {
 	/* border-width: 0 — with padding: 0 (see .corner-btn) the border
 	   alone still held the collapsed button at 2px; 0 makes it a true 0. */
 	border-width: 0;
+	/* PR #32: visibility hides the collapsed copy entirely, so it can
+	   never ghost over the top-row copy during the stick transition
+	   (same double-text crossfade as .header-top above). Hidden 350ms
+	   after the collapse starts; the stuck rule shows it immediately. */
+	visibility: hidden;
 	transition:
 		width 350ms ease-out,
 		opacity 250ms ease,
 		border-color 250ms ease,
-		background-color 200ms ease;
+		background-color 200ms ease,
+		visibility 0s linear 350ms;
 }
 
 /* PR #26: same opaque treatment as the PR #25 stuck pill. The base
@@ -1277,6 +1292,13 @@ button:focus-visible {
 	border-color: var(--card-border);
 	border-width: 1px;
 	background: var(--bg);
+	visibility: visible;
+	transition:
+		width 350ms ease-out,
+		opacity 250ms ease,
+		border-color 250ms ease,
+		background-color 200ms ease,
+		visibility 0s;
 }
 
 @media (min-width: 640px) {
@@ -1333,6 +1355,17 @@ button:focus-visible {
 		background: var(--accent-wash);
 		color: var(--ink);
 	}
+}
+
+/* Active page (PR #32): the nav marks where you are — teal text + a
+   2px underline bar. The site had NO current-page indicator, which is
+   what the live verify read as "the underline sits under Ventures on
+   sub-pages" (there was nothing marking the real page). Set from
+   SiteHeader via aria-current="page". */
+.pill-nav a.nav-active {
+	color: var(--accent-strong);
+	font-weight: 600;
+	box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 /* Work sub-menu (2026-11-10 nav round): the "Work" pill-nav link
@@ -2010,7 +2043,7 @@ html[lang="bn"] .hero-name {
 
 @media (hover: hover) and (pointer: fine) {
 	.service-card:hover {
-		transform: translateY(-2px);
+		transform: translateY(-6px);
 		box-shadow: var(--shadow);
 		border-color: var(--accent-soft);
 	}
@@ -2094,7 +2127,8 @@ html[lang="bn"] .hero-name {
 	font-weight: 600;
 	transition:
 		background-color 200ms ease,
-		border-color 200ms ease;
+		border-color 200ms ease,
+		transform 200ms ease;
 }
 
 .chip.active {
@@ -2105,7 +2139,12 @@ html[lang="bn"] .hero-name {
 
 @media (hover: hover) and (pointer: fine) {
 	.chip:hover {
+		/* PR #32: the old background-only hover was invisible in
+		   screenshots (no clear scale or glow on a filter pill) — the
+		   border + 1px lift make the hover read. */
 		background: var(--accent-wash);
+		border-color: var(--accent);
+		transform: translateY(-1px);
 	}
 	.chip.active:hover {
 		background: var(--accent-strong);
@@ -2652,7 +2691,9 @@ button.tag:hover {
 
 @media (hover: hover) and (pointer: fine) {
 	.grid-card:hover {
-		transform: translateY(-2px);
+		/* PR #32: -2px was invisible in screenshots (verify: edges in
+		   exactly the same place before/after hover). -6px reads. */
+		transform: translateY(-6px);
 		box-shadow: var(--shadow);
 	}
 }
@@ -5380,8 +5421,9 @@ button.tag:hover {
    PR #28). Page transitions are untouched (PR #25 ghost fix). */
 
 /* --- Card hover: image zoom + arrow slide --- */
-/* .grid-card already lifts on hover (translateY(-2px) + shadow above);
-   this adds the thumb zoom and the title arrow. */
+/* .grid-card already lifts on hover (translateY(-6px) + shadow above);
+   this adds the thumb zoom and the title arrow. PR #32: the 1.06 zoom
+   was invisible in screenshots — 1.08 reads. */
 @media (hover: hover) and (pointer: fine) {
 	.grid-card .grid-thumb img,
 	.grid-card .grid-thumb video {
@@ -5389,7 +5431,7 @@ button.tag:hover {
 	}
 	.grid-card:hover .grid-thumb img,
 	.grid-card:hover .grid-thumb video {
-		transform: scale(1.06);
+		transform: scale(1.08);
 	}
 	.grid-card h3::after {
 		content: "→";
@@ -5413,7 +5455,7 @@ button.tag:hover {
 			box-shadow 200ms ease;
 	}
 	.deck-card:hover {
-		transform: translateY(-2px);
+		transform: translateY(-6px);
 		box-shadow: var(--shadow);
 	}
 	.deck-card .deck-thumb img,
@@ -5422,7 +5464,7 @@ button.tag:hover {
 	}
 	.deck-card:hover .deck-thumb img,
 	.deck-card:hover .deck-thumb video {
-		transform: scale(1.06);
+		transform: scale(1.08);
 	}
 	/* Release card: lift + thumb zoom (it only changed background before). */
 	.release-card {
@@ -5432,14 +5474,14 @@ button.tag:hover {
 			background-color 200ms ease;
 	}
 	.release-card:hover {
-		transform: translateY(-2px);
+		transform: translateY(-6px);
 		box-shadow: var(--shadow);
 	}
 	.release-card-thumb img {
 		transition: transform 300ms ease;
 	}
 	.release-card:hover .release-card-thumb img {
-		transform: scale(1.05);
+		transform: scale(1.08);
 	}
 	/* Service card: icon pops with the existing lift. */
 	.service-icon {

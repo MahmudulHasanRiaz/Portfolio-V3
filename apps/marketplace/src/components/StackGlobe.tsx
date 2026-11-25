@@ -1009,7 +1009,20 @@ export default function StackGlobe({
 						<h2>{t.stackTitle}</h2>
 					</div>
 					{/* PR #24: homepage entry point to the Skills page. */}
-					<a className="view-all" href={langUrl("/skills", lang)}>
+					{/* PR #32: data-astro-reload — the View Transitions
+					    navigation to /bn/skills silently stalls (live
+					    verify 2026-11-25: the BN homepage link did
+					    nothing twice, 6s/10s waits, while /bn/skills
+					    loads fine directly and the EN link works; the
+					    href is correct in the served HTML and no site
+					    handler intercepts the click). A full document
+					    load is proven working for this URL, so this
+					    link bypasses View Transitions entirely. */}
+					<a
+						className="view-all"
+						href={langUrl("/skills", lang)}
+						data-astro-reload
+					>
 						{t.viewAllSkills}
 					</a>
 				</div>
