@@ -215,18 +215,19 @@ app.get("/", async (c) => {
       });
     }
 
-    const [totalResult] = await db
-      .select({ count: count() })
-      .from(mediaAssets)
-      .where(where);
+    // PR #46: count + page rows are independent queries — one round,
+    // not two sequential Neon trips.
+    const [[totalResult], items] = await Promise.all([
+      db.select({ count: count() }).from(mediaAssets).where(where),
+      db
+        .select()
+        .from(mediaAssets)
+        .where(where)
+        .orderBy(orderBy)
+        .limit(pageSize)
+        .offset(offset),
+    ]);
     const total = Number(totalResult?.count || 0);
-    const items = await db
-      .select()
-      .from(mediaAssets)
-      .where(where)
-      .orderBy(orderBy)
-      .limit(pageSize)
-      .offset(offset);
     return c.json({
       success: true,
       items: items.map((item) => toListItem(c, item)),
