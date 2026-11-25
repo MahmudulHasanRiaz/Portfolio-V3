@@ -4548,45 +4548,48 @@ button.tag:hover {
 }
 
 /* ---------- Combined section ---------- */
-/* The two halves live in ONE framed panel (rounded border, no gap):
-   left half on a light grey/mint tint, right half on the card's own
-   surface, with a clear divider between them — two callings, not one
-   jammed block. The closing band joins the frame at the bottom. */
+/* PR #44: the two halves are TWO independent glass cards (each
+   .combined-half carries the .glass class), not one framed panel.
+   The grid is only a layout grid now — no border, no background —
+   so below the shorter card is the page background, not panel teal.
+   The closing band (.combined-cta) is a standalone card below the
+   grid, with its own full radius and a gap above it. The section
+   itself is no longer .glass: the heading sits on the page
+   background above the two cards. */
 .combined-grid {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr);
-	gap: 0;
-	border: 1px solid var(--card-border);
-	border-bottom: 0;
-	border-radius: 24px 24px 0 0;
-	overflow: hidden;
-	background: var(--card);
+	gap: 16px;
 }
 
 @media (min-width: 640px) {
 	.combined-grid {
 		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-		/* PR #43: do NOT stretch the halves to equal height. The
-		   grid's default stretch made the short right half as tall
-		   as the left half's four venture cards, so ~230px of dead
-		   teal sat inside its box (PR #42's vertical centring only
-		   split it top/bottom). align-items: start lets each half
-		   size to its own content — a shorter right card ending
-		   naturally is normal design; a blank band inside a teal
-		   box is not. The panel below the short half shows the
-		   grid's own --card background, which in dark mode is the
-		   same teal token at 0.50 vs the half's 0.55, so no seam;
-		   in light mode the half is transparent over the same
-		   --card, so no seam either. Mobile (single column) is
-		   unaffected: each half already sizes its own row. */
+		/* PR #43 kept this: do NOT stretch the cards to equal
+		   height. The grid's default stretch made the short right
+		   card as tall as the left card's four venture cards, so
+		   ~230px of dead teal sat inside its box. align-items:
+		   start lets each card size to its own content — a shorter
+		   right card ending naturally is normal design. PR #44:
+		   the cards are independent now, so the space below the
+		   short card is the page background (with the teal wash in
+		   dark mode), not a shared panel. Mobile (single column)
+		   is unaffected: each card already sizes its own row. */
 		align-items: start;
 	}
 }
 
 .combined-half {
+	/* PR #44: each half is an independent .glass card (the class is
+	   on the element in Combined.astro) — the glass owns the
+	   background, border, radius, shadow and backdrop blur. The
+	   padding below only keeps the mobile 20px (glass is 24px);
+	   at >=640px the half keeps 24px too. No background here: in
+	   light mode the card is var(--card) like every other glass
+	   card; in dark mode the rule below keeps the proven 0.55
+	   teal-dark fill plus the glass top wash. */
 	min-width: 0;
 	padding: 20px;
-	background: var(--bg-wash);
 }
 
 @media (min-width: 640px) {
@@ -4595,40 +4598,35 @@ button.tag:hover {
 	}
 }
 
-/* Second half: white/very-light surface + the vertical divider. */
-.combined-half + .combined-half {
-	background: transparent;
-	border-top: 1px solid var(--card-border);
-}
+/* PR #44: the vertical divider between the halves is gone — the
+   cards are independent now, and the divider was the visible seam
+   (it ended mid-panel below the short half's content). No
+   .combined-half + .combined-half rule remains. */
 
-@media (min-width: 640px) {
-	.combined-half + .combined-half {
-		border-top: 0;
-		border-left: 1px solid var(--card-border);
-		/* PR #43: the PR #42 flex-centring lived here (display:flex;
-		   justify-content:center) but is removed — the grid now
-		   sizes each half to its own content (align-items: start
-		   above), so there is no extra space left to centre within
-		   and the dead band is gone rather than split top/bottom. */
-	}
-}
-
-/* Dark mode (PR #40): the halves need a real teal-dark fill — --bg-wash
-   (#08110d) is essentially black, so PR #39's "identically tinted"
-   halves still read split: the left half only looked teal because its
-   mini-rows are filled, while the right half (text + chips only) read
-   as a black void below the platform pills. Both halves now get the
-   card token at 0.55 so they read as one teal panel; the mini-rows
-   stay darker (#0b1a14) and read as cards inside it. */
-[data-theme="dark"] .combined-half,
-[data-theme="dark"] .combined-half + .combined-half {
-	background: rgba(21, 54, 43, 0.55);
+/* Dark mode (PR #40, split PR #44): the halves need a real teal-dark
+   fill — --bg-wash (#08110d) is essentially black, so PR #39's
+   "identically tinted" halves still read split: the left half only
+   looked teal because its mini-rows are filled, while the right half
+   (text + chips only) read as a black void below the platform pills.
+   Each half keeps the card token at 0.55 (the plain .glass wash over
+   var(--card) composites to near-black on a panel this tall — the
+   PR #40 lesson), plus the standard glass top-left wash so the card
+   reads as glass, not a flat tint. The mini-rows stay darker
+   (#0b1a14) and read as cards inside it. PR #44: the halves are
+   independent cards now, not one teal panel — same fill, no divider. */
+[data-theme="dark"] .combined-half {
+	background:
+		radial-gradient(120% 90% at 18% 0%, rgba(45, 212, 191, 0.09) 0%, rgba(45, 212, 191, 0.02) 45%, transparent 65%),
+		rgba(21, 54, 43, 0.55);
+	border-color: rgba(94, 234, 212, 0.18);
 }
 
 @media (prefers-color-scheme: dark) {
-	:root:not([data-theme="light"]) .combined-half,
-	:root:not([data-theme="light"]) .combined-half + .combined-half {
-		background: rgba(21, 54, 43, 0.55);
+	:root:not([data-theme="light"]) .combined-half {
+		background:
+			radial-gradient(120% 90% at 18% 0%, rgba(45, 212, 191, 0.09) 0%, rgba(45, 212, 191, 0.02) 45%, transparent 65%),
+			rgba(21, 54, 43, 0.55);
+		border-color: rgba(94, 234, 212, 0.18);
 	}
 }
 
@@ -4792,10 +4790,12 @@ button.tag:hover {
 }
 
 .combined-cta {
-	/* Mint closing band: full width of the frame, text left, the
-	   teal Know Me button right — a horizontal band, not a centred
-	   stack. */
-	margin-top: 0;
+	/* PR #44: mint closing band, now a standalone card below the
+	   two cards — full radius (it no longer joins the grid's frame
+	   at the bottom) and a 16px gap above it matching the grid gap.
+	   Text left, the teal Know Me button right — a horizontal band,
+	   not a centred stack. */
+	margin-top: 16px;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -4804,7 +4804,7 @@ button.tag:hover {
 	text-align: left;
 	padding: 20px 24px;
 	border: 1px solid var(--card-border);
-	border-radius: 0 0 24px 24px;
+	border-radius: var(--radius);
 	background: var(--accent-soft);
 }
 

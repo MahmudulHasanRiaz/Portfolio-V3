@@ -50,12 +50,14 @@ const musicPlatforms = platforms.filter((p) => p.group === "music");
 const artistShortPoints = t.artistPoints;
 ---
 
-<section class="glass section" id="beyond">
+<section class="section" id="beyond">
 	<div class="section-head">
 		<h2>{t.beyondTitle}</h2>
 	</div>
+	{/* PR #44: the two halves are independent .glass cards — no shared
+	    panel, no divider — each sizing to its own content height. */}
 	<div class="combined-grid">
-		<div class="combined-half">
+		<div class="glass combined-half">
 			<h3>
 				<span class="half-icon" aria-hidden="true">
 					<svg
@@ -146,7 +148,7 @@ const artistShortPoints = t.artistPoints;
 				</a>
 			</p>
 		</div>
-		<div class="combined-half">
+		<div class="glass combined-half">
 			<h3>
 				<span class="half-icon" aria-hidden="true">
 					<svg
