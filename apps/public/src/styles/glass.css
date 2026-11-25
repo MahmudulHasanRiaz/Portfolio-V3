@@ -3541,7 +3541,7 @@ button.tag:hover {
 	   `paint` / `content` / `strict` and NEVER overflow: clip here —
 	   the orbit ring sits at inset −7% OUTSIDE the stage by design and
 	   paint containment would cut it (worker F rule). The rAF loop
-	   positions tags with left/top + transform; the final-centre clamp
+	   positions tags with transform only (PR #30); the final-centre clamp
 	   in StackGlobe.tsx keeps every pill inside the stage, so no tag
 	   can overflow the page. */
 	contain: layout style;

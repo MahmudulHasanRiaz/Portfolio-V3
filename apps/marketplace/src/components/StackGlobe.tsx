@@ -301,7 +301,8 @@ export default function StackGlobe({
 	// Globe redesign (2026-11-09): each tag is a button hit target
 	// wrapping a visual pill span. Depth scale applies to the PILL
 	// only — the button never scales, so its ≥24px tap target holds
-	// at every depth. Collision + clamp read the pill's size.
+	// at every depth. Pill sizes are measured ONCE (measurePills,
+	// PR #30) — never read inside the animation loop.
 	const pillRefs = useRef<Array<HTMLSpanElement | null>>([]);
 	const stageRef = useRef<HTMLDivElement | null>(null);
 	const lineRefs = useRef<Array<SVGLineElement | null>>([]);
@@ -337,20 +338,42 @@ export default function StackGlobe({
 	const frontIdxRef = useRef(0);
 	const frontNameRef = useRef(techs[0]?.name ?? "");
 	const lastNowRef = useRef<number | null>(null);
-	// Off-screen pause: the rAF loop repositions 44 nodes + all lines
-	// EVERY frame, even when the globe is scrolled far out of view —
-	// that saturated the mobile main thread and delayed/dropped taps
-	// elsewhere (service cards). An IntersectionObserver on the stage
-	// flips this off when the globe leaves the viewport; the loop then
-	// skips all DOM work until it is visible again. Defaults to true:
-	// the island hydrates via client:visible, so it is on-screen when
-	// the loop first runs.
+	// Off-screen pause (fix 2026-11-13): the rAF loop below repositions
+	// 44 tech nodes + all constellation lines via DOM writes EVERY
+	// frame. With no off-screen pause it ran forever once hydrated
+	// (client:visible), saturating the mobile main thread so service
+	// taps (click -> "open-service" -> Preact setState) got delayed or
+	// dropped. An IntersectionObserver on the stage flips this flag;
+	// the loop then skips all DOM work while off-screen (and while the
+	// tab is hidden) but keeps scheduling rAF, so it resumes instantly
+	// on return. Default true: the island only hydrates when visible
+	// (client:visible), so it starts visible.
 	const visibleRef = useRef(true);
 	const filterRef = useRef("All");
 	const selectedRef = useRef<StackTech | null>(null);
 	const reducedRef = useRef(false);
 	const matchingRef = useRef<number[]>([]);
 	const clusterBaseRef = useRef<Vec[]>([]);
+	// PR #30 — cached stage + pill sizes. The old loop read
+	// stage.clientWidth and every pill's offsetWidth/offsetHeight
+	// EVERY frame (forced layout per frame = the jerky, sticking
+	// rotation). Sizes are measured once here (mount, resize, ready,
+	// font load) and the loop only reads the cached refs.
+	const stageSizeRef = useRef({ w: 440, h: 440 });
+	const pillHalfRef = useRef<Array<{ w: number; h: number }>>([]);
+	const measurePills = () => {
+		const stage = stageRef.current;
+		if (!stage) return;
+		const w = stage.clientWidth || 440;
+		stageSizeRef.current = { w, h: w };
+		pillHalfRef.current = pillRefs.current.map((pill) => {
+			if (!pill) return { w: 8, h: 3 };
+			return {
+				w: (pill.offsetWidth / 2 / w) * 100,
+				h: (pill.offsetHeight / 2 / w) * 100,
+			};
+		});
+	};
 
 	reducedRef.current = reduced;
 
@@ -363,8 +386,6 @@ export default function StackGlobe({
 	}, []);
 
 	useEffect(() => {
-		// Off-screen pause (see visibleRef): stop the loop's DOM work
-		// while the globe is not on screen. Disconnect on unmount.
 		const stage = stageRef.current;
 		if (!stage || typeof IntersectionObserver === "undefined") return;
 		const observer = new IntersectionObserver(
@@ -378,13 +399,31 @@ export default function StackGlobe({
 	}, []);
 
 	useEffect(() => {
+		const stage = stageRef.current;
+		measurePills();
+		if (typeof document !== "undefined" && document.fonts) {
+			document.fonts.ready.then(() => measurePills()).catch(() => {});
+		}
+		if (!stage || typeof ResizeObserver === "undefined") return;
+		const ro = new ResizeObserver(() => measurePills());
+		ro.observe(stage);
+		return () => ro.disconnect();
+	}, []);
+
+	useEffect(() => {
+		if (ready) measurePills();
+	}, [ready]);
+
+	useEffect(() => {
 		let raf = 0;
 
 		const loop = (now: number) => {
 			// Off-screen / hidden-tab pause: skip ALL positioning and
-			// DOM work — the rAF chain alone is near-free. Update
-			// lastNowRef so no huge dt accumulates while paused (the
-			// existing 50ms dt clamp guards the resume either way).
+			// DOM work, but keep the rAF chain alive and refresh the
+			// timestamp so no huge dt accumulates (the existing
+			// Math.min(0.05, ...) clamp already guards resume too).
+			// All existing pause conditions (card open, dragging,
+			// fly-to, tween) are untouched below.
 			if (!visibleRef.current || document.hidden) {
 				lastNowRef.current = now;
 				raf = requestAnimationFrame(loop);
@@ -577,153 +616,48 @@ export default function StackGlobe({
 				}
 			}
 
-			// Pass 2 — collision avoidance in the 2D projection. The
-			// Fibonacci sphere puts several tags at nearly the same
-			// (x, y) with different z, so centre tags stacked on each
-			// other. After positions are known, nudge overlapping tags
-			// apart (12 relaxation passes — 4 was not enough for the
-			// centre cluster to settle — using each tag's real
-			// measured size × its scale). The front tag never moves —
-			// neighbours move away from it — so the spotlight tag is
-			// always clearly readable and never overlapped. Back tags
-			// move more than front ones. Offsets are small and clamped,
-			// so tags stay on the sphere; no tech is ever removed.
-			const stageW =
-				stageRef.current?.clientWidth || 440;
-			const stageH = stageW; // the stage is square
+			// Pass 2 — pure sphere projection (PR #30). NO collision
+			// relaxation: the old 12-pass O(n²) pass ran every frame
+			// (~11k pair checks) and read every pill's offsetWidth /
+			// offsetHeight inside the inner loop — forced layout every
+			// frame, so auto-rotation visibly jerked and stuck, and the
+			// nudges pushed tags off the sphere so the silhouette went
+			// lumpy. The reference globe has no collision pass: icons
+			// may overlap slightly as they pass, and the sphere stays a
+			// perfect circle. Positions below are the pure
+			// Fibonacci-sphere projection; only the final-centre clamp
+			// (cached pill halves — measured once, never per frame)
+			// keeps a wide pill's edge inside the stage.
+			const stageW = stageSizeRef.current.w;
+			const stageH = stageSizeRef.current.h;
 			const scales: number[] = new Array(techs.length);
 			const depths: number[] = new Array(techs.length);
 			const posX: number[] = new Array(techs.length);
 			const posY: number[] = new Array(techs.length);
-			const offX: number[] = new Array(techs.length).fill(0);
-			const offY: number[] = new Array(techs.length).fill(0);
 			for (let i = 0; i < techs.length; i++) {
 				const p = cur[i];
 				const depth = (p.z + 1) / 2;
 				depths[i] = depth;
 				// Back tags recede so the centre reads clean: scale floor
-				// 0.60 (was 0.72), so back tags are small and faint like
-				// the preview and the front/mid tags dominate. Smaller
-				// back tags also shrink their collision boxes, which is
-				// what lets the relaxation below actually separate them.
+				// 0.60, so back tags are small and faint like the preview
+				// and the front/mid tags dominate.
 				let scale = 0.6 + 0.4 * depth;
 				if (i === frontIdx) scale *= 1.35;
 				scales[i] = scale;
-				posX[i] = 50 + p.x * SPREAD;
-				posY[i] = 50 + p.y * SPREAD;
-			}
-			for (let pass = 0; pass < 12; pass++) {
-				for (let i = 0; i < techs.length; i++) {
-					for (let j = i + 1; j < techs.length; j++) {
-						// Filter cluster (fix 2026-11-09): matching tags
-						// must keep their exact cluster positions. The
-						// preview has NO collision pass at all — its
-						// cluster tags sit close together by design.
-						// Relaxing them here pushed the compact front
-						// cluster apart again (measured in simulation:
-						// Frontend y-span 32% → 47% of the stage at
-						// 390px), so a tap showed no regrouping. Skip
-						// any pair touching a matching tag; dimmed tags
-						// also never push cluster tags. Non-matching
-						// pairs still relax among themselves.
-						if (
-							filterActive &&
-							(matchingSet.has(i) || matchingSet.has(j))
-						) {
-							continue;
-						}
-						// Sizes come from the PILL (the visual), not the
-						// button: the button is a larger invisible hit
-						// target, and the collision box must match what
-						// the visitor actually sees.
-						const pillI = pillRefs.current[i];
-						const pillJ = pillRefs.current[j];
-						const wI =
-							(pillI?.offsetWidth || 64) * scales[i];
-						const wJ =
-							(pillJ?.offsetWidth || 64) * scales[j];
-						const hI =
-							(pillI?.offsetHeight || 18) * scales[i];
-						const hJ =
-							(pillJ?.offsetHeight || 18) * scales[j];
-						// 1.05 demands a full gap plus a hair of
-						// breathing room between tags (0.92 let them sit
-						// 8% overlapped, which is what stacked the centre
-						// cluster on top of each other).
-						const minDx =
-							((wI + wJ) / 2 / stageW) * 100 * 1.05;
-						const minDy =
-							((hI + hJ) / 2 / stageH) * 100 * 1.05;
-						const dx =
-							posX[j] + offX[j] - (posX[i] + offX[i]);
-						const dy =
-							posY[j] + offY[j] - (posY[i] + offY[i]);
-						if (
-							Math.abs(dx) < minDx &&
-							Math.abs(dy) < minDy
-						) {
-							const overlapX = minDx - Math.abs(dx);
-							const overlapY = minDy - Math.abs(dy);
-							// Push along the axis of least penetration.
-							const pushX = overlapX <= overlapY;
-							const wi =
-								i === frontIdx
-									? 0
-									: 0.6 + 0.4 * (1 - depths[i]);
-							const wj =
-								j === frontIdx
-									? 0
-									: 0.6 + 0.4 * (1 - depths[j]);
-							const wSum = wi + wj || 1;
-							const push =
-								(pushX ? overlapX : overlapY) + 1.0;
-							const dirX = dx === 0 ? (i % 2 ? 1 : -1) : Math.sign(dx);
-							const dirY = dy === 0 ? (j % 2 ? 1 : -1) : Math.sign(dy);
-							if (pushX) {
-								offX[i] -= dirX * push * (wi / wSum);
-								offX[j] += dirX * push * (wj / wSum);
-							} else {
-								offY[i] -= dirY * push * (wi / wSum);
-								offY[j] += dirY * push * (wj / wSum);
-							}
-						}
-					}
-				}
-			}
-			for (let i = 0; i < techs.length; i++) {
-				// Clamp tightened (±10 x / ±8 y, was ±14 / ±10) to match
-				// the wider SPREAD: nudged tags stay on the sphere and
-				// inside the stage instead of being pushed past its edge.
-				// On SMALL stages (<400px, e.g. ~308px at 390px) the
-				// clamp loosens (±14 / ±12): tags are wider relative to
-				// the ball there, so they need more room to escape the
-				// centre pile — the tight clamp is what kept them
-				// stacked.
-				const clampX = stageW < 400 ? 14 : 10;
-				const clampY = stageW < 400 ? 12 : 8;
-				offX[i] = Math.max(-clampX, Math.min(clampX, offX[i]));
-				offY[i] = Math.max(-clampY, Math.min(clampY, offY[i]));
-				posX[i] += offX[i];
-				posY[i] += offY[i];
-				// Final-centre clamp (2026-11-08): the nudge clamp above
-				// only bounds the NUDGE, not the centre — base centre
-				// 50 + p.x * 42 already reaches 92%, +14% nudge put the
-				// centre at 106%, and the pill's half-width stuck out
-				// further (~29px overrun @390px — the mobile right-edge
-				// overflow). Clamp the final centre so the WHOLE pill
-				// stays inside the stage. Constellation lines read
-				// posX/posY afterwards, so they stay attached. Do NOT
-				// use overflow: clip on the stage — it would cut the
-				// orbit ring (inset -7%).
-				const pillEl = pillRefs.current[i];
-				const halfW = pillEl
-					? ((pillEl.offsetWidth * scales[i]) / 2 / stageW) * 100
-					: 8;
-				const halfH = pillEl
-					? ((pillEl.offsetHeight * scales[i]) / 2 / stageH) * 100
-					: 3;
-				posX[i] = Math.max(halfW, Math.min(100 - halfW, posX[i]));
-				posY[i] = Math.max(halfH, Math.min(100 - halfH, posY[i]));
+				let x = 50 + p.x * SPREAD;
+				let y = 50 + p.y * SPREAD;
+				// Final-centre clamp (2026-11-08): keep the WHOLE pill
+				// inside the stage. Half-sizes are cached (measurePills,
+				// on mount / resize / ready) — never read per frame.
+				// Do NOT use overflow: clip on the stage — it would cut
+				// the orbit ring (inset -7%).
+				const half = pillHalfRef.current[i] ?? { w: 8, h: 3 };
+				const halfW = half.w * scale;
+				const halfH = half.h * scale;
+				x = Math.max(halfW, Math.min(100 - halfW, x));
+				y = Math.max(halfH, Math.min(100 - halfH, y));
+				posX[i] = x;
+				posY[i] = y;
 			}
 
 			// Pass 3: apply positions, scale, opacity and z-order.
@@ -734,12 +668,17 @@ export default function StackGlobe({
 					const dimmed = filterActive && !matchingSet.has(i);
 					// The front tag reads ~35% larger (preview spotlight).
 					const scale = scales[i];
-					el.style.left = `${posX[i]}%`;
-					el.style.top = `${posY[i]}%`;
-					// The BUTTON gets translate only — never scale — so
+					// Transform-only positioning (PR #30): the button
+					// is anchored at left/top 50% (set once in JSX)
+					// and moved with translate3d — no left/top writes
+					// and no layout reads per frame, so the compositor
+					// carries the rotation at a steady 60fps. The
+					// BUTTON gets translate only — never scale — so
 					// its ≥24px hit area holds at every depth. The depth
 					// scale goes on the visual pill inside it.
-					el.style.transform = "translate(-50%, -50%)";
+					const dx = ((posX[i] - 50) / 100) * stageW;
+					const dy = ((posY[i] - 50) / 100) * stageH;
+					el.style.transform = `translate(-50%, -50%) translate3d(${dx.toFixed(2)}px, ${dy.toFixed(2)}px, 0)`;
 					const pillEl = pillRefs.current[i];
 					if (pillEl) {
 						pillEl.style.transform = `scale(${scale})`;
@@ -1239,6 +1178,7 @@ export default function StackGlobe({
 									tagRefs.current[i] = el;
 								}}
 								className="globe-tag"
+								style={{ left: "50%", top: "50%" }}
 								data-tech={i}
 								tabIndex={isDimmed ? -1 : undefined}
 								aria-hidden={isDimmed || undefined}
