@@ -327,6 +327,8 @@ export const experienceEntrySchema = z.object({
   titleBn: z.string().nullable().optional(),
   organisation: z.string().nullable().optional(),
   organisationBn: z.string().nullable().optional(),
+  role: z.string().nullable().optional(),
+  roleBn: z.string().nullable().optional(),
   startDate: z.string().nullable().optional(),
   endDate: z.string().nullable().optional(),
   description: z.string().nullable().optional(),

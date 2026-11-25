@@ -1205,6 +1205,8 @@ async function listExperience(db: Db): Promise<PublicContentItem[]> {
         titleBn: r.titleBn ?? undefined,
         organisation: r.organisation ?? undefined,
         organisationBn: r.organisationBn ?? undefined,
+        role: r.role ?? undefined,
+        roleBn: r.roleBn ?? undefined,
         startDate: toISO(r.startDate) ?? undefined,
         endDate: toISO(r.endDate) ?? undefined,
         description: r.description ?? undefined,

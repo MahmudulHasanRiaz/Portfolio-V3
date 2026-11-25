@@ -168,6 +168,12 @@ function startYear(iso: string | undefined): string {
 											: t.experienceRole}
 									</span>
 									<h2 class="exp-entry-title">{entry.titleBn ?? entry.title}</h2>
+									{entry.type === "project" &&
+										(entry.roleBn ?? entry.role) && (
+											<p class="exp-role">
+												{entry.roleBn ?? entry.role}
+											</p>
+										)}
 									{entry.organisation && (
 										<p class="exp-org">
 											{entry.type === "project" ? "ক্লায়েন্ট: " : ""}
@@ -386,6 +392,14 @@ function startYear(iso: string | undefined): string {
 	.exp-org {
 		margin: 4px 0 0;
 		font-weight: 600;
+	}
+	/* Role on the engagement (0042, PR #48) — project cards only,
+	   under the project name, in the accent so it reads as his part
+	   in the work (the org line below it stays neutral). */
+	.exp-role {
+		margin: 4px 0 0;
+		font-weight: 600;
+		color: var(--accent-strong);
 	}
 	.exp-period {
 		margin: 2px 0 0;

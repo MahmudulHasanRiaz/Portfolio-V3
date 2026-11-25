@@ -817,6 +817,10 @@ export interface ExperienceEntry {
 	/** Organisation (role) or client (project). */
 	organisation?: string;
 	organisationBn?: string;
+	/** Role on the engagement (0042, PR #48) — project entries
+	 *  only; role entries carry no separate role (title IS the role). */
+	role?: string;
+	roleBn?: string;
 	/** ISO date strings ("2020-01-01T00:00:00.000Z"); endDate
 	 *  undefined = ongoing / present. */
 	startDate?: string;
@@ -863,6 +867,8 @@ export async function getExperience(): Promise<ExperienceEntry[]> {
 			organisationBn: asString(
 				liveField(d, "organisation_bn", "organisationBn"),
 			),
+			role: asString(liveField(d, "role")),
+			roleBn: asString(liveField(d, "role_bn", "roleBn")),
 			startDate: asString(liveField(d, "start_date", "startDate")),
 			endDate: asString(liveField(d, "end_date", "endDate")),
 			description: asString(liveField(d, "description")),

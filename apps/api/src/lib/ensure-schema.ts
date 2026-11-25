@@ -243,6 +243,17 @@ export function ensureExperienceEntries(db: ApiDb): Promise<void> {
           "created_at" timestamp with time zone DEFAULT now(),
           "updated_at" timestamp with time zone DEFAULT now()
         )`);
+        // 0042 (PR #48): role on the engagement — project entries
+        // only. Same auto-apply pattern as 0040 (logo_tone): the
+        // ALTERs are re-runnable and additive, so existing databases
+        // gain the columns on the next request; the record lives in
+        // packages/database/drizzle/0042_experience_role.sql.
+        await db.execute(
+          sql`ALTER TABLE "experience_entries" ADD COLUMN IF NOT EXISTS "role" text`,
+        );
+        await db.execute(
+          sql`ALTER TABLE "experience_entries" ADD COLUMN IF NOT EXISTS "role_bn" text`,
+        );
       } catch (err) {
         // A transient failure must not poison the isolate: clear the
         // guard so the next request retries.

@@ -53,6 +53,8 @@ export interface ExperienceEntryRow {
   titleBn: string | null;
   organisation: string | null;
   organisationBn: string | null;
+  role: string | null;
+  roleBn: string | null;
   startDate: string | null;
   endDate: string | null;
   description: string | null;
@@ -85,6 +87,8 @@ export interface ExperienceEntryInput {
   titleBn?: string | null;
   organisation?: string | null;
   organisationBn?: string | null;
+  role?: string | null;
+  roleBn?: string | null;
   startDate?: string | null;
   endDate?: string | null;
   description?: string | null;
@@ -101,6 +105,8 @@ function experienceEntryValues(data: ExperienceEntryInput) {
     titleBn: asText(data.titleBn),
     organisation: asText(data.organisation),
     organisationBn: asText(data.organisationBn),
+    role: asText(data.role),
+    roleBn: asText(data.roleBn),
     startDate: asDate(data.startDate),
     endDate: asDate(data.endDate),
     description: asText(data.description),

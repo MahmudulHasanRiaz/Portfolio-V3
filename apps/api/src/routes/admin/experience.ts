@@ -80,6 +80,8 @@ function entryValues(data: Record<string, unknown>) {
     titleBn: asText(data.titleBn),
     organisation: asText(data.organisation),
     organisationBn: asText(data.organisationBn),
+    role: asText(data.role),
+    roleBn: asText(data.roleBn),
     startDate: asDate(data.startDate),
     endDate: asDate(data.endDate),
     description: asText(data.description),

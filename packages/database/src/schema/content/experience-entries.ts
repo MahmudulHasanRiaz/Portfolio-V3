@@ -28,6 +28,12 @@ export const experienceEntries = pgTable("experience_entries", {
   titleBn: text("title_bn"),
   organisation: text("organisation"),
   organisationBn: text("organisation_bn"),
+  // Role on the engagement (0042, PR #48) — project entries only:
+  // the part he played (e.g. "Lead Developer & Architect"). Role
+  // entries need no separate role — their title IS the role. NULL
+  // means not set; the card renders no role line.
+  role: text("role"),
+  roleBn: text("role_bn"),
   // Dates are plain calendar dates (no time component): a NULL
   // endDate means ongoing / present.
   startDate: date("start_date"),
