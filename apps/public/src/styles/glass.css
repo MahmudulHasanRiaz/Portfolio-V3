@@ -741,6 +741,10 @@ button:focus-visible {
 	color: var(--accent);
 	font-size: 13px;
 	font-weight: 600;
+	/* "বাং" label (PR #52): explicit --font stack so the Bengali
+	   glyphs fall through to Li Ador Noirrit (Plus Jakarta Sans has
+	   no Bengali glyphs) instead of a system fallback font. */
+	font-family: var(--font);
 	transition: background-color 200ms ease;
 	/* No browser-default (blue) focus outline on the corner buttons —
 	   the moon button showed a blue ring in the live screenshot. */
