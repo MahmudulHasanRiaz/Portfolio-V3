@@ -398,9 +398,9 @@ export default function SiteHeader({
 	// The corner buttons exist TWICE (top row + stuck-row copies, like
 	// the preview). The hidden set is inert (tabIndex -1) so keyboard
 	// users never tab into an invisible button.
-	// Accessible name must contain the visible label ("BN"/"EN" on
-	// mobile, "EN/BN" on desktop) — label-content-name-mismatch.
-	const langLabel = `${dict.switchLanguage} — EN/BN`;
+	// Accessible name must contain the visible label ("বাং"/"EN" on
+	// mobile, "EN/বাং" on desktop) — label-content-name-mismatch.
+	const langLabel = `${dict.switchLanguage} — EN/বাং`;
 	const langBtn = (inert: boolean) => (
 		<a
 			className="corner-btn"
@@ -411,8 +411,8 @@ export default function SiteHeader({
 			aria-label={langLabel}
 			title={langLabel}
 		>
-			<span className="lang-mobile">{lang === "en" ? "BN" : "EN"}</span>
-			<span className="lang-desktop">EN/BN</span>
+			<span className="lang-mobile">{lang === "en" ? "বাং" : "EN"}</span>
+			<span className="lang-desktop">EN/বাং</span>
 		</a>
 	);
 
