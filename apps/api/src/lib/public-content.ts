@@ -633,13 +633,17 @@ async function projectSlugById(db: Db): Promise<Map<string, string>> {
 }
 
 async function listPosts(db: Db): Promise<PublicContentItem[]> {
-  const rows = await db
-    .select()
-    .from(posts)
-    .where(eq(posts.status, "published"))
-    .orderBy(desc(posts.publishAt), desc(posts.createdAt));
-  const tagsById = await postTagsByPostId(db);
-  const seo = await seoMetaByEntity(db);
+  // PR #46: rows + tags + SEO overlay are independent queries — run
+  // them concurrently instead of stacking three Neon round trips.
+  const [rows, tagsById, seo] = await Promise.all([
+    db
+      .select()
+      .from(posts)
+      .where(eq(posts.status, "published"))
+      .orderBy(desc(posts.publishAt), desc(posts.createdAt)),
+    postTagsByPostId(db),
+    seoMetaByEntity(db),
+  ]);
   return rows
     .filter((r) => r.slug && r.title)
     .map((r) => {
@@ -680,14 +684,18 @@ async function listPosts(db: Db): Promise<PublicContentItem[]> {
 }
 
 async function listProjects(db: Db): Promise<PublicContentItem[]> {
-  const rows = await db
-    .select()
-    .from(projects)
-    .where(eq(projects.status, "published"))
-    .orderBy(desc(projects.createdAt));
-  const techsById = await techsByProjectId(db);
-  const projectTagsById = await projectTagsByProjectId(db);
-  const seo = await seoMetaByEntity(db);
+  // PR #46: rows + techs + tags + SEO overlay are independent queries
+  // — run them concurrently instead of stacking four Neon round trips.
+  const [rows, techsById, projectTagsById, seo] = await Promise.all([
+    db
+      .select()
+      .from(projects)
+      .where(eq(projects.status, "published"))
+      .orderBy(desc(projects.createdAt)),
+    techsByProjectId(db),
+    projectTagsByProjectId(db),
+    seoMetaByEntity(db),
+  ]);
   return rows
     .filter((r) => r.slug && r.title)
     .map((r) => {
@@ -746,13 +754,17 @@ async function listCaseStudies(db: Db): Promise<PublicContentItem[]> {
   // 0038 auto-apply: create `indexable` before the first query that
   // selects it (no manual migration).
   await ensurePerItemIndexing(db);
-  const rows = await db
-    .select()
-    .from(caseStudies)
-    .where(eq(caseStudies.status, "published"))
-    .orderBy(desc(caseStudies.createdAt));
-  const slugById = await projectSlugById(db);
-  const caseStudyTagsById = await caseStudyTagsByCaseStudyId(db);
+  // PR #46: rows + project slugs + tags are independent queries — run
+  // them concurrently instead of stacking three Neon round trips.
+  const [rows, slugById, caseStudyTagsById] = await Promise.all([
+    db
+      .select()
+      .from(caseStudies)
+      .where(eq(caseStudies.status, "published"))
+      .orderBy(desc(caseStudies.createdAt)),
+    projectSlugById(db),
+    caseStudyTagsByCaseStudyId(db),
+  ]);
   return rows
     .filter((r) => r.slug && r.title)
     .map((r) => {
@@ -819,12 +831,16 @@ async function listVentures(db: Db): Promise<PublicContentItem[]> {
   // 0038 auto-apply: create `indexable` before the first query that
   // selects it (no manual migration).
   await ensurePerItemIndexing(db);
-  const rows = await db
-    .select()
-    .from(ventures)
-    .where(eq(ventures.contentStatus, "published"))
-    .orderBy(desc(ventures.createdAt));
-  const seo = await seoMetaByEntity(db);
+  // PR #46: rows + SEO overlay are independent queries — run them
+  // concurrently instead of stacking two Neon round trips.
+  const [rows, seo] = await Promise.all([
+    db
+      .select()
+      .from(ventures)
+      .where(eq(ventures.contentStatus, "published"))
+      .orderBy(desc(ventures.createdAt)),
+    seoMetaByEntity(db),
+  ]);
   return rows
     .filter((r) => r.slug && r.name)
     .map((r) => {
@@ -890,16 +906,28 @@ async function listReleases(db: Db): Promise<PublicContentItem[]> {
   // 0038 auto-apply: create `indexable` before the first query that
   // selects it (no manual migration).
   await ensurePerItemIndexing(db);
-  const rows = await db
-    .select()
-    .from(releases)
-    .where(eq(releases.status, "published"))
-    .orderBy(desc(releases.releaseDate), desc(releases.createdAt));
-  const platformsById = await platformsByReleaseId(db);
-  const lyricsById = await lyricsByReleaseId(db);
-  const lyricsTranslationsById = await lyricsTranslationsByReleaseId(db);
-  const videosById = await videosByReleaseId(db);
-  const seo = await seoMetaByEntity(db);
+  // PR #46: rows + platforms + lyrics + lyric translations + videos +
+  // SEO overlay are independent queries — run them concurrently
+  // instead of stacking six Neon round trips.
+  const [
+    rows,
+    platformsById,
+    lyricsById,
+    lyricsTranslationsById,
+    videosById,
+    seo,
+  ] = await Promise.all([
+    db
+      .select()
+      .from(releases)
+      .where(eq(releases.status, "published"))
+      .orderBy(desc(releases.releaseDate), desc(releases.createdAt)),
+    platformsByReleaseId(db),
+    lyricsByReleaseId(db),
+    lyricsTranslationsByReleaseId(db),
+    videosByReleaseId(db),
+    seoMetaByEntity(db),
+  ]);
   return rows
     // NOTE: no Ya Nabi exclusion here — the LIST route filters it out
     // (see api/public/content/[type]/route.ts); the single-item endpoint
@@ -964,12 +992,16 @@ async function listReleases(db: Db): Promise<PublicContentItem[]> {
 }
 
 async function listServices(db: Db): Promise<PublicContentItem[]> {
-  const rows = await db
-    .select()
-    .from(services)
-    .where(eq(services.status, "published"))
-    .orderBy(asc(services.sortOrder), desc(services.createdAt));
-  const seo = await seoMetaByEntity(db);
+  // PR #46: rows + SEO overlay are independent queries — run them
+  // concurrently instead of stacking two Neon round trips.
+  const [rows, seo] = await Promise.all([
+    db
+      .select()
+      .from(services)
+      .where(eq(services.status, "published"))
+      .orderBy(asc(services.sortOrder), desc(services.createdAt)),
+    seoMetaByEntity(db),
+  ]);
   return rows
     .filter((r) => r.slug && r.title)
     .map((r) => {
@@ -1589,6 +1621,9 @@ export async function getPublicSettings(): Promise<PublicSettings> {
     designations: [],
   };
   try {
+    // PR #46: the stats row, the profile row and the founder row are
+    // independent of the settings keys and of each other — read them
+    // in the same round instead of three sequential queries after it.
     const [
       portraitRow,
       faviconRow,
@@ -1616,6 +1651,9 @@ export async function getPublicSettings(): Promise<PublicSettings> {
       siteDescriptionRow,
       siteNameRow,
       siteTaglineRow,
+      statsEntries,
+      profile,
+      founder,
     ] = await Promise.all([
       findSetting(HERO_PORTRAIT_KEY),
       findSetting(FAVICON_KEY),
@@ -1643,8 +1681,10 @@ export async function getPublicSettings(): Promise<PublicSettings> {
       findSetting(SITE_DESCRIPTION_KEY),
       findSetting(SITE_NAME_KEY),
       findSetting(SITE_TAGLINE_KEY),
+      statsRow(getApiDb()),
+      publicProfile(getApiDb()),
+      founderRow(getApiDb()),
     ]);
-    const statsEntries = await statsRow(getApiDb());
     // English stats: the valid row items, in row order. Bangla labels:
     // positional over ALL row items (null = no Bangla yet for that
     // slot), present only when at least one label is set — the same
@@ -1664,11 +1704,9 @@ export async function getPublicSettings(): Promise<PublicSettings> {
         ? statsEntries.map((e) => e?.labelBn ?? null)
         : undefined;
     const heroChips = asStringList(heroChipsRow?.value);
-    const profile = await publicProfile(getApiDb());
     // Founder summary: the settings keys win; the homepage_sections
     // "founder" row is the fallback for summaries written before the
     // keys existed (see founderRow).
-    const founder = await founderRow(getApiDb());
     const founderSummary =
       asNonEmptyString(founderSummaryRow?.value) ?? founder.summary;
     const founderSummaryBn =

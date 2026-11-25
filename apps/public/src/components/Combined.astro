@@ -22,7 +22,12 @@ const founderSummary =
 		? (settings.bn?.founderSummary ?? settings.founderSummary)
 		: settings.founderSummary;
 
-const venturesRaw = await getVentures();
+// PR #46: the two content fetches are independent — run them
+// concurrently instead of stacking two API round trips.
+const [venturesRaw, platformsRaw] = await Promise.all([
+	getVentures(),
+	getPlatforms(),
+]);
 // Homepage preview cap: 4 mini-rows keeps the Combined section
 // balanced against the artist column. The full /ventures/ listing
 // page is NOT capped. Slicing before the map keeps the
@@ -35,7 +40,7 @@ const ventures = venturesRaw
 	}));
 // Live music platforms over the build-time fallback (bn overlay on
 // /bn/ — platform names are proper nouns, subtitles localise).
-const platforms = (await getPlatforms()).map((p) =>
+const platforms = platformsRaw.map((p) =>
 	localizeData({ ...p }, lang),
 );
 const musicPlatforms = platforms.filter((p) => p.group === "music");

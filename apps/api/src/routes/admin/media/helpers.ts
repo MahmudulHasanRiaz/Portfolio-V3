@@ -89,7 +89,7 @@
 // module-level singleton, mirroring packages/media/src/r2.ts.
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { and, count, eq, isNull, ne } from "drizzle-orm";
+import { and, count, eq, inArray, isNull, ne } from "drizzle-orm";
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import {
   caseStudies,
@@ -558,14 +558,23 @@ export interface MediaUsage {
 }
 
 export async function loadUsageRefs(db: ApiDb): Promise<UsageRef[]> {
+  // PR #46: the per-table selects are independent — run them
+  // concurrently instead of stacking ten sequential full-table
+  // selects. A failed table still yields no refs for that source
+  // (same as before — the per-source try/catch is preserved).
+  const perSource = await Promise.all(
+    USAGE_SOURCES.map(async (source) => {
+      try {
+        return await db.select().from(source.table);
+      } catch {
+        return [] as any[];
+      }
+    }),
+  );
   const refs: UsageRef[] = [];
-  for (const source of USAGE_SOURCES) {
-    let rows: any[];
-    try {
-      rows = await db.select().from(source.table);
-    } catch {
-      continue;
-    }
+  for (let i = 0; i < USAGE_SOURCES.length; i++) {
+    const source = USAGE_SOURCES[i]!;
+    const rows = perSource[i] as any[];
     for (const row of rows) {
       const record = row as Record<string, unknown>;
       for (const field of source.fields) {
@@ -771,39 +780,50 @@ export async function listFolders(
   db: ApiDb,
   parentId: string | null,
 ): Promise<FolderNode[]> {
-  const where = parentId
-    ? eq(mediaFolders.parentId, parentId)
-    : isNull(mediaFolders.parentId);
-  const folders = await db.select().from(mediaFolders).where(where);
-  const nodes: FolderNode[] = [];
-  for (const f of folders) {
-    const children = await listFolders(db, f.id);
-    const [direct] = await db
-      .select({ count: count() })
+  // PR #46: was ~2 Neon round trips PER folder (one children query +
+  // one count, each level sequential). Now two queries total — all
+  // folders + one grouped asset count — and the tree is built in
+  // memory. Same output shape and order (DB row order, children in
+  // DB order) and the same subtree totals (direct count + children's
+  // subtree totals).
+  const [allFolders, counts] = await Promise.all([
+    db.select().from(mediaFolders),
+    db
+      .select({ folderId: mediaAssets.folderId, count: count() })
       .from(mediaAssets)
-      .where(
-        and(
-          eq(mediaAssets.folderId, f.id),
-          isNull(mediaAssets.deletedAt),
-        ),
-      );
-    const directCount = Number(direct?.count || 0);
-    // Subtree total, not just this folder's own files: a parent whose
-    // files all live in subfolders showed "0" before, which read as
-    // broken. Children already carry their own subtree totals, so the
-    // sum is the whole subtree.
-    const assetCount =
-      directCount + children.reduce((sum, c) => sum + (c.assetCount || 0), 0);
-    nodes.push({
-      id: f.id,
-      name: f.name || "",
-      path: f.path || "",
-      parentId: f.parentId,
-      children,
-      assetCount,
-    });
+      .where(isNull(mediaAssets.deletedAt))
+      .groupBy(mediaAssets.folderId),
+  ]);
+  const directCount = new Map<string, number>();
+  for (const row of counts) {
+    if (row.folderId) directCount.set(row.folderId, Number(row.count));
   }
-  return nodes;
+  const byParent = new Map<string | null, typeof allFolders>();
+  for (const f of allFolders) {
+    const key = f.parentId ?? null;
+    const list = byParent.get(key) ?? [];
+    list.push(f);
+    byParent.set(key, list);
+  }
+  const build = (pid: string | null): FolderNode[] => {
+    const nodes: FolderNode[] = [];
+    for (const f of byParent.get(pid) ?? []) {
+      const children = build(f.id);
+      const assetCount =
+        (directCount.get(f.id) ?? 0) +
+        children.reduce((sum, c) => sum + (c.assetCount || 0), 0);
+      nodes.push({
+        id: f.id,
+        name: f.name || "",
+        path: f.path || "",
+        parentId: f.parentId,
+        children,
+        assetCount,
+      });
+    }
+    return nodes;
+  };
+  return build(parentId);
 }
 
 // ─── "Unorganized" default subfolder ─────────────────────────────────────────
@@ -879,16 +899,36 @@ export async function getOrCreateUnorganized(
  *  are buckets themselves and get no child. */
 export async function ensureUnorganizedFolders(db: ApiDb): Promise<void> {
   const folders = await db.select().from(mediaFolders);
-  for (const folder of folders) {
-    if (isUnorganizedName(folder.name)) continue;
-    const existing = await getUnorganizedChild(db, folder.id);
-    if (existing) continue;
-    await db.insert(mediaFolders).values({
-      name: UNORGANIZED_FOLDER_NAME,
-      parentId: folder.id,
-      path: `${folder.path || ""}/${UNORGANIZED_FOLDER_NAME}`,
-    });
-  }
+  const parents = folders.filter((f) => !isUnorganizedName(f.name));
+  if (parents.length === 0) return;
+  // PR #46: was one "does the bucket exist?" query per folder, then
+  // one insert per missing bucket, all sequential. One query now
+  // finds every existing bucket, and the missing ones are inserted
+  // concurrently (different parents — independent rows).
+  const existing = await db
+    .select({ parentId: mediaFolders.parentId })
+    .from(mediaFolders)
+    .where(
+      and(
+        inArray(
+          mediaFolders.parentId,
+          parents.map((p) => p.id),
+        ),
+        eq(mediaFolders.name, UNORGANIZED_FOLDER_NAME),
+      ),
+    );
+  const hasBucket = new Set(existing.map((r) => r.parentId));
+  await Promise.all(
+    parents
+      .filter((f) => !hasBucket.has(f.id))
+      .map((folder) =>
+        db.insert(mediaFolders).values({
+          name: UNORGANIZED_FOLDER_NAME,
+          parentId: folder.id,
+          path: `${folder.path || ""}/${UNORGANIZED_FOLDER_NAME}`,
+        }),
+      ),
+  );
 }
 
 /** Resolve a folder id to the folder a file should actually live in:
@@ -905,23 +945,22 @@ export async function resolveFolderForFile(
 }
 
 /** All folder ids in a subtree: the folder itself plus every descendant,
- *  breadth-first. Used by the recursive list (GET /?folderId=&recursive=true). */
+ *  breadth-first. Used by the recursive list (GET /?folderId=&recursive=true).
+ *  PR #46: breadth-first by LEVEL — one query per depth level (inArray
+ *  over the whole level) instead of one query per parent, sequential. */
 export async function getDescendantFolderIds(
   db: ApiDb,
   folderId: string,
 ): Promise<string[]> {
   const ids = [folderId];
-  const queue = [folderId];
-  while (queue.length > 0) {
-    const parent = queue.shift()!;
+  let level = [folderId];
+  while (level.length > 0) {
     const children = await db
       .select({ id: mediaFolders.id })
       .from(mediaFolders)
-      .where(eq(mediaFolders.parentId, parent));
-    for (const child of children) {
-      ids.push(child.id);
-      queue.push(child.id);
-    }
+      .where(inArray(mediaFolders.parentId, level));
+    level = children.map((c) => c.id);
+    ids.push(...level);
   }
   return ids;
 }

@@ -57,13 +57,20 @@ const profile = isKnowMe ? "knowme" : "se";
 // Technologies are fetched in both branches too (the globe reads
 // them as a prop; the fetch falls back to build-time rows when the
 // live API is unreachable).
-const projects = isKnowMe ? [] : await getProjects();
-const caseStudies = isKnowMe ? [] : await getCaseStudies();
-const posts = isKnowMe ? [] : await getPosts();
-const services = await getServices();
-// Live stack techs over the build-time STACK fallback (globe reads
-// them as a prop — the island itself cannot call getLiveCollection).
-const technologies = await getTechnologies();
+// PR #46: the five content fetches are independent — run them
+// concurrently instead of stacking five API round trips. The Know Me
+// branch still skips projects/case-studies/posts (KnowMeSections
+// fetches its own rows there — no double fetch).
+const [projects, caseStudies, posts, services, technologies] =
+	await Promise.all([
+		isKnowMe ? Promise.resolve([]) : getProjects(),
+		isKnowMe ? Promise.resolve([]) : getCaseStudies(),
+		isKnowMe ? Promise.resolve([]) : getPosts(),
+		getServices(),
+		// Live stack techs over the build-time STACK fallback (globe reads
+		// them as a prop — the island itself cannot call getLiveCollection).
+		getTechnologies(),
+	]);
 
 const carouselProjects = projects
 	.slice(0, HOMEPAGE_PROJECTS_LIMIT)

@@ -488,12 +488,6 @@ app.get("/:type", async (c) => {
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const [countResult] = await db
-      .select({ count: count() })
-      .from(def.table)
-      .where(where);
-    const total = Number(countResult?.count ?? 0);
-
     const orderField = sortField || "createdAt";
     const orderDir = sortDir || "desc";
     const orderCol = def.table[orderField];
@@ -503,13 +497,23 @@ app.get("/:type", async (c) => {
         : asc(orderCol)
       : desc(def.table.createdAt);
 
-    const items = await db
-      .select()
-      .from(def.table)
-      .where(where)
-      .orderBy(orderBy)
-      .limit(pageSize)
-      .offset((page - 1) * pageSize);
+    // PR #46: count + page rows are independent queries — one round,
+    // not two sequential Neon trips.
+    const [countResult, items] = await Promise.all([
+      db
+        .select({ count: count() })
+        .from(def.table)
+        .where(where)
+        .then((r) => r[0]),
+      db
+        .select()
+        .from(def.table)
+        .where(where)
+        .orderBy(orderBy)
+        .limit(pageSize)
+        .offset((page - 1) * pageSize),
+    ]);
+    const total = Number(countResult?.count ?? 0);
 
     const totalPages = Math.ceil(total / pageSize);
 

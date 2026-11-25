@@ -52,7 +52,17 @@ const sizedThumb = (url: string | null | undefined, w = 800) =>
 		? url.replace(/w=\d+/, `w=${w}`).replace(/q=\d+/, "q=75")
 		: url;
 
-const releases = (await getReleases()).map((r) => {
+// PR #46: the five content fetches are independent — run them
+// concurrently instead of stacking five API round trips.
+const [releasesRaw, projectsRaw, postsRaw, services, platformsRaw] =
+	await Promise.all([
+		getReleases(),
+		getProjects(),
+		getPosts(),
+		getServices(),
+		getPlatforms(),
+	]);
+const releases = releasesRaw.map((r) => {
 	const d = localizeData(r.data, lang);
 	return {
 		slug: d.slug,
@@ -64,24 +74,21 @@ const releases = (await getReleases()).map((r) => {
 		platforms: d.platforms ?? [],
 	};
 });
-const projects = (await getProjects())
+const projects = projectsRaw
 	.slice(0, KNOW_ME_PROJECTS_LIMIT)
 	.map((p) => ({
 		...p,
 		data: localizeData(p.data, lang),
 	}));
-const posts = (await getPosts())
-	.slice(0, HOMEPAGE_POSTS_LIMIT)
-	.map((p) => ({
-		...p,
-		data: localizeData(p.data, lang),
-	}));
-const services = await getServices();
+const posts = postsRaw.slice(0, HOMEPAGE_POSTS_LIMIT).map((p) => ({
+	...p,
+	data: localizeData(p.data, lang),
+}));
 
 // Live platforms (A3): admin-managed rows over the build-time
 // PLATFORMS fallback — localizeData is a no-op for "en", so one line
 // serves both languages (bn overlay, English fallback).
-const platforms = (await getPlatforms()).map((p) =>
+const platforms = platformsRaw.map((p) =>
 	localizeData({ ...p }, lang),
 );
 const socialPlatforms = platforms.filter((p) => p.group === "social");

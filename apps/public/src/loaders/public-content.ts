@@ -373,6 +373,35 @@ function isBuildFetchCacheActive(): boolean {
 	return ua !== "Cloudflare-Workers";
 }
 
+// Worker-side fetch memo (PR #46, admin-slow-lists).
+//
+// The build-time cache above is deliberately OFF in the Worker, but
+// that leaves a real waste at request time: mergeWithLive() first
+// probes a collection (liveCollectionReachable — a full list fetch)
+// and then loads it (getLiveCollection — the SAME list fetch again),
+// so every collection costs TWO API round trips per page render, in
+// sequence. This memo dedupes identical URLs for 60 s in module
+// state — the same 60 s TTL and the same pattern as the settings
+// memos (getSiteSettings / fetchPublicSettings), and the same
+// promise-caching behaviour as buildFetchCache (failures are cached
+// too — a failed probe still marks the live fallback, exactly as
+// before; the next request after the TTL retries live).
+//
+// Staleness bound: at most 60 s, well under the 3600 s edge cache
+// on list pages — a render served from the edge cache is stale for
+// far longer already, so this memo changes nothing a visitor can
+// notice. It never skips live data the gate allowed (isLiveFetchAllowed
+// still decides whether to fetch at all); it only dedupes fetches the
+// gate already allowed. Keyed by URL only: within one Worker isolate
+// the Bearer token is constant (env secret), so the same URL always
+// carries the same authorisation.
+const WORKER_FETCH_TTL_MS = 60_000;
+
+const workerFetchCache = new Map<
+	string,
+	{ promise: Promise<unknown>; at: number }
+>();
+
 async function fetchJson(
 	url: string,
 	token: string | undefined,
@@ -391,7 +420,12 @@ async function fetchJson(
 		buildFetchCache.set(url, promise);
 		return promise;
 	}
-	return fetchJsonUncached(url, token);
+	const now = Date.now();
+	const hit = workerFetchCache.get(url);
+	if (hit && now - hit.at < WORKER_FETCH_TTL_MS) return hit.promise;
+	const promise = fetchJsonUncached(url, token);
+	workerFetchCache.set(url, { promise, at: now });
+	return promise;
 }
 
 /**
