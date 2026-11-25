@@ -196,6 +196,17 @@ const journey = JOURNEY_STAGES.map(({ stage, label, note }) => ({
 		font-size: 13px;
 		color: var(--ink-dim);
 	}
+	/* Dark mode (PR #37): the muted teal-grey subtext under skill
+	   names is low-contrast on the dark tile — lifted so it stays
+	   readable without going bright. */
+	[data-theme="dark"] .skill-use {
+		color: #b9c9bf;
+	}
+	@media (prefers-color-scheme: dark) {
+		:root:not([data-theme="light"]) .skill-use {
+			color: #b9c9bf;
+		}
+	}
 	.skill-proficiency {
 		display: flex;
 		align-items: center;
@@ -268,6 +279,20 @@ const journey = JOURNEY_STAGES.map(({ stage, label, note }) => ({
 		box-shadow:
 			0 0 0 4px var(--accent-wash),
 			0 0 16px rgba(13, 148, 136, 0.45);
+	}
+	/* Dark mode (PR #37): the "Today" dot's halo uses the LIGHT-mode
+	   teal — murky over black. Bright teal halo. */
+	[data-theme="dark"] .journey-dot-today {
+		box-shadow:
+			0 0 0 4px rgba(45, 212, 191, 0.18),
+			0 0 18px rgba(45, 212, 191, 0.55);
+	}
+	@media (prefers-color-scheme: dark) {
+		:root:not([data-theme="light"]) .journey-dot-today {
+			box-shadow:
+				0 0 0 4px rgba(45, 212, 191, 0.18),
+				0 0 18px rgba(45, 212, 191, 0.55);
+		}
 	}
 	.journey-step-title {
 		font-size: 16px;
