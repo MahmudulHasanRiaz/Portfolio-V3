@@ -167,6 +167,15 @@
 /* 1. Dashboard-scoped tokens — space palette ("Admin Dashboard")      */
 /* ------------------------------------------------------------------ */
 :root {
+  /* Type — this override MUST live here, not only in @theme above:
+     the unlayered :root --font-sans in packages/ui/src/styles/tokens.css
+     (imported first) BEATS the @theme definition, because unlayered
+     author styles win over @layer theme regardless of source order
+     (PR #64 lesson: the @theme-only fix left Bangla rendering in the
+     system fallback). This unlayered dashboard :root comes later in
+     source order, so it wins over tokens.css. Keep both stacks identical. */
+  --font-sans: "DM Sans", "Li Ador Noirrit", "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
+
   /* Page + surfaces (light) */
   --background: #f4f6f5;
   --foreground: #101613;
