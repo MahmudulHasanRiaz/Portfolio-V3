@@ -59,7 +59,10 @@ import {
   services,
 } from "@repo/database/schema";
 import { getApiDb } from "../../../db";
-import { ensurePerItemIndexing } from "../../../lib/ensure-schema";
+import {
+  ensureBnSeoFields,
+  ensurePerItemIndexing,
+} from "../../../lib/ensure-schema";
 import { requireAuth } from "../../../lib/admin-auth";
 import {
   invalidParam,
@@ -155,6 +158,8 @@ const CONTENT_TYPES: Record<string, ContentTypeConfig> = {
       "unpublishAt",
       "canonicalUrl",
       "keywords",
+      "metaTitleBn",
+      "metaDescriptionBn",
       "indexable",
       "followLinks",
       "archiveAllowed",
@@ -218,6 +223,8 @@ const CONTENT_TYPES: Record<string, ContentTypeConfig> = {
       "isFeatured",
       "canonicalUrl",
       "keywords",
+      "metaTitleBn",
+      "metaDescriptionBn",
       "indexable",
       "followLinks",
       "archiveAllowed",
@@ -252,6 +259,8 @@ const CONTENT_TYPES: Record<string, ContentTypeConfig> = {
       "isFeatured",
       "canonicalUrl",
       "keywords",
+      "metaTitleBn",
+      "metaDescriptionBn",
       // Per-item search indexing (0038).
       "indexable",
     ],
@@ -403,6 +412,10 @@ app.get("/:type", async (c) => {
     const def = CONTENT_TYPES[type];
     if (!def) return c.json({ error: "Unknown content type" }, 404);
     const db = getApiDb();
+    // 0043 auto-apply: BN SEO columns on posts / projects /
+    // case_studies — create them before the first select/insert
+    // that reads them (no manual migration).
+    await ensureBnSeoFields(db);
     // 0038 auto-apply: case_studies selects read the `indexable`
     // column — create it first (no manual migration).
     if (type === "case_studies") await ensurePerItemIndexing(db);
@@ -543,6 +556,10 @@ app.get("/:type/:id", async (c) => {
     const id = uuidParam(c, "id");
     if (!id) return invalidParam(c, "id");
     const db = getApiDb();
+    // 0043 auto-apply: BN SEO columns on posts / projects /
+    // case_studies — create them before the first select/insert
+    // that reads them (no manual migration).
+    await ensureBnSeoFields(db);
     // 0038 auto-apply: case_studies selects read the `indexable`
     // column — create it first (no manual migration).
     if (c.req.param("type") === "case_studies") await ensurePerItemIndexing(db);
@@ -577,6 +594,10 @@ app.post("/:type", async (c) => {
       return c.json({ error: "slug is required" }, 400);
     }
     const db = getApiDb();
+    // 0043 auto-apply: BN SEO columns on posts / projects /
+    // case_studies — create them before the first select/insert
+    // that reads them (no manual migration).
+    await ensureBnSeoFields(db);
     // 0038 auto-apply: case_studies inserts read the `indexable`
     // column — create it first (no manual migration).
     if (type === "case_studies") await ensurePerItemIndexing(db);
@@ -636,6 +657,10 @@ app.put("/:type/:id", async (c) => {
     const data = { ...(v.data as Record<string, unknown>) };
     stripServerManaged(data);
     const db = getApiDb();
+    // 0043 auto-apply: BN SEO columns on posts / projects /
+    // case_studies — create them before the first select/insert
+    // that reads them (no manual migration).
+    await ensureBnSeoFields(db);
     // 0038 auto-apply: case_studies selects read the `indexable`
     // column — create it first (no manual migration).
     if (type === "case_studies") await ensurePerItemIndexing(db);
@@ -679,6 +704,10 @@ app.delete("/:type/:id", async (c) => {
     const id = uuidParam(c, "id");
     if (!id) return invalidParam(c, "id");
     const db = getApiDb();
+    // 0043 auto-apply: BN SEO columns on posts / projects /
+    // case_studies — create them before the first select/insert
+    // that reads them (no manual migration).
+    await ensureBnSeoFields(db);
     // 0038 auto-apply: case_studies selects read the `indexable`
     // column — create it first (no manual migration).
     if (type === "case_studies") await ensurePerItemIndexing(db);
@@ -719,6 +748,10 @@ app.post("/:type/:id/transition", async (c) => {
     if ("error" in v) return c.json({ error: v.error }, 400);
     const action = v.data.action;
     const db = getApiDb();
+    // 0043 auto-apply: BN SEO columns on posts / projects /
+    // case_studies — create them before the first select/insert
+    // that reads them (no manual migration).
+    await ensureBnSeoFields(db);
     // 0038 auto-apply: case_studies selects read the `indexable`
     // column — create it first (no manual migration).
     if (type === "case_studies") await ensurePerItemIndexing(db);

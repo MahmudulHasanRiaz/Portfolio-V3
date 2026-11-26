@@ -7,6 +7,7 @@ import { toErrorMessage } from "@/lib/error-message";
 import { useRouter } from "next/navigation";
 import { ContentMediaFields, parseUrlList } from "@/components/content-media-fields";
 import { ContentTechnologiesField, type TechnologyOption } from "@/components/content-technologies-field";
+import { TipTapField } from "@/components/tiptap-field";
 import { setEntityTechnologies, listTechnologies } from "@/actions/entity-technologies";
 
 export default function NewProjectPage() {
@@ -112,7 +113,7 @@ export default function NewProjectPage() {
         </div>
         <div>
           <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "var(--text-primary)", marginBottom: 6 }}>Description</label>
-          <Textarea name="description" placeholder="Full project description" rows={8} />
+          <TipTapField name="description" placeholder="Full project description" />
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <input type="checkbox" id="isFeatured" name="isFeatured" />

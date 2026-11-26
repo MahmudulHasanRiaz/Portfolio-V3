@@ -9,6 +9,7 @@ import { Badge } from "@repo/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ContentMediaFields, parseUrlList } from "@/components/content-media-fields";
 import { ContentSeoFields } from "@/components/content-seo-fields";
+import { TipTapField } from "@/components/tiptap-field";
 import { ContentTagsField } from "@/components/content-tags-field";
 import { ContentTechnologiesField, type TechnologyOption } from "@/components/content-technologies-field";
 import { getEntityTags, setEntityTags } from "@/actions/entity-tags";
@@ -64,6 +65,8 @@ export default function EditProjectPage() {
       galleryImages: parseUrlList(form.get("galleryImages")),
       metaTitle: form.get("metaTitle"),
       metaDescription: form.get("metaDescription"),
+      metaTitleBn: form.get("metaTitleBn"),
+      metaDescriptionBn: form.get("metaDescriptionBn"),
       ogImage: form.get("ogImage"),
       canonicalUrl: form.get("canonicalUrl"),
       keywords: form.get("keywords"),
@@ -174,11 +177,11 @@ export default function EditProjectPage() {
             </div>
             <div>
               <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "var(--text-primary)", marginBottom: 6 }}>Description</label>
-              <Textarea name="description" defaultValue={project.description as string || ""} rows={8} />
+              <TipTapField name="description" defaultValue={project.description as string || ""} />
             </div>
             <div>
               <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "var(--text-primary)", marginBottom: 6 }}>Description (Bangla) — বাংলা</label>
-              <Textarea name="descriptionBn" defaultValue={project.descriptionBn as string || ""} rows={8} placeholder="বাংলা বিবরণ (optional — empty shows the English description)" />
+              <TipTapField name="descriptionBn" defaultValue={project.descriptionBn as string || ""} placeholder="বাংলা বিবরণ (optional — empty shows the English description)" />
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <input type="checkbox" id="isFeatured" name="isFeatured" defaultChecked={project.isFeatured === true} />

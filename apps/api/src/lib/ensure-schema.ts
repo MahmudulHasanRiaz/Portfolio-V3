@@ -211,7 +211,63 @@ export function ensureClientsLogoTone(db: ApiDb): Promise<void> {
   return clientsLogoTone;
 }
 
-// 0041 (packages/database/drizzle/0041_experience_entries.sql):
+// 0043 (packages/database/drizzle/0043_bn_seo_fields.sql):
+// `meta_title_bn` / `meta_description_bn` on `projects`, `posts`,
+// `case_studies`, `ventures` and `releases` — separate Bangla SEO
+// fields (the BN detail pages used to share the EN meta). Nullable,
+// no default; existing rows keep NULL (= BN page shows the EN meta).
+// Await this before any query that reads or writes the columns on
+// any of the five tables — a Drizzle select() reads every column, so
+// every handler that touches one of these tables must await it first
+// (public-content list, admin content/ventures/releases routes, and
+// the search-indexer loader in lib/side-effects).
+let bnSeoFields: Promise<void> | null = null;
+
+export function ensureBnSeoFields(db: ApiDb): Promise<void> {
+  if (!bnSeoFields) {
+    bnSeoFields = (async () => {
+      try {
+        await db.execute(
+          sql`ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "meta_title_bn" text`,
+        );
+        await db.execute(
+          sql`ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "meta_description_bn" text`,
+        );
+        await db.execute(
+          sql`ALTER TABLE "posts" ADD COLUMN IF NOT EXISTS "meta_title_bn" text`,
+        );
+        await db.execute(
+          sql`ALTER TABLE "posts" ADD COLUMN IF NOT EXISTS "meta_description_bn" text`,
+        );
+        await db.execute(
+          sql`ALTER TABLE "case_studies" ADD COLUMN IF NOT EXISTS "meta_title_bn" text`,
+        );
+        await db.execute(
+          sql`ALTER TABLE "case_studies" ADD COLUMN IF NOT EXISTS "meta_description_bn" text`,
+        );
+        await db.execute(
+          sql`ALTER TABLE "ventures" ADD COLUMN IF NOT EXISTS "meta_title_bn" text`,
+        );
+        await db.execute(
+          sql`ALTER TABLE "ventures" ADD COLUMN IF NOT EXISTS "meta_description_bn" text`,
+        );
+        await db.execute(
+          sql`ALTER TABLE "releases" ADD COLUMN IF NOT EXISTS "meta_title_bn" text`,
+        );
+        await db.execute(
+          sql`ALTER TABLE "releases" ADD COLUMN IF NOT EXISTS "meta_description_bn" text`,
+        );
+      } catch (err) {
+        // A transient failure must not poison the isolate: clear the
+        // guard so the next request retries.
+        bnSeoFields = null;
+        throw err;
+      }
+    })();
+  }
+  return bnSeoFields;
+}
+
 // The new `experience_entries` table (Experience page, PR #35) —
 // one river timeline weaving role entries (job at an organisation)
 // and project entries (project-basis engagement for a client, linked

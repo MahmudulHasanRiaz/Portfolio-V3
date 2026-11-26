@@ -8,6 +8,7 @@ import { Badge } from "@repo/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ContentMediaFields } from "@/components/content-media-fields";
 import { ContentSeoFields } from "@/components/content-seo-fields";
+import { TipTapField } from "@/components/tiptap-field";
 
 export default function EditServicePage() {
   const router = useRouter();
@@ -128,18 +129,18 @@ export default function EditServicePage() {
             </div>
             <div>
               <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "var(--text-primary)", marginBottom: 6 }}>Description</label>
-              <Textarea name="description" defaultValue={service.description as string || ""} rows={8} />
+              <TipTapField name="description" defaultValue={service.description as string || ""} />
             </div>
             <div>
               <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "var(--text-primary)", marginBottom: 6 }}>Description (Bangla) — বাংলা</label>
-              <Textarea name="descriptionBn" defaultValue={service.descriptionBn as string || ""} rows={8} placeholder="বাংলা বিবরণ (optional — empty shows the English description)" />
+              <TipTapField name="descriptionBn" defaultValue={service.descriptionBn as string || ""} placeholder="বাংলা বিবরণ (optional — empty shows the English description)" />
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <input type="checkbox" id="isFeatured" name="isFeatured" defaultChecked={service.isFeatured === true} />
               <label htmlFor="isFeatured" style={{ fontSize: 14, color: "var(--text-primary)" }}>Featured service</label>
             </div>
             <ContentMediaFields initial={service} videosAndGallery={false} />
-            <ContentSeoFields initial={service} showIndexable={false} />
+            <ContentSeoFields initial={service} showIndexable={false} showBn={false} />
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <Button type="submit" disabled={loading}>{loading ? "Saving..." : "Save Changes"}</Button>
               <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>

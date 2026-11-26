@@ -22,12 +22,16 @@ const labelStyle = { display: "block", fontSize: 14, fontWeight: 500, color: "va
 export function ContentSeoFields({
   initial,
   showIndexable = true,
+  showBn = true,
 }: {
   /** The loaded row (edit) — a Record<string, unknown> is fine. */
   initial?: Record<string, unknown>;
   /** Hide the per-item indexing toggle (services have no public
    * detail page, so there is nothing to index). */
   showIndexable?: boolean;
+  /** Hide the Bangla SEO fields (services have no BN detail page, so
+   * their BN meta would be dead input — services pass false). */
+  showBn?: boolean;
 }) {
   const ogImageRef = useRef<HTMLInputElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -54,6 +58,18 @@ export function ContentSeoFields({
           <label style={labelStyle}>Meta Description</label>
           <Textarea name="metaDescription" defaultValue={(initial?.metaDescription as string) || ""} rows={2} placeholder="Short description for search results (empty = excerpt / summary)" />
         </div>
+        {showBn ? (
+          <>
+            <div>
+              <label style={labelStyle}>Meta Title (Bangla) — বাংলা</label>
+              <Input name="metaTitleBn" defaultValue={(initial?.metaTitleBn as string) || ""} placeholder="বাংলা শিরোনাম (optional — empty shows the English meta title)" />
+            </div>
+            <div>
+              <label style={labelStyle}>Meta Description (Bangla) — বাংলা</label>
+              <Textarea name="metaDescriptionBn" defaultValue={(initial?.metaDescriptionBn as string) || ""} rows={2} placeholder="বাংলা বিবরণ (optional — empty shows the English meta description)" />
+            </div>
+          </>
+        ) : null}
         <div>
           <label style={labelStyle}>OG Image URL</label>
           <div style={{ display: "flex", gap: 8 }}>

@@ -3157,6 +3157,40 @@ button.tag:hover {
 	color: var(--ink);
 }
 
+.detail-body ul,
+.detail-body ol {
+	margin: 0 0 12px;
+	padding-left: 1.25rem;
+	color: var(--ink-dim);
+}
+
+.detail-body li {
+	margin: 0 0 6px;
+}
+
+/* Nested list items render flat with a level (see MarkdownBody) —
+ * the indent carries the nesting visually. */
+.detail-body li[data-level="1"] {
+	margin-left: 1.25rem;
+}
+
+.detail-body li[data-level="2"] {
+	margin-left: 2.5rem;
+}
+
+.detail-body li[data-level="3"] {
+	margin-left: 3.75rem;
+}
+
+.detail-body blockquote {
+	margin: 0 0 12px;
+	padding: 12px 16px;
+	border-left: 3px solid var(--accent);
+	background: var(--accent-wash);
+	border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+	color: var(--ink-dim);
+}
+
 .problem-fix-result {
 	display: grid;
 	gap: 12px;

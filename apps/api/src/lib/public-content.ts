@@ -50,7 +50,7 @@ import {
 } from "./integrations";
 import { asc, desc, eq } from "drizzle-orm";
 import { getApiDb } from "../db";
-import { ensureClientsLogoDisplayMode, ensureClientsLogoTone, ensureEducationSkills, ensureExperienceEntries, ensurePerItemIndexing } from "./ensure-schema";
+import { ensureBnSeoFields, ensureClientsLogoDisplayMode, ensureClientsLogoTone, ensureEducationSkills, ensureExperienceEntries, ensurePerItemIndexing } from "./ensure-schema";
 import {
   educationEntries,
   experienceEntries,
@@ -190,6 +190,8 @@ function toStringList(value: unknown): string[] {
 function seoFields(r: {
   metaTitle?: string | null;
   metaDescription?: string | null;
+  metaTitleBn?: string | null;
+  metaDescriptionBn?: string | null;
   ogImage?: string | null;
   canonicalUrl?: string | null;
   keywords?: string | null;
@@ -197,6 +199,8 @@ function seoFields(r: {
 }): {
   metaTitle?: string;
   metaDescription?: string;
+  metaTitleBn?: string;
+  metaDescriptionBn?: string;
   ogImage?: string;
   canonicalUrl?: string;
   keywords?: string;
@@ -205,6 +209,11 @@ function seoFields(r: {
   return {
     metaTitle: r.metaTitle ?? undefined,
     metaDescription: r.metaDescription ?? undefined,
+    // Bangla SEO (0043): the BN detail pages read these with fallback
+    // to the EN fields above. Undefined when unset — the BN page then
+    // shows the EN meta (which already includes any seo_meta overlay).
+    metaTitleBn: r.metaTitleBn ?? undefined,
+    metaDescriptionBn: r.metaDescriptionBn ?? undefined,
     ogImage: r.ogImage ?? undefined,
     canonicalUrl: r.canonicalUrl ?? undefined,
     keywords: r.keywords ?? undefined,
@@ -1222,6 +1231,9 @@ export async function listPublicContent(
   type: PublicContentType,
 ): Promise<PublicContentItem[]> {
   const db = getApiDb();
+  // 0043 auto-apply: the list functions below select the BN SEO
+  // columns — create them first (no manual migration).
+  await ensureBnSeoFields(db);
   switch (type) {
     case "posts":
       return listPosts(db);

@@ -131,20 +131,432 @@ export function isRealUrl(url: string | null | undefined): url is string {
 	return true;
 }
 
+export interface InlineRun {
+	/** Plain text of this run (already entity-decoded). */
+	text: string;
+	bold?: boolean;
+	italic?: boolean;
+	underline?: boolean;
+	strike?: boolean;
+	/** Validated href — http(s), site-relative (/path) or anchor (#id) only. */
+	href?: string;
+	/** A <br> line break inside the current block. */
+	br?: boolean;
+}
+
+export interface ListItem {
+	rich: InlineRun[];
+	/** Nesting depth inside the list (0 = top level). */
+	level: number;
+	/** "ul" or "ol" — the list this item belongs to. */
+	kind: "ul" | "ol";
+}
+
 export interface BodyBlock {
-	kind: "h3" | "p" | "img";
+	kind: "h2" | "h3" | "p" | "img" | "ul" | "ol" | "blockquote";
 	text: string;
 	/** Image URL — img blocks only. */
 	src?: string;
 	/** Image alt text — img blocks only. */
 	alt?: string;
+	/** Inline formatted runs — p / h2 / h3 / blockquote blocks only.
+	 *  `text` stays the plain-text concatenation so dedupeBlocks keeps
+	 *  working on rich blocks exactly as on legacy ones. */
+	rich?: InlineRun[];
+	/** List items — ul / ol blocks only. */
+	items?: ListItem[];
 }
 
 /**
- * The preview's content blocks: a '## ' line is an h3 sub-heading,
- * a line that is exactly a markdown image `![alt](url)` is an img
- * block, every other block is a paragraph. Single newlines inside a
- * block are line wraps, not new blocks.
+ * Dual-format body parsing (TipTap editor, 0043):
+ *
+ * - Legacy rows (`## ` headings + blank-line paragraphs, the only
+ *   format the admin could produce before) parse exactly as before
+ *   through parseLegacyBlocks — no existing content changes.
+ * - Rows saved through the TipTap editor are HTML: they parse through
+ *   the sanitized HTML path below. Detection requires a real block tag
+ *   at the start (p / h2 / h3 / ul / ol / blockquote / img / div) —
+ *   a `<` typed as prose (e.g. "<3") never takes the HTML path.
+ *
+ * The HTML path is an allowlist sanitizer, not a passthrough: only
+ * p / h2 / h3 / strong / b / em / i / u / s / strike / del / ul / ol /
+ * li / blockquote / a / img / br survive (unknown tags are unwrapped,
+ * their text kept); a[href] and img[src] accept http(s), site-relative
+ * (/path) and anchor (#id) URLs only — javascript: / data: / //
+ * never reach the page; script / style / iframe / form / svg and
+ * friends are dropped WITH their subtree; every other attribute
+ * (class / style / on*) is stripped. Text is rendered through Astro /
+ * Preact expressions, which escape it — raw HTML never reaches the
+ * page. Runs server-side only (Astro SSR / build); nothing of this
+ * ships in the public JS bundle.
+ */
+const HTML_BLOCK_TAG = /^\s*<(p|h2|h3|ul|ol|blockquote|img|div|script|style)[\s/>]/i;
+
+/** True when the stored body is TipTap HTML rather than legacy text. */
+export function isHtmlContent(text: string | null | undefined): boolean {
+	if (!text) return false;
+	return HTML_BLOCK_TAG.test(text);
+}
+
+/** Tags whose entire subtree is dropped (children included). */
+const DROP_TAGS = new Set([
+	"script",
+	"style",
+	"iframe",
+	"object",
+	"embed",
+	"form",
+	"input",
+	"textarea",
+	"button",
+	"select",
+	"svg",
+	"math",
+	"video",
+	"audio",
+	"noscript",
+	"template",
+	"title",
+	"head",
+]);
+
+/** Decode the HTML entities TipTap / pasted content can carry.
+ *  &amp; decodes LAST so `&amp;lt;` becomes `&lt;`, never `<`. */
+export function decodeEntities(text: string): string {
+	return text
+		.replace(/&nbsp;/g, " ")
+		.replace(/&lt;/g, "<")
+		.replace(/&gt;/g, ">")
+		.replace(/&quot;/g, '"')
+		.replace(/&#39;|&apos;/g, "'")
+		.replace(/&#(\d+);/g, (_m, n) => {
+			const c = Number(n);
+			return Number.isFinite(c) && c > 0 && c < 0x110000
+				? String.fromCodePoint(c)
+				: "";
+		})
+		.replace(/&#x([0-9a-fA-F]+);/g, (_m, h) => {
+			const c = parseInt(h, 16);
+			return Number.isFinite(c) && c > 0 && c < 0x110000
+				? String.fromCodePoint(c)
+				: "";
+		})
+		.replace(/&amp;/g, "&");
+}
+
+/** A URL is safe for href/src only as http(s), a site-relative path
+ *  (/path — NOT protocol-relative //host) or a same-page anchor. */
+export function safeUrl(url: string | undefined): string | undefined {
+	if (!url) return undefined;
+	const u = url.trim();
+	if (!u || /[\s<>"`]/.test(u)) return undefined;
+	if (/^https?:\/\//i.test(u)) return u;
+	if (/^\/(?!\/)/.test(u)) return u;
+	if (/^#/.test(u)) return u;
+	return undefined;
+}
+
+/** Attributes of one tag token, lowercased names, first wins. */
+function parseAttrs(tagInner: string): Record<string, string> {
+	const attrs: Record<string, string> = {};
+	const re =
+		/([a-zA-Z][a-zA-Z0-9-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
+	let m: RegExpExecArray | null;
+	while ((m = re.exec(tagInner))) {
+		const name = m[1].toLowerCase();
+		if (!(name in attrs)) attrs[name] = m[2] ?? m[3] ?? m[4] ?? "";
+	}
+	return attrs;
+}
+
+/** Tokenize HTML into tags / comments / text. A lone `<` that opens
+ *  no tag (prose like "<3") is its own token so the `<` survives. */
+const TOKEN_RE = /<!--[\s\S]*?-->|<![^>]*>|<\/?[a-zA-Z][^>]*>|[^<]+|</g;
+
+interface HtmlBlockState {
+	kind: "p" | "h2" | "h3" | "blockquote";
+	rich: InlineRun[];
+}
+
+/** Parse TipTap HTML into blocks. Tolerant of unclosed / mismatched
+ *  tags (admin HTML is editor-produced, but pasted content is not).
+ *  Empty paragraphs (`<p></p>`, `<p><br></p>`) are dropped. */
+export function parseHtmlBlocks(html: string): BodyBlock[] {
+	const blocks: BodyBlock[] = [];
+	let cur: HtmlBlockState | null = null;
+	// Open lists, outermost first. A nested list merges its items into
+	// its parent on close; each item records its depth in `level`.
+	const listStack: { kind: "ul" | "ol"; items: ListItem[] }[] = [];
+	let curItem: ListItem | null = null;
+	let bold = 0;
+	let italic = 0;
+	let underline = 0;
+	let strike = 0;
+	const hrefStack: (string | null)[] = [];
+	const dropStack: string[] = [];
+
+	const plainText = (rich: InlineRun[]): string =>
+		rich.map((r) => (r.br ? " " : r.text)).join("");
+
+	/** Drop leading/trailing whitespace-only runs; trim the edges. */
+	function trimRuns(rich: InlineRun[]): InlineRun[] {
+		let start = 0;
+		let end = rich.length;
+		while (start < end && /^\s*$/.test(rich[start].text) && !rich[start].br)
+			start++;
+		while (end > start && /^\s*$/.test(rich[end - 1].text) && !rich[end - 1].br)
+			end--;
+		const out = rich.slice(start, end);
+		if (out.length > 0 && !out[0].br)
+			out[0] = { ...out[0], text: out[0].text.replace(/^\s+/, "") };
+		if (out.length > 0 && !out[out.length - 1].br) {
+			const last = out[out.length - 1];
+			out[out.length - 1] = { ...last, text: last.text.replace(/\s+$/, "") };
+		}
+		return out;
+	}
+
+	function flushBlock(): void {
+		if (!cur) return;
+		const rich = trimRuns(cur.rich);
+		const text = plainText(rich).trim();
+		if (text !== "") blocks.push({ kind: cur.kind, text, rich });
+		cur = null;
+	}
+
+	function flushItem(): void {
+		if (!curItem) return;
+		const list = listStack[listStack.length - 1];
+		if (list) {
+			const rich = trimRuns(curItem.rich);
+			if (plainText(rich).trim() !== "")
+				list.items.push({ ...curItem, rich });
+		}
+		curItem = null;
+	}
+
+	/** Close one open list, merging a nested list into its parent. */
+	function closeList(): void {
+		flushItem();
+		const closed = listStack.pop();
+		if (!closed) return;
+		if (listStack.length > 0) {
+			listStack[listStack.length - 1].items.push(...closed.items);
+		} else if (closed.items.length > 0) {
+			blocks.push({
+				kind: closed.kind,
+				text: closed.items
+					.map((i) => plainText(i.rich))
+					.join(" ")
+					.trim(),
+				items: closed.items,
+			});
+		}
+	}
+
+	function flushLists(): void {
+		while (listStack.length > 0) closeList();
+	}
+
+	function openBlock(kind: "p" | "h2" | "h3" | "blockquote"): void {
+		// <p> inside <li> or inside <blockquote> flows into the open
+		// block — TipTap wraps both in <p>.
+		if (curItem) return;
+		if (cur?.kind === "blockquote" && kind === "p") return;
+		flushLists();
+		flushBlock();
+		cur = { kind, rich: [] };
+	}
+
+	function closeBlock(): void {
+		// A <p> close inside <li> / <blockquote> is a no-op — the
+		// outer block closes on its own tag.
+		if (curItem) return;
+		flushBlock();
+	}
+
+	function openList(kind: "ul" | "ol"): void {
+		if (curItem) {
+			// Nested list inside the current item: flush the item so
+			// document order is kept, then open the deeper list.
+			flushItem();
+		} else {
+			flushBlock();
+		}
+		listStack.push({ kind, items: [] });
+	}
+
+	function openItem(): void {
+		if (listStack.length === 0) {
+			// Stray <li> with no list — treat it as a bullet list.
+			listStack.push({ kind: "ul", items: [] });
+		}
+		flushItem();
+		const list = listStack[listStack.length - 1];
+		curItem = { rich: [], level: listStack.length - 1, kind: list.kind };
+	}
+
+	function appendImage(attrs: Record<string, string>): void {
+		const src = safeUrl(attrs.src);
+		if (!src) return;
+		if (curItem) flushItem();
+		flushLists();
+		flushBlock();
+		blocks.push({ kind: "img", text: attrs.alt ?? "", src, alt: attrs.alt ?? "" });
+	}
+
+	function appendText(raw: string): void {
+		if (dropStack.length > 0) return;
+		const text = decodeEntities(raw);
+		if (text === "") return;
+		const run: InlineRun = { text };
+		if (bold > 0) run.bold = true;
+		if (italic > 0) run.italic = true;
+		if (underline > 0) run.underline = true;
+		if (strike > 0) run.strike = true;
+		const href =
+			hrefStack.length > 0 ? hrefStack[hrefStack.length - 1] : null;
+		if (href) run.href = href;
+		const target = curItem ?? cur;
+		if (!target) {
+			// Bare text outside any block (TipTap never emits this) —
+			// wrap it in a paragraph so it is never lost.
+			cur = { kind: "p", rich: [run] };
+			return;
+		}
+		const rich = target.rich;
+		const last = rich[rich.length - 1];
+		if (
+			last &&
+			!last.br &&
+			last.bold === run.bold &&
+			last.italic === run.italic &&
+			last.underline === run.underline &&
+			last.strike === run.strike &&
+			last.href === run.href
+		) {
+			last.text += run.text;
+		} else {
+			rich.push(run);
+		}
+	}
+
+	function appendBreak(): void {
+		if (dropStack.length > 0) return;
+		const target = curItem ?? cur;
+		if (!target) return;
+		target.rich.push({ text: "", br: true });
+	}
+
+	for (const token of html.match(TOKEN_RE) ?? []) {
+		if (token.startsWith("<!--") || token.startsWith("<!")) continue;
+		if (token === "<") {
+			appendText("<");
+			continue;
+		}
+		if (!token.startsWith("<")) {
+			appendText(token);
+			continue;
+		}
+		const isClose = token.startsWith("</");
+		const inner = token.slice(isClose ? 2 : 1, -1).trim();
+		const selfClose = inner.endsWith("/");
+		const name = (inner.split(/\s+/, 1)[0] ?? "")
+			.replace(/\/$/, "")
+			.toLowerCase();
+		if (!name) continue;
+		// Inside a dropped subtree only its own close tag matters.
+		if (dropStack.length > 0) {
+			if (isClose && name === dropStack[dropStack.length - 1])
+				dropStack.pop();
+			continue;
+		}
+		if (!isClose && DROP_TAGS.has(name)) {
+			if (!selfClose) dropStack.push(name);
+			continue;
+		}
+		const attrs = isClose ? {} : parseAttrs(inner);
+		switch (name) {
+			case "p":
+				if (isClose) closeBlock();
+				else openBlock("p");
+				break;
+			case "h2":
+				if (isClose) closeBlock();
+				else openBlock("h2");
+				break;
+			case "h3":
+				if (isClose) closeBlock();
+				else openBlock("h3");
+				break;
+			case "blockquote":
+				if (isClose) closeBlock();
+				else openBlock("blockquote");
+				break;
+			case "ul":
+				if (isClose) closeList();
+				else openList("ul");
+				break;
+			case "ol":
+				if (isClose) closeList();
+				else openList("ol");
+				break;
+			case "li":
+				if (isClose) flushItem();
+				else openItem();
+				break;
+			case "a":
+				if (isClose) hrefStack.pop();
+				else hrefStack.push(safeUrl(attrs.href) ?? null);
+				break;
+			case "strong":
+			case "b":
+				bold = Math.max(0, bold + (isClose ? -1 : 1));
+				break;
+			case "em":
+			case "i":
+				italic = Math.max(0, italic + (isClose ? -1 : 1));
+				break;
+			case "u":
+				underline = Math.max(0, underline + (isClose ? -1 : 1));
+				break;
+			case "s":
+			case "strike":
+			case "del":
+				strike = Math.max(0, strike + (isClose ? -1 : 1));
+				break;
+			case "br":
+				if (!isClose) appendBreak();
+				break;
+			case "img":
+				if (!isClose) appendImage(attrs);
+				break;
+			case "hr":
+				if (!isClose) {
+					if (curItem) flushItem();
+					flushLists();
+					flushBlock();
+				}
+				break;
+			default:
+				// Unknown tag (div / span / code / ...): unwrap — the
+				// tag is dropped, its children render as if it was
+				// never there. Nothing else is trusted.
+				break;
+		}
+	}
+	flushItem();
+	flushLists();
+	flushBlock();
+	return blocks;
+}
+
+/**
+ * The preview's content blocks (LEGACY path — unchanged):
+ * a '## ' line is an h3 sub-heading, a line that is exactly a markdown
+ * image `![alt](url)` is an img block, every other block is a
+ * paragraph. Single newlines inside a block are line wraps, not new
+ * blocks.
  *
  * Inline images inside a paragraph (text before/after the `![...]`)
  * stay literal text — only a standalone image line becomes an <img>,
@@ -153,7 +565,21 @@ export interface BodyBlock {
  * optimization as every other remote image (files.riaz.com.bd →
  * /api/image, Unsplash → w= rewrite, anything else unchanged).
  */
+
+/**
+ * Dual-format entry point: TipTap HTML rows go through the sanitized
+ * HTML path; every other row keeps the legacy `## ` + paragraphs
+ * parse, byte-identical to before.
+ */
 export function parseBodyBlocks(
+	text: string | null | undefined,
+): BodyBlock[] {
+	if (!text) return [];
+	if (isHtmlContent(text)) return parseHtmlBlocks(text);
+	return parseLegacyBlocks(text);
+}
+
+function parseLegacyBlocks(
 	text: string | null | undefined,
 ): BodyBlock[] {
 	if (!text) return [];

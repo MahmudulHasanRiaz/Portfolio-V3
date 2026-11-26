@@ -69,6 +69,12 @@ const baseSchema = z.object({
 	// the detail pages.
 	metaTitle: z.string().optional(),
 	metaDescription: z.string().optional(),
+	// Bangla SEO (0043): separate BN meta title / description, read by
+	// the /bn/ detail pages with fallback to the EN fields above.
+	// Zod strips undeclared live fields, so these must be declared here
+	// or the values never reach the BN pages.
+	metaTitleBn: z.string().optional(),
+	metaDescriptionBn: z.string().optional(),
 	ogImage: z.string().optional(),
 	canonicalUrl: z.string().optional(),
 	keywords: z.string().optional(),

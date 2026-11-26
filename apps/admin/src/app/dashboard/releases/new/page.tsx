@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Input, Textarea, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Card, CardContent } from "@repo/ui";
+import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Card, CardContent } from "@repo/ui";
 import { ArrowLeft } from "lucide-react";
+import { TipTapField } from "@/components/tiptap-field";
 import Link from "next/link";
 
 const TYPES = ["nasheed", "tilawat", "acting", "podcast", "interview", "documentary"];
@@ -112,7 +113,7 @@ export default function NewReleasePage() {
             </div>
             <div>
               <label style={{ fontSize: 14, fontWeight: 500, marginBottom: 4, display: "block" }}>Description</label>
-              <Textarea value={form.description} onChange={(e) => handleChange("description", e.target.value)} rows={4} />
+              <TipTapField value={form.description} defaultValue={form.description} onChange={(html) => handleChange("description", html)} />
             </div>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <Link href="/dashboard/releases">

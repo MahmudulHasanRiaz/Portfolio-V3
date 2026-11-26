@@ -7,6 +7,7 @@ import { useRouter, useParams } from "next/navigation";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ContentMediaFields, parseUrlList } from "@/components/content-media-fields";
 import { ContentSeoFields } from "@/components/content-seo-fields";
+import { TipTapField } from "@/components/tiptap-field";
 
 export default function EditBlogPost() {
   const router = useRouter();
@@ -52,6 +53,8 @@ export default function EditBlogPost() {
       galleryImages: parseUrlList(form.get("galleryImages")),
       metaTitle: form.get("metaTitle"),
       metaDescription: form.get("metaDescription"),
+      metaTitleBn: form.get("metaTitleBn"),
+      metaDescriptionBn: form.get("metaDescriptionBn"),
       ogImage: form.get("ogImage"),
       canonicalUrl: form.get("canonicalUrl"),
       keywords: form.get("keywords"),
@@ -130,16 +133,16 @@ export default function EditBlogPost() {
             </div>
             <div>
               <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "var(--text-primary)", marginBottom: 6 }}>Content</label>
-              <Textarea name="content" defaultValue={post.content as string || ""} rows={12} />
+              <TipTapField name="content" defaultValue={post.content as string || ""} />
               <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
-                Inline images in markdown: ![alt text](https://...) — recommended up to 1600px wide, WebP/AVIF
+                Images: use the Image button in the toolbar to pick from the media library — recommended up to 1600px wide, WebP/AVIF
                 preferred (JPEG/PNG ok), quality 75–80 — don&apos;t compress aggressively. No manual resizing
                 needed — images are automatically optimized for the public site.
               </p>
             </div>
             <div>
               <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "var(--text-primary)", marginBottom: 6 }}>Content (Bangla) — বাংলা</label>
-              <Textarea name="contentBn" defaultValue={post.contentBn as string || ""} rows={12} placeholder="বাংলা কনটেন্ট (optional — empty shows the English content)" />
+              <TipTapField name="contentBn" defaultValue={post.contentBn as string || ""} placeholder="বাংলা কনটেন্ট (optional — empty shows the English content)" />
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <input type="checkbox" id="isFeatured" name="isFeatured" defaultChecked={post.isFeatured === true} />

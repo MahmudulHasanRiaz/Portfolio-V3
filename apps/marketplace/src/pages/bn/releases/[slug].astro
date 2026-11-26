@@ -86,10 +86,14 @@ const merged = mergeDetail(buildData, liveData) as unknown as
 // Admin SEO overrides (Dashboard → SEO → Metadata) — the same
 // single fields EN uses. The BN page never had this wiring (PR #33
 // fixed EN only), so every BN detail page showed the fallback
-// title. Read from `merged` (unlocalized): the SEO fields are
-// locale-independent and the `bn` object never overrides them.
-const seoTitle = seoString(merged, "metaTitle");
-const seoDescription = seoString(merged, "metaDescription");
+// title. Read from `merged` (unlocalized). Bangla SEO (0043): the BN
+// meta title / description win when set, falling back to the EN fields
+// (which already include any seo_meta override) when empty.
+const seoTitle =
+	seoString(merged, "metaTitleBn") ?? seoString(merged, "metaTitle");
+const seoDescription =
+	seoString(merged, "metaDescriptionBn") ??
+	seoString(merged, "metaDescription");
 const seoOgImage = seoString(merged, "ogImage");
 const seoCanonical = seoString(merged, "canonicalUrl");
 const seoKeywords = seoString(merged, "keywords");
