@@ -24,9 +24,10 @@
 // - versions POST resolves the internal `users` id from the session email
 //   (authorizeByEmail with no role list); when it cannot be resolved the
 //   createdBy column stays null, exactly as in the original.
-// - There is deliberately NO homepage/seed route here: the Next.js
-//   homepage/seed route bulk-seeds dummy data (including a DevPulse BD
-//   venture the user said to drop) and is NOT ported.
+// - There is deliberately NO homepage/seed route here: the former
+//   Next.js route bulk-seeded dummy data (including a DevPulse BD
+//   venture the user said to drop) and was removed entirely rather
+//   than ported.
 //
 // Cache purge (wired at cutover via lib/side-effects): HomepageService
 // calls purgePublicCache(["home"]) after reorder, section update,
