@@ -20,7 +20,6 @@ export interface Dict {
 	profileSe: string;
 	profileKnowMe: string;
 	chooseProfile: string;
-	resumeRotation: string;
 	openMenu: string;
 	closeMenu: string;
 	mobileNav: string;
@@ -40,7 +39,6 @@ export interface Dict {
 	followConnect: string;
 	projectsShipped: string;
 	ordersDaily: string;
-	designationSe: string[];
 	designationKnowMe: string[];
 	statYears: string;
 	statProjects: string;
@@ -124,7 +122,6 @@ export interface Dict {
 	allEducation: string;
 	allExperience: string;
 	allChip: string;
-	moreFilters: string;
 	showingProjects: string;
 	showingPosts: string;
 	showingReleases: string;
@@ -187,8 +184,6 @@ export interface Dict {
 	next: string;
 	previousProject: string;
 	nextProject: string;
-	previousClient: string;
-	nextClient: string;
 	loadingProjects: string;
 	builtWith: string;
 	notFoundProject: string;
@@ -277,7 +272,6 @@ export interface Dict {
 	skillsMainIntro: string;
 	skillsJourneyTitle: string;
 	skillsJourneyIntro: string;
-	stageSoftware: string;
 	stageGraphicDesign: string;
 	stageDigitalMarketing: string;
 	stageGraphicDesignNote: string;
@@ -313,7 +307,6 @@ export const bn: Dict = {
 	profileSe: "সফটওয়্যার ইঞ্জিনিয়ার",
 	profileKnowMe: "আমাকে জানুন",
 	chooseProfile: "একটা প্রোফাইল বেছে নিন",
-	resumeRotation: "অটো-রোটেশন চালু করুন",
 	openMenu: "মেনু খুলুন",
 	closeMenu: "মেনু বন্ধ করুন",
 	mobileNav: "মোবাইল মেনু",
@@ -336,7 +329,6 @@ export const bn: Dict = {
 	followConnect: "ফলো করুন ও যুক্ত থাকুন",
 	projectsShipped: "প্রজেক্ট সম্পন্ন",
 	ordersDaily: "প্রতিদিন সামলানো অর্ডার",
-	designationSe: ["সফটওয়্যার ইঞ্জিনিয়ার"],
 	designationKnowMe: [
 		"সফটওয়্যার ইঞ্জিনিয়ার",
 		"উদ্যোক্তা",
@@ -442,7 +434,6 @@ export const bn: Dict = {
 	allEducation: "শিক্ষা",
 	allExperience: "অভিজ্ঞতা",
 	allChip: "সবগুলো",
-	moreFilters: "আরও",
 	showingProjects: "মোট {total}টি প্রজেক্টের মধ্যে {shown}টি দেখাচ্ছে",
 	showingPosts: "মোট {total}টি পোস্টের মধ্যে {shown}টি দেখাচ্ছে",
 	showingReleases: "মোট {total}টি রিলিজের মধ্যে {shown}টি দেখাচ্ছে",
@@ -505,8 +496,6 @@ export const bn: Dict = {
 	next: "পরেরটা",
 	previousProject: "আগের প্রজেক্ট",
 	nextProject: "পরের প্রজেক্ট",
-	previousClient: "আগের ক্লায়েন্ট",
-	nextClient: "পরের ক্লায়েন্ট",
 	loadingProjects: "প্রজেক্ট লোড হচ্ছে",
 	builtWith: "যা দিয়ে বানানো",
 	notFoundProject: "প্রজেক্টটা পাওয়া যায়নি",
@@ -613,7 +602,6 @@ export const bn: Dict = {
 	skillsJourneyTitle: "এখানে আসার জার্নি",
 	skillsJourneyIntro:
 		"Software-এর আগে ছিল design — আর তার আগে marketing। আগের skills-গুলো এখানেই আছে, একটু ছোট করে।",
-	stageSoftware: "Software Development",
 	stageGraphicDesign: "Graphic Design",
 	stageDigitalMarketing: "Digital Marketing",
 	stageGraphicDesignNote: "যেখান থেকে শুরু।",

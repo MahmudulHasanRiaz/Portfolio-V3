@@ -33,35 +33,6 @@ export function getDict(lang: Lang): Dict {
 export function displayName(lang: Lang): string {
 	return lang === "bn" ? PROFILE.nameBn : PROFILE.name;
 }
-/**
- * Admin-overridable site copy (gap group (f)).
- *
- * `settings.siteCopy` (EN) / `settings.siteCopyBn` (BN) are the admin-
- * managed `site_copy` / `site_copy_bn` settings keys, exposed via
- * getPublicSettings() as `siteCopy` / `siteCopyBn`. For the current
- * language, a settings value wins over the dictionary value, PER KEY —
- * the admin can override ONE string without touching the rest. Absent
- * settings value -> dictionary value; the dictionary stays the
- * fail-safe fallback. An empty / whitespace-only string (or an empty /
- * non-string array for the four list keys) is treated as absent, so a
- * page can never render a blank. Keys the dictionary does not know are
- * ignored. When there is nothing to override, the SAME dict object is
- * returned — with no settings keys present (the state today) the output
- * is byte-identical to getDict() alone.
- *
- * The `settings` parameter is deliberately `unknown`: PublicSettings
- * does not declare siteCopy/siteCopyBn yet (that exposure lands
- * separately), so no named object type can accept it today — an
- * all-optional shape trips TS2559 ("no properties in common") at the
- * call sites, and an index signature trips TS2345. The function
- * narrows defensively instead, so anything malformed is ignored and
- * the dictionary wins. Once the loader declares the fields, tighten
- * the parameter to `SiteCopySettings` (below).
- */
-export interface SiteCopySettings {
-	siteCopy?: Record<string, unknown> | null;
-	siteCopyBn?: Record<string, unknown> | null;
-}
 
 export function applySiteCopy(
 	dict: Dict,
@@ -94,7 +65,6 @@ export function applySiteCopy(
 	}
 	return (out ?? dict) as Dict;
 }
-
 
 // ---------------------------------------------------------------------------
 // Per-island dictionary subsets (Issue 7B).
@@ -151,7 +121,6 @@ export const SITE_HEADER_DICT_KEYS = [
 	"switchToLight",
 	"switchToDark",
 	"chooseProfile",
-	"resumeRotation",
 	"openMenu",
 	"closeMenu",
 	"mobileNav",
@@ -250,32 +219,6 @@ export const STACK_GLOBE_DICT_KEYS = [
 export type StackGlobeDict = Pick<
 	Dict,
 	(typeof STACK_GLOBE_DICT_KEYS)[number]
->;
-
-/** DetailMedia: gallery/video slider labels, counter + alt-text base. */
-export const DETAIL_MEDIA_DICT_KEYS = [
-	"galleryLabel",
-	"videosLabel",
-	"prevImages",
-	"nextImages",
-	"prevVideos",
-	"nextVideos",
-	"mediaCounter",
-	"galleryImage",
-] as const;
-export type DetailMediaDict = Pick<
-	Dict,
-	(typeof DETAIL_MEDIA_DICT_KEYS)[number]
->;
-
-/** ThemeToggle: light/dark switch labels (aria-label only). */
-export const THEME_TOGGLE_DICT_KEYS = [
-	"switchToLight",
-	"switchToDark",
-] as const;
-export type ThemeToggleDict = Pick<
-	Dict,
-	(typeof THEME_TOGGLE_DICT_KEYS)[number]
 >;
 
 /** ServiceModal: close + handover CTA + spinner label (all optional). */
@@ -395,21 +338,6 @@ export function localizeCaseStudy<T extends Record<string, unknown>>(
 	return localizeData({ ...data, bn: remapped }, lang);
 }
 
-/** Date in the page language (Bangla → bn-BD, Bangla digits). */
-export function formatDateLang(
-	iso: string | undefined | null,
-	lang: Lang,
-): string {
-	if (!iso) return "";
-	const d = new Date(iso);
-	if (Number.isNaN(d.getTime())) return "";
-	return d.toLocaleDateString(lang === "bn" ? "bn-BD" : "en-GB", {
-		day: "numeric",
-		month: "short",
-		year: "numeric",
-	});
-}
-
 /** "3 min read" / "৩ মিনিট পড়া" (Bangla digits on /bn/). */
 export function readingTimeLabel(
 	minutes: number | undefined | null,
@@ -437,19 +365,4 @@ export function showingLabel(
 	return template
 		.replace("{shown}", fmt(shown))
 		.replace("{total}", fmt(total));
-}
-
-/** "Watch on YouTube" / "ইউটিউবে দেখুন", "Listen on X" / "X-এ শুনুন". */
-export function platformActionLabelLang(
-	name: string,
-	lang: Lang,
-): string {
-	if (lang === "bn") {
-		return name.toLowerCase() === "youtube"
-			? "ইউটিউবে দেখুন"
-			: `${name}-এ শুনুন`;
-	}
-	return name.toLowerCase() === "youtube"
-		? "Watch on YouTube"
-		: `Listen on ${name}`;
 }

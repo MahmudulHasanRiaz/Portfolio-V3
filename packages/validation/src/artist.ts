@@ -108,5 +108,3 @@ export const createReleaseVideoSchema = z.object({
   title: z.string().optional(),
   sortOrder: z.coerce.number().int().optional(),
 });
-
-export const updateReleaseVideoSchema = createReleaseVideoSchema.partial();

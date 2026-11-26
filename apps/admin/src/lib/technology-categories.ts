@@ -19,4 +19,3 @@ export const TECHNOLOGY_CATEGORIES = [
   "Auth",
 ] as const;
 
-export type TechnologyCategory = (typeof TECHNOLOGY_CATEGORIES)[number];

@@ -85,23 +85,6 @@ function adminBase(siteUrl?: string | null): string | undefined {
 }
 
 /**
- * Host-consistent base — for robots.txt + sitemap.xml. MARKETPLACE
- * COPY: the admin site_url is IGNORED here — it belongs to the public
- * site (portfolio-v3-public.riaaz.workers.dev), and this copy must
- * never point at it. Precedence: request host → SITE_URL fallback.
- * (The marketplace copy has no sitemap; robots.txt is a static
- * Disallow-all and does not call this, but the helper stays correct
- * for any future caller.)
- */
-export function resolveHostBase(
-	siteUrl?: string | null,
-	request?: Request | URL | string | { url?: string | URL } | undefined,
-): string {
-	void siteUrl; // admin site_url deliberately ignored on this copy
-	return requestOrigin(request) ?? SITE_URL;
-}
-
-/**
  * Canonical base — for Layout canonical / hreflang / og:url / JSON-LD
  * and detail-page canonicals. MARKETPLACE COPY: the admin site_url is
  * IGNORED here — it belongs to the public site, and a marketplace
@@ -121,29 +104,6 @@ export function resolveCanonicalBase(
 ): string {
 	void siteUrl; // admin site_url deliberately ignored on this copy
 	return requestOrigin(request) ?? SITE_URL;
-}
-
-/**
- * Resolve the site's canonical base URL from the admin setting
- * (settings key "site_url", parsed as PublicSettings.siteUrl).
- * Only a valid http(s) URL counts — anything else (absent,
- * empty, malformed, wrong scheme) falls back to SITE_URL, the
- * live workers.dev base, so a bad admin value can never poison
- * canonicals, sitemap or robots. Never returns a trailing slash.
- * The custom domain (mahmudulhasanriaz.com) stays disconnected
- * until dev finishes — it arrives here only via the admin setting.
- *
- * Kept for backward compatibility: this is the canonical (SEO)
- * precedence — explicit admin site_url → request host → SITE_URL.
- * Robots/sitemap must use resolveHostBase() instead (request host
- * first); canonical/OG/JSON-LD callers should prefer
- * resolveCanonicalBase() explicitly.
- */
-export function resolveSiteUrl(
-	siteUrl?: string | null,
-	request?: Request | URL | string | { url?: string | URL } | undefined,
-): string {
-	return resolveCanonicalBase(siteUrl, request);
 }
 
 /**
@@ -169,15 +129,6 @@ export function isRealUrl(url: string | null | undefined): url is string {
 	if (!/^https?:\/\/[^/]+\.[^/]{2,}/i.test(url)) return false;
 	if (/example\.(com|org|net)/i.test(url)) return false;
 	return true;
-}
-
-/** Split a plain-text body into paragraphs (blank-line separated). */
-export function splitParagraphs(text: string | null | undefined): string[] {
-	if (!text) return [];
-	return text
-		.split(/\n\s*\n/)
-		.map((s) => s.replace(/\s*\n\s*/g, " ").trim())
-		.filter(Boolean);
 }
 
 export interface BodyBlock {
@@ -420,11 +371,4 @@ export function serviceForTags(tags: string[] | undefined): string | undefined {
 		return "Ecommerce Consultancy";
 	}
 	return undefined;
-}
-
-/** "Watch on YouTube" for video platforms, "Listen on …" elsewhere. */
-export function platformActionLabel(name: string): string {
-	return name.toLowerCase() === "youtube"
-		? "Watch on YouTube"
-		: `Listen on ${name}`;
 }

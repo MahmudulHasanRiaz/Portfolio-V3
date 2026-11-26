@@ -60,12 +60,6 @@ export const homepageSectionSchema = z.object({
   updatedAt: timestampSchema,
 });
 
-export const createHomepageSectionSchema = z.object({
-  sectionKey: z.string().max(100),
-  sortOrder: z.coerce.number().int().optional(),
-  content: z.record(z.string(), z.unknown()).optional(),
-});
-
 export const updateHomepageSectionSchema = homepageSectionSchema.partial();
 
 // ─── Services ────────────────────────────────────────────────────────────────
@@ -136,25 +130,7 @@ export const createServiceSchema = z.object({
 });
 
 export const updateServiceSchema = serviceSchema.partial();
-
 // ─── Service FAQs ────────────────────────────────────────────────────────────
-
-export const serviceFaqSchema = z.object({
-  id: uuidSchema,
-  serviceId: uuidSchema,
-  question: z.string().nullable().optional(),
-  answer: z.string().nullable().optional(),
-  sortOrder: z.coerce.number().int().optional(),
-});
-
-export const createServiceFaqSchema = z.object({
-  serviceId: uuidSchema,
-  question: z.string().nullable().optional(),
-  answer: z.string().nullable().optional(),
-  sortOrder: z.coerce.number().int().optional(),
-});
-
-export const updateServiceFaqSchema = serviceFaqSchema.partial();
 
 // ─── Projects ────────────────────────────────────────────────────────────────
 
@@ -343,16 +319,7 @@ export const createExperienceEntrySchema = experienceEntrySchema.omit({
 });
 
 export const updateExperienceEntrySchema = experienceEntrySchema.partial();
-
 // ─── Project Technologies (junction) ─────────────────────────────────────────
-
-export const projectTechnologySchema = z.object({
-  projectId: uuidSchema,
-  technologyId: uuidSchema,
-});
-
-export const createProjectTechnologySchema = projectTechnologySchema;
-export const updateProjectTechnologySchema = projectTechnologySchema.partial();
 
 // ─── Case Studies ────────────────────────────────────────────────────────────
 
@@ -539,67 +506,9 @@ export const createTagSchema = z.object({
 });
 
 export const updateTagSchema = tagSchema.partial();
-
 // ─── Post Categories (junction) ──────────────────────────────────────────────
-
-export const postCategorySchema = z.object({
-  postId: uuidSchema,
-  categoryId: uuidSchema,
-});
-
-export const createPostCategorySchema = postCategorySchema;
-export const updatePostCategorySchema = postCategorySchema.partial();
-
 // ─── Post Tags (junction) ────────────────────────────────────────────────────
-
-export const postTagSchema = z.object({
-  postId: uuidSchema,
-  tagId: uuidSchema,
-});
-
-export const createPostTagSchema = postTagSchema;
-export const updatePostTagSchema = postTagSchema.partial();
-
 // ─── Resources ───────────────────────────────────────────────────────────────
-
-export const resourceSchema = z.object({
-  id: uuidSchema,
-  title: z.string().nullable().optional(),
-  slug: slugSchema.optional(),
-  type: z.enum(["guide", "checklist", "template", "download"]).optional(),
-  description: z.string().nullable().optional(),
-  content: z.string().nullable().optional(),
-  fileUrl: z.string().nullable().optional(),
-  isFeatured: z.boolean().optional(),
-  status: entityStatusSchema.optional(),
-  metaTitle: z.string().nullable().optional(),
-  metaDescription: z.string().nullable().optional(),
-  ogImage: z.string().nullable().optional(),
-  canonicalUrl: z.string().nullable().optional(),
-  keywords: z.string().nullable().optional(),
-  createdBy: uuidSchema.optional(),
-  createdAt: timestampSchema,
-  updatedAt: timestampSchema,
-});
-
-export const createResourceSchema = z.object({
-  title: z.string().nullable().optional(),
-  slug: slugSchema.optional(),
-  type: z.enum(["guide", "checklist", "template", "download"]).optional(),
-  description: z.string().nullable().optional(),
-  content: z.string().nullable().optional(),
-  fileUrl: z.string().nullable().optional(),
-  isFeatured: z.boolean().optional(),
-  status: entityStatusSchema.optional(),
-  metaTitle: z.string().nullable().optional(),
-  metaDescription: z.string().nullable().optional(),
-  ogImage: z.string().nullable().optional(),
-  canonicalUrl: z.string().nullable().optional(),
-  keywords: z.string().nullable().optional(),
-  createdBy: uuidSchema.optional(),
-});
-
-export const updateResourceSchema = resourceSchema.partial();
 
 // ─── Media Mentions ──────────────────────────────────────────────────────────
 
@@ -661,39 +570,3 @@ export const createFaqSchema = z.object({
 });
 
 export const updateFaqSchema = faqSchema.partial();
-
-// ─── Testimonials ────────────────────────────────────────────────────────────
-
-export const testimonialSchema = z.object({
-  id: uuidSchema,
-  authorName: z.string().nullable().optional(),
-  authorTitle: z.string().nullable().optional(),
-  authorAvatar: z.string().nullable().optional(),
-  content: z.string().nullable().optional(),
-  sourceType: z.enum(["freelance_client", "event_organizer", "collaborator", "general"]).optional(),
-  projectId: uuidSchema.optional(),
-  eventId: uuidSchema.optional(),
-  rating: z.coerce.number().int().min(1).max(5).optional(),
-  isFeatured: z.boolean().optional(),
-  isPreview: z.boolean().optional(),
-  status: z.enum(["pending_review", "approved", "rejected"]).optional(),
-  displayOrder: z.coerce.number().int().optional(),
-  createdAt: timestampSchema,
-});
-
-export const createTestimonialSchema = z.object({
-  authorName: z.string().nullable().optional(),
-  authorTitle: z.string().nullable().optional(),
-  authorAvatar: z.string().nullable().optional(),
-  content: z.string().nullable().optional(),
-  sourceType: z.enum(["freelance_client", "event_organizer", "collaborator", "general"]).optional(),
-  projectId: uuidSchema.optional(),
-  eventId: uuidSchema.optional(),
-  rating: z.coerce.number().int().min(1).max(5).optional(),
-  isFeatured: z.boolean().optional(),
-  isPreview: z.boolean().optional(),
-  status: z.enum(["pending_review", "approved", "rejected"]).optional(),
-  displayOrder: z.coerce.number().int().optional(),
-});
-
-export const updateTestimonialSchema = testimonialSchema.partial();
