@@ -473,6 +473,28 @@ button:focus-visible {
 		0 0 0 4px var(--accent);
 }
 
+/* Focus-ring radius (2026-11-26): the box-shadow ring follows the
+   element's own border-radius, so plain text links — which have no
+   radius — drew a square ring even after the PR #60 box-shadow
+   conversion (live-verified 2026-11-26: all six "View all" links,
+   back links, KeyStrip "Visit site", the email links, and the
+   footer text links). These selectors get a small radius on
+   :focus-visible only: it has no visible effect on the link itself
+   (no background/border), it only rounds the ring. */
+.view-all:focus-visible,
+.back-link:focus-visible,
+.key-strip dd a:focus-visible,
+.contact-info .info-row a:focus-visible,
+.author-info a:focus-visible,
+.footer-text-link:focus-visible,
+.footer-links a:focus-visible {
+	outline: none;
+	border-radius: var(--radius-xs);
+	box-shadow:
+		0 0 0 2px var(--bg),
+		0 0 0 4px var(--accent);
+}
+
 /* ---------- Buttons (subtle hover, desktop-only) ---------- */
 .btn {
 	display: inline-block;
@@ -3651,6 +3673,10 @@ button.tag:hover {
 .media-thumb:focus-visible,
 .media-scroll-frame:focus-visible {
 	outline: none;
+	/* Radius (2026-11-26): .media-thumb has no base radius, so its
+	   ring drew square; --radius-sm matches the site's image radius
+	   (.media-scroll-frame already has it, so this is a no-op there). */
+	border-radius: var(--radius-sm);
 	box-shadow:
 		0 0 0 2px var(--bg),
 		0 0 0 4px var(--accent);
@@ -4181,6 +4207,17 @@ button.tag:hover {
 	cursor: pointer;
 	will-change: transform, opacity;
 	overflow: visible;
+}
+
+/* Globe tags: the button is an invisible square tap target; the
+   visual pill inside is 999px. Without a radius here the ring draws
+   square around the rounded pill (live-verified 2026-11-26). */
+.globe-tag:focus-visible {
+	outline: none;
+	border-radius: 999px;
+	box-shadow:
+		0 0 0 2px var(--bg),
+		0 0 0 4px var(--accent);
 }
 
 /* The visual pill — the old .globe-tag styling, verbatim. Only this
@@ -4885,6 +4922,9 @@ button.tag:hover {
 
 .release-card-link:focus-visible {
 	outline: none;
+	/* Radius (2026-11-26): the link itself has no base radius, so
+	   its ring drew square around the 24px-rounded card inside. */
+	border-radius: var(--radius);
 	box-shadow:
 		0 0 0 2px var(--bg),
 		0 0 0 4px var(--accent);
