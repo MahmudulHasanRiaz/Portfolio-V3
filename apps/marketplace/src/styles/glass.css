@@ -452,7 +452,8 @@ main {
    tags, picker rows). Every link/button now gets a teal ring on
    keyboard focus. Components with their own :focus-visible ring
    (corner-btn, pill-rotate-btn, chev-btn, deck-dot, home-fab,
-   picker-resume-btn, release-card-link) keep theirs — their
+   picker-resume-btn, release-card-link, pill-profile-btn,
+   pill-menu-btn) keep theirs — their
    class-scoped rules outrank this one. */
 a:focus-visible,
 button:focus-visible {
@@ -1015,6 +1016,7 @@ button:focus-visible {
 	height: 22px;
 	padding: 0;
 	border: 0;
+	border-radius: 999px;
 	background: none;
 	color: var(--ink);
 	cursor: pointer;
@@ -1100,12 +1102,25 @@ button:focus-visible {
 .pill-menu-btn {
 	background: none;
 	border: 0;
+	border-radius: 999px;
 	/* 2px padding: the 18px hamburger icon makes a 22px button
 	   (preview). */
 	padding: 2px;
 	color: var(--ink);
 	display: inline-flex;
 	align-items: center;
+}
+
+/* Pill buttons: the global :focus-visible outline draws square in Safari
+   (outlines ignore border-radius there). These two sit inside the rounded
+   sticky pill, so they get the same box-shadow ring as .corner-btn —
+   box-shadow follows the radius in every browser. */
+.pill-profile-btn:focus-visible,
+.pill-menu-btn:focus-visible {
+	outline: none;
+	box-shadow:
+		0 0 0 2px var(--bg),
+		0 0 0 4px var(--accent);
 }
 
 /* Preview: at md (768px) the hamburger hides and the 5 nav links
