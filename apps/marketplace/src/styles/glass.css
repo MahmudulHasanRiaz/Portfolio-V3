@@ -493,8 +493,6 @@ button:focus-visible {
    active chip gets its ink text back below. */
 [data-theme="dark"] .btn:not(.btn-ghost):not(.btn-quiet),
 [data-theme="dark"] .chip.active,
-[data-theme="dark"] .picker-resume-btn,
-[data-theme="dark"] .pill-rotate-btn,
 [data-theme="dark"] .audio-badge {
 	color: #03211c;
 }
@@ -502,8 +500,6 @@ button:focus-visible {
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme="light"]) .btn:not(.btn-ghost):not(.btn-quiet),
 	:root:not([data-theme="light"]) .chip.active,
-	:root:not([data-theme="light"]) .picker-resume-btn,
-	:root:not([data-theme="light"]) .pill-rotate-btn,
 	:root:not([data-theme="light"]) .audio-badge {
 		color: #03211c;
 	}
@@ -529,12 +525,6 @@ button:focus-visible {
 	border-color: var(--card-border);
 }
 
-.btn-quiet {
-	background: transparent;
-	color: var(--ink-dim);
-	border-color: transparent;
-}
-
 @media (hover: hover) and (pointer: fine) {
 	.btn:hover {
 		background: var(--accent-strong);
@@ -545,9 +535,6 @@ button:focus-visible {
 		background: var(--accent-wash);
 		border-color: var(--accent-soft);
 		box-shadow: var(--shadow-soft);
-	}
-	.btn-quiet:hover {
-		background: var(--accent-wash);
 	}
 }
 
@@ -711,17 +698,6 @@ button:focus-visible {
 
 .site-header.is-stuck .header-top .corner-btn {
 	pointer-events: none;
-}
-
-.lang-hint {
-	text-align: center;
-	font-size: 12px;
-	color: var(--ink-dim);
-	margin: 4px 0 0;
-}
-
-.site-header.is-stuck .lang-hint {
-	display: none;
 }
 
 .corner-btn {
@@ -1108,35 +1084,6 @@ button:focus-visible {
 	}
 }
 
-/* Rotation toggle in the pill (preview: teal play button). A small
-   teal-filled rounded square; Play = paused, tap to resume. */
-.pill-rotate-btn {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	/* Preview: the in-pill resume button is 20x20px. */
-	width: 20px;
-	height: 20px;
-	flex: none;
-	padding: 0;
-	border: 0;
-	border-radius: 7px;
-	background: var(--accent);
-	color: #fff;
-	cursor: pointer;
-}
-
-.pill-rotate-btn:hover {
-	background: var(--accent-strong);
-}
-
-.pill-rotate-btn:focus-visible {
-	outline: none;
-	box-shadow:
-		0 0 0 2px var(--bg),
-		0 0 0 4px var(--accent);
-}
-
 .sticky-pill .pill-dot {
 	width: 6px;
 	height: 6px;
@@ -1454,36 +1401,6 @@ button:focus-visible {
 	display: inline-flex;
 	flex: none;
 	color: var(--accent);
-}
-
-/* "Resume auto-rotation" (preview): big full-width teal button at the
-   bottom of the picker, play icon + label. */
-.picker-resume-btn {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	gap: 8px;
-	width: 100%;
-	margin-top: 8px;
-	padding: 11px 12px;
-	border: 0;
-	border-radius: 12px;
-	background: var(--accent);
-	color: #fff;
-	font-size: 14px;
-	font-weight: 700;
-	cursor: pointer;
-}
-
-.picker-resume-btn:hover {
-	background: var(--accent-strong);
-}
-
-.picker-resume-btn:focus-visible {
-	outline: none;
-	box-shadow:
-		0 0 0 2px var(--bg),
-		0 0 0 4px var(--accent);
 }
 
 /* Stuck (scrolled) header: the two corner buttons flank the pill at
@@ -2824,10 +2741,6 @@ html[lang="bn"] .hero-name {
 	contain: layout style;
 }
 
-.deck-indicator-spacer {
-	min-width: 0;
-}
-
 .deck-indicator-center {
 	display: flex;
 	align-items: center;
@@ -2835,12 +2748,6 @@ html[lang="bn"] .hero-name {
 	gap: 10px;
 	flex-wrap: wrap;
 	min-width: 0;
-}
-
-.deck-nav {
-	display: flex;
-	gap: 8px;
-	justify-self: end;
 }
 
 .deck-dots {
@@ -5125,13 +5032,6 @@ button.tag:hover {
 	font-weight: 600;
 }
 
-.platform-links {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-	margin-top: 16px;
-}
-
 /* ---------- Clients wall ---------- */
 /* A seamless, continuous marquee — NOT a slider. The client list
    renders twice (two identical `.clients-set` halves) and the
@@ -5451,7 +5351,6 @@ button.tag:hover {
 		display: none;
 	}
 }
-
 
 /* ---------- Know Me ---------- */
 .identity-grid {
@@ -6222,10 +6121,6 @@ button.tag:hover {
 /* --- Buttons: tap/press feedback (touch has no hover) --- */
 .btn:active,
 .btn-ghost:active,
-.btn-quiet:active {
-	transform: translateY(0) scale(0.97);
-}
-
 /* --- Scroll-reveal: top-level sections fade/slide in once --- */
 /* The hidden state is applied by JS (inline style) only — no-JS keeps
    everything visible. The transition lives here so the JS only has to

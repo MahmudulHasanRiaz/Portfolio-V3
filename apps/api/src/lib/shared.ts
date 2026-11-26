@@ -5,32 +5,6 @@
 
 export const PRIMARY_IDENTITY_KEY = "primary_identity";
 
-export const PRIMARY_IDENTITIES = ["developer", "entrepreneur", "artist"] as const;
-
-export type PrimaryIdentity = (typeof PRIMARY_IDENTITIES)[number];
-
-export const PRIMARY_IDENTITY_DEFAULT: PrimaryIdentity = "developer";
-
-export function isPrimaryIdentity(value: unknown): value is PrimaryIdentity {
-  return (
-    typeof value === "string" &&
-    (PRIMARY_IDENTITIES as readonly string[]).includes(value)
-  );
-}
-
-export function normalizePrimaryIdentity(value: unknown): PrimaryIdentity {
-  if (isPrimaryIdentity(value)) return value;
-  if (
-    value !== null &&
-    typeof value === "object" &&
-    "value" in value &&
-    isPrimaryIdentity((value as { value: unknown }).value)
-  ) {
-    return (value as { value: PrimaryIdentity }).value;
-  }
-  return PRIMARY_IDENTITY_DEFAULT;
-}
-
 export const SITE_PRIMARY_IDENTITIES = ["developer", "know-me"] as const;
 
 export type SitePrimaryIdentity = (typeof SITE_PRIMARY_IDENTITIES)[number];

@@ -127,22 +127,6 @@ button.is-navigating {
 	}
 }
 
-/* Modal skeleton: shown inside the sheet for the first frame(s) while
-   the modal content mounts, so the sheet itself is never a dead wait. */
-.modal-skel {
-	display: grid;
-	gap: 12px;
-	padding-top: 8px;
-	/* Animation isolation: skeleton lines shimmer by transform only;
-	   contained inside the modal sheet. */
-	contain: layout style;
-}
-.modal-skel .skel-line--title {
-	height: 22px;
-	width: 55%;
-	margin: 0;
-}
-
 /* ---- 3. Image placeholders ----
    Thumb containers get a frosted shimmer behind the image; the image
    fades in once loaded (class added by the Layout script / React

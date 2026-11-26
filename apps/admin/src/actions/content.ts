@@ -219,40 +219,6 @@ export async function deleteTag(id: string): Promise<void> {
 // longer called here; Hono's faqs / timeline-events / content-taxonomy
 // routers mirror them.
 
-export async function setContentCategories(contentType: ContentTypeName, contentId: string, categoryIds: string[]): Promise<void> {
-  const session = await getServerSession();
-  getUserId(session);
-  await honoFetch<{ ok: boolean }>(
-    `/api/admin/content-taxonomy/${contentType}/${contentId}/categories`,
-    { method: "POST", json: { categoryIds } },
-  );
-}
-
-export async function getContentCategories(contentType: ContentTypeName, contentId: string): Promise<CategoryData[]> {
-  const session = await getServerSession();
-  getUserId(session);
-  return honoFetch<CategoryData[]>(
-    `/api/admin/content-taxonomy/${contentType}/${contentId}/categories`,
-  );
-}
-
-export async function setContentTags(contentType: ContentTypeName, contentId: string, tagIds: string[]): Promise<void> {
-  const session = await getServerSession();
-  getUserId(session);
-  await honoFetch<{ ok: boolean }>(
-    `/api/admin/content-taxonomy/${contentType}/${contentId}/tags`,
-    { method: "POST", json: { tagIds } },
-  );
-}
-
-export async function getContentTags(contentType: ContentTypeName, contentId: string): Promise<TagData[]> {
-  const session = await getServerSession();
-  getUserId(session);
-  return honoFetch<TagData[]>(
-    `/api/admin/content-taxonomy/${contentType}/${contentId}/tags`,
-  );
-}
-
 export async function listFAQs(entityType?: string, entityId?: string): Promise<FAQData[]> {
   const session = await getServerSession();
   getUserId(session);

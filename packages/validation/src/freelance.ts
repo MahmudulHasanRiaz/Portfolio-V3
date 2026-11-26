@@ -1,27 +1,8 @@
 import { z } from "zod";
-import { uuidSchema, timestampSchema, slugSchema } from "./common";
+import { uuidSchema, timestampSchema } from "./common";
 
 // ─── Project Categories ──────────────────────────────────────────────────────
 
-export const projectCategorySchema = z.object({
-  id: uuidSchema,
-  name: z.string().max(100),
-  slug: slugSchema.optional(),
-  description: z.string().optional(),
-  color: z.string().max(7).optional(),
-  icon: z.string().optional(),
-  createdAt: timestampSchema,
-});
-
-export const createProjectCategorySchema = z.object({
-  name: z.string().max(100),
-  slug: slugSchema.optional(),
-  description: z.string().optional(),
-  color: z.string().max(7).optional(),
-  icon: z.string().optional(),
-});
-
-export const updateProjectCategorySchema = projectCategorySchema.partial();
 
 // ─── Projects (Freelance) ────────────────────────────────────────────────────
 
@@ -122,23 +103,3 @@ export const createProjectDeliverableSchema = z.object({
 });
 
 export const updateProjectDeliverableSchema = projectDeliverableSchema.partial();
-
-// ─── Project Activity Logs ───────────────────────────────────────────────────
-
-export const projectActivityLogSchema = z.object({
-  id: uuidSchema,
-  projectId: uuidSchema,
-  actorId: uuidSchema,
-  action: z.string(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
-  createdAt: timestampSchema,
-});
-
-export const createProjectActivityLogSchema = z.object({
-  projectId: uuidSchema,
-  actorId: uuidSchema,
-  action: z.string(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
-});
-
-export const updateProjectActivityLogSchema = projectActivityLogSchema.partial();

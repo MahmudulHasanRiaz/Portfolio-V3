@@ -11,10 +11,6 @@
   ],
   "exclude": [
     "node_modules",
-    "dist",
-    "src/seed/check-data.ts",
-    "src/seed/check-tables.ts",
-    "src/seed/test-connection.ts",
-    "src/seed/phase15-content.ts"
+    "dist"
   ]
 }

@@ -24,8 +24,5 @@
   "packageManager": "npm@11.13.0",
   "engines": {
     "node": ">=22.0.0"
-  },
-  "dependencies": {
-    "better-auth": "^1.7.22"
   }
 }

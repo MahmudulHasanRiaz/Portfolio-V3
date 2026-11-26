@@ -9,13 +9,6 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "@repo/database": "*",
-    "@repo/validation": "*",
-    "@repo/shared": "*",
-    "@repo/auth": "*",
-    "@repo/seo": "*"
-  },
   "devDependencies": {
     "@repo/typescript-config": "*",
     "@repo/eslint-config": "*",
