@@ -486,6 +486,7 @@ button:focus-visible {
 .key-strip dd a:focus-visible,
 .contact-info .info-row a:focus-visible,
 .author-info a:focus-visible,
+.form-prefer-email a:focus-visible,
 .footer-text-link:focus-visible,
 .footer-links a:focus-visible {
 	outline: none;
