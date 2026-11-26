@@ -41,6 +41,43 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Li Ador Noirrit — Bangla webfont (user-supplied, self-hosted in
+   public/fonts/, same files as the public site + marketplace).
+   DM Sans has no Bengali glyphs, so Bengali text falls through to
+   this font in the --font-sans stack below; Latin text stays in
+   DM Sans. There is no @fontsource/li-ador-noirrit package, so the
+   woff2 files are copied from apps/public/public/fonts/ (do NOT
+   delete them — the @font-face src below points at /fonts/...).
+   font-display: swap so text never blocks. */
+@font-face {
+  font-family: "Li Ador Noirrit";
+  src: url("/fonts/li-ador-noirrit-300.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Li Ador Noirrit";
+  src: url("/fonts/li-ador-noirrit-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Li Ador Noirrit";
+  src: url("/fonts/li-ador-noirrit-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Li Ador Noirrit";
+  src: url("/fonts/li-ador-noirrit-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Content sources — BOTH trees, so @repo/ui's classes are generated too. */
 @source "../../";
 @source "../../../../packages/ui/src";
@@ -118,8 +155,10 @@
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
 
-  /* Type — DM Sans (self-hosted via @fontsource, already installed). */
-  --font-sans: "DM Sans", "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
+  /* Type — DM Sans (self-hosted via @fontsource, already installed);
+     Li Ador Noirrit second so Bengali falls through to it (same as
+     the public site's --font stack). */
+  --font-sans: "DM Sans", "Li Ador Noirrit", "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
 }
 
