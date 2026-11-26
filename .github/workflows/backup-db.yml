@@ -1,0 +1,115 @@
+# Backup — daily Neon database dump to a private R2 bucket.
+#
+# Route: GitHub Actions + pg_dump (custom format, compressed). The
+# Worker-cron route was evaluated and REJECTED: Workers Free allows only
+# 10 ms CPU per invocation (cron included) and 50 subrequests, while a
+# logical dump of 94 tables needs 100+ queries and far more CPU — and
+# only pg_dump produces a dump pg_restore understands.
+#
+# Schedule: daily 21:00 UTC = 03:00 Asia/Dhaka (off-peak).
+# Retention: the last 30 daily dumps (scripts/backup/rotate.sh).
+# Cost: one pg_dump a day reads the whole DB once — a few seconds at
+# 0.25–2 CU, ~0.06 CU-hours/month against the free 100 CU-hour
+# allowance. Negligible.
+#
+# Secrets (repo Settings → Secrets and variables → Actions):
+#   BACKUP_DATABASE_URL — Neon DIRECT (non-pooled) connection string
+#     for project "Project Portfolio", branch br-raspy-mountain-ao8imklh,
+#     database `portfolio` (Neon dashboard → Connection string → pick the
+#     direct endpoint, NOT the -pooler one: pg_dump breaks through
+#     PgBouncer's transaction pooling). Includes ?sslmode=require.
+#   R2_BACKUP_ACCESS_KEY_ID / R2_BACKUP_SECRET_ACCESS_KEY — an R2 API
+#     token scoped to the `portfolio-v3-backups` bucket only (Cloudflare
+#     dashboard → R2 → Manage R2 API Tokens → Create API Token → apply
+#     read/write to that bucket).
+# The Cloudflare account ID is hardcoded below (not a secret — deploy.yml
+# does the same).
+#
+# Bucket: `portfolio-v3-backups`, created in the Cloudflare dashboard
+# with NO public access. It MUST be separate from `portfolio-v3-media`:
+# that bucket is public (its r2.dev URL serves media to everyone), so an
+# unencrypted database dump there would be world-readable.
+#
+# NOTE: workflow files cannot be pushed via the GitHub API (the App lacks
+# the workflows permission) — this file is uploaded through the GitHub web
+# UI (browser). Do not expect it to arrive via a snapshot push.
+name: Backup — Neon DB to R2
+
+on:
+  schedule:
+    # Daily 21:00 UTC = 03:00 Asia/Dhaka (no DST in Bangladesh).
+    - cron: "0 21 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-db
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: pg_dump + upload to R2
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      R2_BUCKET: portfolio-v3-backups
+      R2_PREFIX: backups/db
+      R2_ACCOUNT_ID: b5c9281cd6a0b13348413d683a2bcc31
+      AWS_DEFAULT_REGION: auto
+      AWS_EC2_METADATA_DISABLED: "true"
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_SECRET_ACCESS_KEY }}
+    steps:
+      - name: Checkout (for scripts/backup/rotate.sh)
+        uses: actions/checkout@v4
+
+      - name: Install pg_dump 18 (PostgreSQL client)
+        # pg_dump's client must be the same version or NEWER than the
+        # server. Client 18 dumps any Neon server (15–18) — no need to
+        # know the server's exact version. Ubuntu's default client is
+        # older, so install from the PostgreSQL apt repository.
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq curl ca-certificates gnupg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
+          echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-18
+          pg_dump --version
+
+      - name: Dump the database (custom format, compressed)
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          FILE="portfolio-$(date -u +%Y-%m-%d).dump"
+          echo "FILE=$FILE" >> "$GITHUB_ENV"
+          pg_dump "$BACKUP_DATABASE_URL" -Fc -Z9 --no-owner --no-acl -f "$FILE"
+          ls -lh "$FILE"
+
+      - name: Verify the dump is a readable pg_dump archive
+        run: |
+          set -euo pipefail
+          # pg_restore --list parses the whole archive header + table of
+          # contents. It fails on a truncated or corrupt dump — without
+          # needing a live database.
+          pg_restore -l "$FILE" | tee /tmp/restore-list.txt | tail -5
+          echo "Archive OK: $(wc -l < /tmp/restore-list.txt) objects listed"
+
+      - name: Upload to R2
+        run: |
+          set -euo pipefail
+          ENDPOINT="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          aws s3 cp "$FILE" "s3://$R2_BUCKET/$R2_PREFIX/$FILE" \
+            --endpoint-url "$ENDPOINT"
+          aws s3api head-object --bucket "$R2_BUCKET" \
+            --key "$R2_PREFIX/$FILE" --endpoint-url "$ENDPOINT" \
+            --query '{Key: Key, Size: ContentLength, LastModified: LastModified}'
+
+      - name: Retention — keep the last 30 daily dumps
+        run: bash scripts/backup/rotate.sh "$R2_BUCKET" "$R2_PREFIX" 30
