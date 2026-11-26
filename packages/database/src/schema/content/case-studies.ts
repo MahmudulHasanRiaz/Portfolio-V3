@@ -31,6 +31,11 @@ export const caseStudies = pgTable("case_studies", {
   status: contentStatus("status"),
   metaTitle: text("meta_title"),
   metaDescription: text("meta_description"),
+  // Bangla SEO (0043): separate BN meta title / description — the BN
+  // detail pages read these with fallback to the EN fields above.
+  // Nullable, no default; empty = the BN page shows the EN meta.
+  metaTitleBn: text("meta_title_bn"),
+  metaDescriptionBn: text("meta_description_bn"),
   ogImage: text("og_image"),
   canonicalUrl: text("canonical_url"),
   keywords: text("keywords"),

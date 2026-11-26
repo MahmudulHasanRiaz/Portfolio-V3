@@ -62,6 +62,7 @@ import {
 import { getApiDb } from "../../../db";
 import { requireAuth, unauthorized } from "../../../lib/admin-auth";
 import {
+  ensureBnSeoFields,
   ensurePerItemIndexing,
   ensureVentureCategories,
 } from "../../../lib/ensure-schema";
@@ -150,6 +151,9 @@ app.get("/", async (c) => {
     const offset = (page - 1) * pageSize;
 
     const db = getApiDb();
+    // 0043 auto-apply: BN SEO columns — create them before the
+    // first select/insert that reads them (no manual migration).
+    await ensureBnSeoFields(db);
     // 0038 auto-apply: ventures selects read the `indexable` column —
     // create it first (no manual migration).
     await ensurePerItemIndexing(db);
@@ -244,6 +248,9 @@ app.post("/", async (c) => {
     const data = { ...(v.data as Record<string, unknown>) };
     stripServerManaged(data);
     const db = getApiDb();
+    // 0043 auto-apply: BN SEO columns — create them before the
+    // first select/insert that reads them (no manual migration).
+    await ensureBnSeoFields(db);
     // 0038 auto-apply: ventures inserts read the `indexable` column —
     // create it first (no manual migration).
     await ensurePerItemIndexing(db);
@@ -273,6 +280,9 @@ app.get("/:id", async (c) => {
     const id = uuidParam(c, "id");
     if (!id) return invalidParam(c, "id");
     const db = getApiDb();
+    // 0043 auto-apply: BN SEO columns — create them before the
+    // first select/insert that reads them (no manual migration).
+    await ensureBnSeoFields(db);
     // 0038 auto-apply: ventures selects read the `indexable` column —
     // create it first (no manual migration).
     await ensurePerItemIndexing(db);
@@ -301,6 +311,9 @@ app.patch("/:id", async (c) => {
     const data = { ...(v.data as Record<string, unknown>) };
     stripServerManaged(data);
     const db = getApiDb();
+    // 0043 auto-apply: BN SEO columns — create them before the
+    // first select/insert that reads them (no manual migration).
+    await ensureBnSeoFields(db);
     // 0038 auto-apply: ventures selects read the `indexable` column —
     // create it first (no manual migration).
     await ensurePerItemIndexing(db);
@@ -339,6 +352,9 @@ app.delete("/:id", async (c) => {
     const id = uuidParam(c, "id");
     if (!id) return invalidParam(c, "id");
     const db = getApiDb();
+    // 0043 auto-apply: BN SEO columns — create them before the
+    // first select/insert that reads them (no manual migration).
+    await ensureBnSeoFields(db);
     // 0038 auto-apply: ventures deletes read the `indexable` column —
     // create it first (no manual migration).
     await ensurePerItemIndexing(db);
@@ -379,6 +395,9 @@ app.get("/:id/products", async (c) => {
     const { page, pageSize } = parsePagination(c, { defaultPageSize: 50 });
     const offset = (page - 1) * pageSize;
     const db = getApiDb();
+    // 0043 auto-apply: BN SEO columns — create them before the
+    // first select/insert that reads them (no manual migration).
+    await ensureBnSeoFields(db);
     const where = eq(products.ventureId, id);
     const [countRow] = await db
       .select({ total: count() })

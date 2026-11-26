@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button, Input, Textarea, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Card, CardContent, Checkbox } from "@repo/ui";
 import { Save } from "lucide-react";
 import { MediaPicker } from "@/components/media-picker";
+import { TipTapField } from "@/components/tiptap-field";
 import { MediaUrlPreview, MediaUrlListPreview } from "@/components/media-url-preview";
 
 /** Stored string[] (jsonb) -> one URL per line for the textarea. */
@@ -50,6 +51,11 @@ interface VentureProfileProps {
     galleryImages: string[] | null;
     metaTitle: string | null;
     metaDescription: string | null;
+    /** Bangla SEO (0043) — optional until the API worker has run
+     *  ensureBnSeoFields (first touch after deploy); the admin API
+     *  creates the columns, so in practice this is always present. */
+    metaTitleBn?: string | null;
+    metaDescriptionBn?: string | null;
     keywords: string | null;
     /** Optional — present only once migration 0029 (short_description /
      * short_description_bn / sort_order) has landed. */
@@ -131,6 +137,8 @@ export function VentureProfile({ venture, onUpdate }: VentureProfileProps) {
     galleryImages: listValue(venture.galleryImages),
     metaTitle: venture.metaTitle || "",
     metaDescription: venture.metaDescription || "",
+    metaTitleBn: venture.metaTitleBn || "",
+    metaDescriptionBn: venture.metaDescriptionBn || "",
     ogImage: venture.ogImage || "",
     canonicalUrl: venture.canonicalUrl || "",
     keywords: venture.keywords || "",
@@ -349,12 +357,12 @@ export function VentureProfile({ venture, onUpdate }: VentureProfileProps) {
 
           <div>
             <label style={{ fontSize: 14, fontWeight: 500, marginBottom: 4, display: "block" }}>Description</label>
-            <Textarea value={form.description} onChange={(e) => handleChange("description", e.target.value)} rows={4} />
+            <TipTapField value={form.description} defaultValue={form.description} onChange={(html) => handleChange("description", html)} />
           </div>
 
           <div>
             <label style={{ fontSize: 14, fontWeight: 500, marginBottom: 4, display: "block" }}>Description (Bangla) — বাংলা</label>
-            <Textarea value={form.descriptionBn} onChange={(e) => handleChange("descriptionBn", e.target.value)} rows={4} placeholder="বাংলা বিবরণ (optional — empty shows the English description)" />
+            <TipTapField value={form.descriptionBn} defaultValue={form.descriptionBn} onChange={(html) => handleChange("descriptionBn", html)} placeholder="বাংলা বিবরণ (optional — empty shows the English description)" />
           </div>
 
           <h3 style={{ fontSize: 16, fontWeight: 600, marginTop: 16, marginBottom: 8 }}>Short Description (archive card)</h3>
@@ -455,6 +463,14 @@ export function VentureProfile({ venture, onUpdate }: VentureProfileProps) {
           <div>
             <label style={{ fontSize: 14, fontWeight: 500, marginBottom: 4, display: "block" }}>Meta Description</label>
             <Textarea value={form.metaDescription} onChange={(e) => handleChange("metaDescription", e.target.value)} rows={2} />
+          </div>
+          <div>
+            <label style={{ fontSize: 14, fontWeight: 500, marginBottom: 4, display: "block" }}>Meta Title (Bangla) — বাংলা</label>
+            <Input value={form.metaTitleBn} onChange={(e) => handleChange("metaTitleBn", e.target.value)} placeholder="বাংলা শিরোনাম (optional — empty shows the English meta title)" />
+          </div>
+          <div>
+            <label style={{ fontSize: 14, fontWeight: 500, marginBottom: 4, display: "block" }}>Meta Description (Bangla) — বাংলা</label>
+            <Textarea value={form.metaDescriptionBn} onChange={(e) => handleChange("metaDescriptionBn", e.target.value)} rows={2} placeholder="বাংলা বিবরণ (optional — empty shows the English meta description)" />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div>

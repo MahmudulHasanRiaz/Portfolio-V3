@@ -10,8 +10,19 @@
 // change all markdown rendering. No build-time entry has an inline
 // image today, so nothing is unoptimized there; see
 // docs/IMAGE_OPTIMIZATION_GUIDE.md for the future path.)
+//
+// Dual-format (TipTap editor, 0043): rows saved through the editor
+// are HTML and arrive here as rich blocks (h2 / lists / blockquote /
+// inline bold-italic-underline-strike-link runs) from parseHtmlBlocks
+// in lib/detail — already allowlist-sanitized there. Legacy rows
+// parse exactly as before. Inline runs render through <RichText/>
+// (static Preact, no client JS): Preact escapes text and hrefs, so
+// no raw HTML ever reaches the page. Nested list items render flat
+// with a data-level attribute (CSS indents them) — the list tree is
+// preserved visually without a recursive component.
 import { parseBodyBlocks, type BodyBlock } from "../lib/detail";
 import { optimizedImageUrl, remoteSrcset } from "../lib/images";
+import { RichText } from "./RichText";
 
 interface Props {
 	/** Raw body text to parse, or pre-parsed blocks (already deduped). */
@@ -27,8 +38,36 @@ const rendered = blocks ?? parseBodyBlocks(text);
 	rendered.length > 0 && (
 		<div class="detail-body">
 			{rendered.map((block) =>
-				block.kind === "h3" ? (
-					<h3>{block.text}</h3>
+				block.kind === "h2" ? (
+					<h2>
+						<RichText runs={block.rich} text={block.text} />
+					</h2>
+				) : block.kind === "h3" ? (
+					<h3>
+						<RichText runs={block.rich} text={block.text} />
+					</h3>
+				) : block.kind === "blockquote" ? (
+					<blockquote>
+						<RichText runs={block.rich} text={block.text} />
+					</blockquote>
+				) : block.kind === "ul" || block.kind === "ol" ? (
+					block.kind === "ul" ? (
+						<ul>
+							{(block.items ?? []).map((item, i) => (
+								<li data-level={item.level}>
+									<RichText runs={item.rich} />
+								</li>
+							))}
+						</ul>
+					) : (
+						<ol>
+							{(block.items ?? []).map((item, i) => (
+								<li data-level={item.level}>
+									<RichText runs={item.rich} />
+								</li>
+							))}
+						</ol>
+					)
 				) : block.kind === "img" && block.src ? (
 					<figure class="body-image">
 						<img
@@ -41,7 +80,9 @@ const rendered = blocks ?? parseBodyBlocks(text);
 						/>
 					</figure>
 				) : (
-					<p>{block.text}</p>
+					<p>
+						<RichText runs={block.rich} text={block.text} />
+					</p>
 				),
 			)}
 		</div>

@@ -5,6 +5,7 @@ import { Button, Input, Textarea, Select, SelectContent, SelectItem, SelectTrigg
 import { createContent } from "@/actions/content";
 import { useRouter } from "next/navigation";
 import { ContentMediaFields } from "@/components/content-media-fields";
+import { TipTapField } from "@/components/tiptap-field";
 
 export default function NewServicePage() {
   const router = useRouter();
@@ -69,7 +70,7 @@ export default function NewServicePage() {
         </div>
         <div>
           <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "var(--text-primary)", marginBottom: 6 }}>Description</label>
-          <Textarea name="description" placeholder="Full service description" rows={8} />
+          <TipTapField name="description" placeholder="Full service description" />
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <input type="checkbox" id="isFeatured" name="isFeatured" />

@@ -10,6 +10,7 @@ import { MediaPicker } from "@/components/media-picker";
 import { MediaUrlPreview, MediaUrlListPreview } from "@/components/media-url-preview";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ContentSeoFields } from "@/components/content-seo-fields";
+import { TipTapField } from "@/components/tiptap-field";
 import { ContentTagsField } from "@/components/content-tags-field";
 
 /** One URL per line (videos / gallery images) -> string[]. */
@@ -145,6 +146,8 @@ export default function EditCaseStudy() {
         galleryImages: parseUrlList(form.get("galleryImages")),
         metaTitle: form.get("metaTitle"),
         metaDescription: form.get("metaDescription"),
+        metaTitleBn: form.get("metaTitleBn"),
+        metaDescriptionBn: form.get("metaDescriptionBn"),
         ogImage: form.get("ogImage"),
         canonicalUrl: form.get("canonicalUrl"),
         keywords: form.get("keywords"),
@@ -210,35 +213,35 @@ export default function EditCaseStudy() {
             </div>
             <div>
               <label style={labelStyle}>Challenge</label>
-              <Textarea name="challenge" defaultValue={data.challenge as string || ""} rows={5} />
+              <TipTapField name="challenge" defaultValue={data.challenge as string || ""} />
             </div>
             <div>
               <label style={labelStyle}>Challenge (Bangla) — বাংলা</label>
-              <Textarea name="challengeBn" defaultValue={data.challengeBn as string || ""} rows={5} placeholder="বাংলা চ্যালেঞ্জ (optional — empty shows the English challenge)" />
+              <TipTapField name="challengeBn" defaultValue={data.challengeBn as string || ""} placeholder="বাংলা চ্যালেঞ্জ (optional — empty shows the English challenge)" />
             </div>
             <div>
               <label style={labelStyle}>Research</label>
-              <Textarea name="research" defaultValue={data.research as string || ""} rows={5} placeholder="What the research found before the fix — how the problem was mapped, what stood out." />
+              <TipTapField name="research" defaultValue={data.research as string || ""} placeholder="What the research found before the fix — how the problem was mapped, what stood out." />
             </div>
             <div>
               <label style={labelStyle}>Research (Bangla) — বাংলা</label>
-              <Textarea name="researchBn" defaultValue={data.researchBn as string || ""} rows={5} placeholder="বাংলা গবেষণা (optional — empty shows the English research)" />
+              <TipTapField name="researchBn" defaultValue={data.researchBn as string || ""} placeholder="বাংলা গবেষণা (optional — empty shows the English research)" />
             </div>
             <div>
               <label style={labelStyle}>Strategy</label>
-              <Textarea name="strategy" defaultValue={data.strategy as string || ""} rows={5} />
+              <TipTapField name="strategy" defaultValue={data.strategy as string || ""} />
             </div>
             <div>
               <label style={labelStyle}>Strategy (Bangla) — বাংলা</label>
-              <Textarea name="strategyBn" defaultValue={data.strategyBn as string || ""} rows={5} placeholder="বাংলা কৌশল (optional — empty shows the English strategy)" />
+              <TipTapField name="strategyBn" defaultValue={data.strategyBn as string || ""} placeholder="বাংলা কৌশল (optional — empty shows the English strategy)" />
             </div>
             <div>
               <label style={labelStyle}>Results</label>
-              <Textarea name="results" defaultValue={data.results as string || ""} rows={5} />
+              <TipTapField name="results" defaultValue={data.results as string || ""} />
             </div>
             <div>
               <label style={labelStyle}>Results (Bangla) — বাংলা</label>
-              <Textarea name="resultsBn" defaultValue={data.resultsBn as string || ""} rows={5} placeholder="বাংলা ফলাফল (optional — empty shows the English results)" />
+              <TipTapField name="resultsBn" defaultValue={data.resultsBn as string || ""} placeholder="বাংলা ফলাফল (optional — empty shows the English results)" />
             </div>
             <div>
               <label style={labelStyle}>Metrics (JSON)</label>

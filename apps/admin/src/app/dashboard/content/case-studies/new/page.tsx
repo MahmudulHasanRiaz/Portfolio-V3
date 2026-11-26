@@ -6,6 +6,7 @@ import { createContent } from "@/actions/content";
 import { toErrorMessage } from "@/lib/error-message";
 import { useRouter } from "next/navigation";
 import { ContentMediaFields, parseUrlList } from "@/components/content-media-fields";
+import { TipTapField } from "@/components/tiptap-field";
 
 const labelStyle = { display: "block", fontSize: 14, fontWeight: 500, color: "var(--text-primary)", marginBottom: 6 } as const;
 
@@ -87,35 +88,35 @@ export default function NewCaseStudy() {
         </div>
         <div>
           <label style={labelStyle}>Challenge</label>
-          <Textarea name="challenge" rows={5} placeholder="What was broken before the fix?" />
+          <TipTapField name="challenge" placeholder="What was broken before the fix?" />
         </div>
         <div>
           <label style={labelStyle}>Challenge (Bangla) — বাংলা</label>
-          <Textarea name="challengeBn" rows={5} placeholder="বাংলা চ্যালেঞ্জ (optional — empty shows the English challenge)" />
+          <TipTapField name="challengeBn" placeholder="বাংলা চ্যালেঞ্জ (optional — empty shows the English challenge)" />
         </div>
         <div>
           <label style={labelStyle}>Research</label>
-          <Textarea name="research" rows={5} placeholder="What the research found before the fix — how the problem was mapped, what stood out." />
+          <TipTapField name="research" placeholder="What the research found before the fix — how the problem was mapped, what stood out." />
         </div>
         <div>
           <label style={labelStyle}>Research (Bangla) — বাংলা</label>
-          <Textarea name="researchBn" rows={5} placeholder="বাংলা গবেষণা (optional — empty shows the English research)" />
+          <TipTapField name="researchBn" placeholder="বাংলা গবেষণা (optional — empty shows the English research)" />
         </div>
         <div>
           <label style={labelStyle}>Strategy</label>
-          <Textarea name="strategy" rows={5} placeholder="How the problem was fixed." />
+          <TipTapField name="strategy" placeholder="How the problem was fixed." />
         </div>
         <div>
           <label style={labelStyle}>Strategy (Bangla) — বাংলা</label>
-          <Textarea name="strategyBn" rows={5} placeholder="বাংলা কৌশল (optional — empty shows the English strategy)" />
+          <TipTapField name="strategyBn" placeholder="বাংলা কৌশল (optional — empty shows the English strategy)" />
         </div>
         <div>
           <label style={labelStyle}>Results</label>
-          <Textarea name="results" rows={5} placeholder="What changed after the fix." />
+          <TipTapField name="results" placeholder="What changed after the fix." />
         </div>
         <div>
           <label style={labelStyle}>Results (Bangla) — বাংলা</label>
-          <Textarea name="resultsBn" rows={5} placeholder="বাংলা ফলাফল (optional — empty shows the English results)" />
+          <TipTapField name="resultsBn" placeholder="বাংলা ফলাফল (optional — empty shows the English results)" />
         </div>
         <div>
           <label style={labelStyle}>Metrics (JSON)</label>

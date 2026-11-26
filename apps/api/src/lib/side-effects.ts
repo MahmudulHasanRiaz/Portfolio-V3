@@ -49,7 +49,10 @@ import {
   workflows,
 } from "@repo/database/schema";
 import type { ApiDb } from "../db";
-import { ensurePerItemIndexing } from "./ensure-schema";
+import {
+  ensureBnSeoFields,
+  ensurePerItemIndexing,
+} from "./ensure-schema";
 
 export type SideEffectEnv = Record<string, string | undefined>;
 
@@ -304,6 +307,8 @@ async function loadSearchEntity(
   // migration). Best-effort callers tolerate a failure here the same
   // way they tolerate a missing row.
   await ensurePerItemIndexing(db);
+  // 0043 auto-apply: the selects below also read the BN SEO columns.
+  await ensureBnSeoFields(db);
   switch (entityType) {
     case "page": {
       const [r] = await db

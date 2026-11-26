@@ -5,6 +5,7 @@ import { Button, Input, Textarea, Select, SelectContent, SelectItem, SelectTrigg
 import { createContent } from "@/actions/content";
 import { useRouter } from "next/navigation";
 import { ContentMediaFields, parseUrlList } from "@/components/content-media-fields";
+import { TipTapField } from "@/components/tiptap-field";
 
 const labelStyle = { display: "block", fontSize: 14, fontWeight: 500, color: "var(--text-primary)", marginBottom: 6 } as const;
 
@@ -77,9 +78,9 @@ export default function NewBlogPost() {
 
         <div>
           <label style={labelStyle}>Content</label>
-          <Textarea name="content" placeholder="Post content (markdown)" rows={12} />
+          <TipTapField name="content" placeholder="Post content" />
           <p style={hintStyle}>
-            Inline images in markdown: ![alt text](https://...) — recommended up to 1600px wide, WebP/AVIF
+            Images: use the Image button in the toolbar to pick from the media library — recommended up to 1600px wide, WebP/AVIF
             preferred (JPEG/PNG ok), quality 75–80 — don&apos;t compress aggressively. No manual resizing
             needed — images are automatically optimized for the public site.
           </p>
