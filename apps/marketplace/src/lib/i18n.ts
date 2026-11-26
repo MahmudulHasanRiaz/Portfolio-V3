@@ -367,3 +367,23 @@ export function showingLabel(
 		.replace("{shown}", fmt(shown))
 		.replace("{total}", fmt(total));
 }
+
+/**
+ * Venture `stage` is free text in the admin with no `stage_bn` field, so
+ * the BN ventures pages map the known English values to Bangla at render
+ * time. Unknown values pass through untranslated — a brand-new English
+ * stage added later shows as-is until it is added here. The proper fix
+ * is a `stage_bn` DB field + admin form field, which is bigger than
+ * this mapping (2026-11-26, small item 1).
+ */
+const VENTURE_STAGE_BN: Record<string, string> = {
+	"Active, ongoing": "সক্রিয়, চলমান",
+	"Live, actively updated": "লাইভ, নিয়মিত আপডেট হচ্ছে",
+	"Live, selling in the market": "লাইভ, বাজারে বিক্রি হচ্ছে",
+};
+
+export function ventureStageBn(stage: string | undefined | null): string {
+	if (!stage) return "";
+	const trimmed = stage.trim();
+	return VENTURE_STAGE_BN[trimmed] ?? trimmed;
+}

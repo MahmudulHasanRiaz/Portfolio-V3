@@ -23,7 +23,7 @@ import {
 } from "../../../lib/detail";
 import { optimizedImageUrl, optimizedSrcset } from "../../../lib/images";
 import { PROFILE } from "../../../data/site";
-import { applySiteCopy, getDict, langUrl, localizeData } from "../../../lib/i18n";
+import { applySiteCopy, getDict, langUrl, localizeData, ventureStageBn } from "../../../lib/i18n";
 import { getSiteSettings } from "../../../lib/settings";
 
 // Bangla live detail route — same live route as the English one.
@@ -281,7 +281,7 @@ const jsonLd = data
 						label: t.publishedLabel,
 						value: formatDate(data.publishedAt, lang),
 					},
-					data.stage ? { label: t.stageLabel, value: data.stage } : null,
+					data.stage ? { label: t.stageLabel, value: ventureStageBn(data.stage) } : null,
 					data.location
 						? { label: t.locationLabel, value: data.location }
 						: null,
