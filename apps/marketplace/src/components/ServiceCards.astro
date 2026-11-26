@@ -1,0 +1,71 @@
+---
+import BrandIcon from "./BrandIcon.astro";
+import ServiceIcon from "./ServiceIcon";
+import ServiceModal from "./ServiceModal";
+import { getDict, pickDict, SERVICE_MODAL_DICT_KEYS, type Lang } from "../lib/i18n";
+import type { Service } from "../data/site";
+
+interface Props {
+	lang?: Lang;
+	/** Live-merged services (getServices()). */
+	services: Service[];
+}
+
+const { lang = "en", services } = Astro.props;
+const t = getDict(lang);
+---
+
+<div class="services-grid">
+	{services.map((service) => {
+		const displayName =
+			lang === "bn" && service.bn?.title
+				? service.bn.title
+				: service.name;
+		return (
+			<button
+				type="button"
+				class="service-card"
+				style="text-align:left;"
+				data-service-slug={service.slug}
+				aria-haspopup="dialog"
+				aria-label={`${t.learnMoreAbout} ${displayName}`}
+			>
+				<span class="service-icon">
+					{service.icon ? (
+						<BrandIcon icon={service.icon} name={displayName} size={26} decorative />
+					) : (
+						// Generic Lucide resolver (was a hardcoded
+						// Database / Code / fallback switch — any other
+						// live icon name showed the fallback). No client
+						// directive: renders as static SVG, no JS shipped.
+						<ServiceIcon name={service.lucide} size={26} />
+					)}
+				</span>
+				<span style="min-width:0;flex:1;">
+					<h3>{displayName}</h3>
+				</span>
+			</button>
+		);
+	})}
+</div>
+{/* Service detail modal — the service brief lives here, not on
+    the card. (MARKETPLACE COPY: the modal has no contact CTA.) */}
+{/* Subset dict only (Issue 7B): 3 keys, not the whole dictionary. */}
+{/* client:idle (not client:visible): the modal renders null while
+    closed, so the island has no size and the visibility observer
+    never fires — the modal could never open. */}
+<ServiceModal services={services} lang={lang} dict={pickDict(t, SERVICE_MODAL_DICT_KEYS)} client:idle />
+
+<style>
+	/* Cards show name + icon only: centre the name against the icon tile. */
+	.service-card {
+		align-items: center;
+	}
+</style>
+
+<!-- Service-card clicks are handled by the delegated handler in
+     /js/detail.js (§7) — NO inline script here. (PR #16: a one-time
+     binding script runs once per full load; Astro dedupes identical
+     scripts on View Transitions swaps, so after a language switch
+     the new cards had no handlers and clicks did nothing until a
+     reload. The delegated handler survives every swap.) -->

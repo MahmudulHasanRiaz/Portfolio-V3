@@ -9,6 +9,7 @@ export interface Dict {
 	navVentures: string;
 	navReleases: string;
 	navProjects: string;
+	navServices: string;
 	navSkills: string;
 	navEducation: string;
 	navExperience: string;
@@ -51,6 +52,7 @@ export interface Dict {
 	close: string;
 	projectsTitle: string;
 	viewAllProjects: string;
+	viewAllServices: string;
 	viewAllCaseStudies: string;
 	viewAllPosts: string;
 	viewAllReleases: string;
@@ -114,6 +116,7 @@ export interface Dict {
 	backHome: string;
 	homeName: string;
 	allProjects: string;
+	allServices: string;
 	allPosts: string;
 	allReleases: string;
 	allVentures: string;
@@ -128,6 +131,7 @@ export interface Dict {
 	showingVentures: string;
 	showingCaseStudies: string;
 	emptyProjects: string;
+	emptyServices: string;
 	emptyPosts: string;
 	emptyCaseStudies: string;
 	emptyVentures: string;
@@ -254,6 +258,8 @@ export interface Dict {
 	platformsPageDescription: string;
 	projectsPageTitle: string;
 	projectsPageDescription: string;
+	servicesPageTitle: string;
+	servicesPageDescription: string;
 	postsPageTitle: string;
 	postsPageDescription: string;
 	releasesPageTitle: string;
@@ -296,6 +302,7 @@ export const bn: Dict = {
 	navVentures: "উদ্যোগ",
 	navReleases: "রিলিজ",
 	navProjects: "প্রজেক্ট",
+	navServices: "সার্ভিস",
 	navCaseStudies: "কেস স্টাডি",
 	navPosts: "পোস্ট",
 	navSkills: "স্কিল",
@@ -347,6 +354,7 @@ export const bn: Dict = {
 	close: "বন্ধ করুন",
 	projectsTitle: "প্রজেক্ট",
 	viewAllProjects: "সব প্রজেক্ট দেখুন →",
+	viewAllServices: "সব সার্ভিস দেখুন →",
 	viewAllCaseStudies: "সব কেস স্টাডি দেখুন →",
 	viewAllPosts: "সব পোস্ট দেখুন →",
 	viewAllReleases: "সব রিলিজ দেখুন →",
@@ -426,6 +434,7 @@ export const bn: Dict = {
 	backHome: "← হোমে ফিরুন",
 	homeName: "হোম",
 	allProjects: "সব প্রজেক্ট",
+	allServices: "সব সার্ভিস",
 	allPosts: "সব পোস্ট",
 	allReleases: "সব রিলিজ",
 	allVentures: "সব উদ্যোগ",
@@ -440,6 +449,7 @@ export const bn: Dict = {
 	showingVentures: "মোট {total}টি উদ্যোগের মধ্যে {shown}টি দেখাচ্ছে",
 	showingCaseStudies: "মোট {total}টি কেস স্টাডির মধ্যে {shown}টি দেখাচ্ছে",
 	emptyProjects: "এখনো কোনো প্রজেক্ট পাবলিশ হয়নি।",
+	emptyServices: "এখনো কোনো সার্ভিস পাবলিশ হয়নি।",
 	emptyPosts: "এখনো কোনো পোস্ট পাবলিশ হয়নি।",
 	emptyCaseStudies: "এখনো কোনো কেস স্টাডি পাবলিশ হয়নি।",
 	emptyVentures: "এখনো কোনো উদ্যোগ পাবলিশ হয়নি।",
@@ -577,6 +587,9 @@ export const bn: Dict = {
 	projectsPageTitle: "সব প্রজেক্ট — মাহমুদুল হাসান রিয়াজ",
 	projectsPageDescription:
 		"মাহমুদুল হাসান রিয়াজের সব প্রজেক্ট — বাংলাদেশ আর বিশ্বের বিজনেসের জন্য ERP, SaaS আর ই-কমার্স সিস্টেম।",
+	servicesPageTitle: "সব সার্ভিস — মাহমুদুল হাসান রিয়াজ",
+	servicesPageDescription:
+		"মাহমুদুল হাসান রিয়াজের সব সার্ভিস — বাংলাদেশের বিজনেসের জন্য ERP/CRM ডেভেলপমেন্ট, কাস্টম ওয়েবসাইট, ই-কমার্স কনসালট্যান্সি আর WordPress ডেভেলপমেন্ট।",
 	postsPageTitle: "সব পোস্ট — মাহমুদুল হাসান রিয়াজ",
 	postsPageDescription:
 		"মাহমুদুল হাসান রিয়াজের পোস্ট — ERP, ই-কমার্স, ওয়ার্ডপ্রেস আর নাশিদ।",

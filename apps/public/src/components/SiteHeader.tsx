@@ -112,6 +112,7 @@ export default function SiteHeader({
 				return (
 					enCurrent === "/" ||
 					enCurrent.startsWith("/projects") ||
+					enCurrent.startsWith("/services") ||
 					enCurrent.startsWith("/case-studies") ||
 					enCurrent.startsWith("/posts")
 				);
@@ -144,6 +145,7 @@ export default function SiteHeader({
 			active: navIsActive("work"),
 			children: [
 				{ label: dict.navProjects, href: langUrl("/projects", lang) },
+				{ label: dict.navServices, href: langUrl("/services", lang) },
 				{
 					label: dict.navCaseStudies,
 					href: langUrl("/case-studies", lang),

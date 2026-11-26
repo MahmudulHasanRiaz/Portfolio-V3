@@ -1,9 +1,7 @@
 ---
 import { SERVICES, type Service } from "../data/site";
-import BrandIcon from "./BrandIcon.astro";
-import ServiceIcon from "./ServiceIcon";
-import ServiceModal from "./ServiceModal";
-import { getDict, pickDict, SERVICE_MODAL_DICT_KEYS, type Lang } from "../lib/i18n";
+import ServiceCards from "./ServiceCards.astro";
+import { getDict, langUrl, type Lang } from "../lib/i18n";
 import { HOMEPAGE_SERVICES_LIMIT } from "../lib/homepage-limits";
 
 interface Props {
@@ -16,7 +14,8 @@ const { lang = "en", services = SERVICES } = Astro.props;
 // Homepage preview cap: the services-grid CSS is designed for exactly
 // 5 cards (3+2 at >=1024px) — a 6th would break the layout. The same
 // capped list feeds the cards AND the ServiceModal, so the modal can
-// never open a service the grid does not show.
+// never open a service the grid does not show. The full listing lives
+// on the /services/ archive page.
 const visibleServices = services.slice(0, HOMEPAGE_SERVICES_LIMIT);
 const t = getDict(lang);
 ---
@@ -26,59 +25,7 @@ const t = getDict(lang);
 		<div>
 			<h2>{t.servicesTitle}</h2>
 		</div>
+		<a class="view-all" href={langUrl("/services", lang)}>{t.viewAllServices}</a>
 	</div>
-	<div class="services-grid">
-		{visibleServices.map((service) => {
-			const displayName =
-				lang === "bn" && service.bn?.title
-					? service.bn.title
-					: service.name;
-			return (
-			<button
-				type="button"
-				class="service-card"
-				style="text-align:left;"
-				data-service-slug={service.slug}
-				aria-haspopup="dialog"
-				aria-label={`${t.learnMoreAbout} ${displayName}`}
-			>
-				<span class="service-icon">
-					{service.icon ? (
-						<BrandIcon icon={service.icon} name={displayName} size={26} decorative />
-					) : (
-						// Generic Lucide resolver (was a hardcoded
-						// Database / Code / fallback switch — any other
-						// live icon name showed the fallback). No client
-						// directive: renders as static SVG, no JS shipped.
-						<ServiceIcon name={service.lucide} size={26} />
-					)}
-				</span>
-				<span style="min-width:0;flex:1;">
-					<h3>{displayName}</h3>
-				</span>
-			</button>
-			);
-		})}
-	</div>
-	{/* Service detail modal — the brief + CTA live here, not on the card. */}
-	{/* Subset dict only (Issue 7B): 3 keys, not the whole dictionary. */}
-	{/* client:idle (not client:visible): the modal renders null while
-	    closed, so the island has no size and the visibility observer
-	    never fires — the modal could never open. ContactModal (Layout)
-	    already uses client:idle for the same reason. */}
-	<ServiceModal services={visibleServices} lang={lang} dict={pickDict(t, SERVICE_MODAL_DICT_KEYS)} client:idle />
+	<ServiceCards services={visibleServices} lang={lang} />
 </section>
-
-<style>
-	/* Cards show name + icon only: centre the name against the icon tile. */
-	.service-card {
-		align-items: center;
-	}
-</style>
-
-<!-- Service-card clicks are handled by the delegated handler in
-     /js/detail.js (§7) — NO inline script here. (PR #16: a one-time
-     binding script runs once per full load; Astro dedupes identical
-     scripts on View Transitions swaps, so after a language switch
-     the new cards had no handlers and clicks did nothing until a
-     reload. The delegated handler survives every swap.) -->
