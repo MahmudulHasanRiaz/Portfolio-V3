@@ -506,31 +506,6 @@ app.delete("/:id", async (c) => {
   }
 });
 
-// ─── Activities ──────────────────────────────────────────────────────────────
-
-// GET /:id/activities — full activity list, oldest first
-// (ActivityRepository.getByLeadId).
-app.get("/:id/activities", async (c) => {
-  try {
-    const user = await requireAuth(c);
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
-    const id = uuidParam(c, "id");
-    if (!id) return invalidParam(c, "id");
-    const db = getApiDb();
-    const rows = await db
-      .select()
-      .from(leadActivities)
-      .where(eq(leadActivities.leadId, id))
-      .orderBy(asc(leadActivities.createdAt));
-    return c.json(rows);
-  } catch (err) {
-    return c.json(
-      { error: errorMessage(err, "Failed to fetch activities") },
-      500,
-    );
-  }
-});
-
 // ─── Assign ──────────────────────────────────────────────────────────────────
 
 // POST /:id/assign — assign (or unassign) a lead.

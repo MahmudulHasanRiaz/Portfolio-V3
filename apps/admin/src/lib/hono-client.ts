@@ -17,17 +17,14 @@
 // Zero endpoints get `hc` type-safety this round. The server actions
 // therefore call the endpoints through `honoFetch<T>()` with explicit
 // per-endpoint request/response types (the sanctioned fallback).
-// `getHonoClient()` is still the single `hc` construction point (same
-// URL, same cookie-forwarding fetch) so the actions can switch to typed
-// RPC calls with no URL changes once the route files are re-chained
-// as expressions — at that point `hc<AppType>` will resolve properly.
+// (The `hc` typed-RPC client, `getHonoClient()`, was deleted 2026-11-26
+// — dead-code B9: zero callers, chaining never landed. If the route
+// files are ever re-chained as expressions, re-add it here.)
 //
 // This module is server-only by convention: it reads the incoming
 // request's cookie via next/headers. Never import it from a client
 // component.
 
-import { hc } from "hono/client";
-import type { AppType } from "@repo/api";
 import { headers } from "next/headers";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
@@ -81,33 +78,6 @@ export async function getRequestCookie(): Promise<string | null> {
   } catch {
     return null;
   }
-}
-
-/**
- * fetch() that forwards the incoming request's session cookie to Hono.
- * Used as the hc client's fetch implementation, so every RPC call is
- * authenticated as the signed-in admin user.
- */
-export const honoAuthFetch: typeof fetch = async (input, init) => {
-  const cookie = await getRequestCookie();
-  const nextHeaders = new Headers(init?.headers);
-  if (cookie && !nextHeaders.has("cookie")) {
-    nextHeaders.set("cookie", cookie);
-  }
-  return fetch(input, { ...init, headers: nextHeaders });
-};
-
-/**
- * The `hc` RPC client, pointed at the Hono worker, authenticated with
- * the incoming request's session cookie.
- *
- * NOTE: its static type is `unknown` this round — `hc<AppType>` collapses
- * (see the header note) because the route files are not yet chained.
- * It is kept as the single construction point for the day chaining
- * lands; endpoint calls today go through `honoFetch<T>()`.
- */
-export function getHonoClient() {
-  return hc<AppType>(getHonoApiUrl(), { fetch: honoAuthFetch });
 }
 
 /** Error thrown when Hono answers with a non-2xx status. Carries the

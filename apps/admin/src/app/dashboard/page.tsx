@@ -9,8 +9,7 @@ import {
 } from "lucide-react";
 import { getServerSession } from "@/lib/get-server-session";
 import { listContent } from "@/actions/content";
-import { createCrmRepositories } from "@repo/crm";
-import { createFinanceRepositories } from "@repo/finance";
+import { getActiveLeadCount, getOpenInvoiceCount } from "@/actions/dashboard";
 
 // Live counts + session are per-request: this page must not be statically
 // prerendered at build time (prerendering would throw "Authentication
@@ -28,9 +27,9 @@ export const dynamic = "force-dynamic";
 // below is isolated: on failure it logs server-side (visible in the
 // container log, so the failing source can still be identified) and falls
 // back to 0, and the page ALWAYS renders its widgets + quick actions.
-// These helpers must never throw: the repository-factory calls live inside
-// the try blocks too, so even a bad DATABASE_URL degrades instead of
-// blanking the page.
+// These helpers must never throw: the Hono calls live inside the try
+// blocks too, so a failing source degrades to 0 instead of blanking
+// the page.
 async function safeContentCount(type: "projects" | "posts"): Promise<number> {
   try {
     const res = await listContent(type, { pageSize: 1 });
@@ -41,27 +40,18 @@ async function safeContentCount(type: "projects" | "posts"): Promise<number> {
   }
 }
 
-const TERMINAL_LEAD_STATUSES = ["won", "lost", "archived"];
-
-async function safeActiveLeadCount(dbUrl: string): Promise<number> {
+async function safeActiveLeadCount(): Promise<number> {
   try {
-    const rows = await createCrmRepositories(dbUrl).leads.getPipelineCounts();
-    return rows
-      .filter((row) => !TERMINAL_LEAD_STATUSES.includes(row.status))
-      .reduce((sum, row) => sum + row.count, 0);
+    return await getActiveLeadCount();
   } catch (error) {
     console.error("[dashboard] Active Leads count failed:", error);
     return 0;
   }
 }
 
-async function safeOpenInvoiceCount(dbUrl: string): Promise<number> {
+async function safeOpenInvoiceCount(): Promise<number> {
   try {
-    const res = await createFinanceRepositories(dbUrl).invoices.list({
-      status: "sent",
-      pageSize: 1,
-    });
-    return Number(res.total ?? 0);
+    return await getOpenInvoiceCount();
   } catch (error) {
     console.error("[dashboard] Open Invoices count failed:", error);
     return 0;
@@ -69,14 +59,16 @@ async function safeOpenInvoiceCount(dbUrl: string): Promise<number> {
 }
 
 // Widget counts come from the dashboard's EXISTING data sources — no new
-// API routes, no new modules. Definitions:
+// API routes. Definitions:
 // - Total Projects: all content items of type "projects" (any status).
 // - Active Leads: leads whose status is not a terminal state. Terminal
 //   states are 'won', 'lost', 'archived' — the same definition the CRM
-//   follow-up queue uses (lead-repository.ts).
+//   follow-up queue uses (lead-repository.ts). Served by Hono
+//   GET /api/admin/leads/stats (actions/dashboard.ts).
 // - Blog Posts: all content items of type "posts" (any status).
 // - Open Invoices: invoices with status "sent" (issued, unpaid). Drafts
-//   are not issued yet; paid/cancelled are closed.
+//   are not issued yet; paid/cancelled are closed. Served by Hono
+//   GET /api/admin/finance/invoices?status=sent (actions/dashboard.ts).
 // - Pending Tasks / Upcoming Events: NO existing server source (workflow
 //   tasks are never persisted — create-task only returns data; the
 //   events module was never built and artist_events has no queries), so
@@ -84,15 +76,14 @@ async function safeOpenInvoiceCount(dbUrl: string): Promise<number> {
 //   into them — they are placeholders until their modules exist.
 export default async function DashboardHome() {
   const session = await getServerSession();
-  const dbUrl = process.env.DATABASE_URL!;
 
   // Safe helpers never reject, so Promise.all here cannot trip the error
   // boundary; a failed source just shows 0 for its widget (see above).
   const [projectCount, postCount, activeLeads, openInvoices] = await Promise.all([
     safeContentCount("projects"),
     safeContentCount("posts"),
-    safeActiveLeadCount(dbUrl),
-    safeOpenInvoiceCount(dbUrl),
+    safeActiveLeadCount(),
+    safeOpenInvoiceCount(),
   ]);
 
   // Icons + foot lines are display-only: values still come from the live
