@@ -8,7 +8,6 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 
 interface Section { id: string; sectionKey: string; isVisible: boolean; sortOrder: number | null; content: Record<string, unknown> | null; createdAt: string; updatedAt: string; }
 interface Version { id: string; version: number; snapshotJson: Record<string, unknown>; createdBy: string | null; createdAt: string; }
-interface SeedReport { sections: { inserted: string[]; skipped: string[] }; services: { inserted: string[]; skipped: string[] }; projects: { inserted: string[]; skipped: string[] }; technologies: { inserted: string[]; skipped: string[] }; projectLinks: { inserted: number }; releases: { inserted: string[]; skipped: string[] }; releasePlatforms: { inserted: number }; ventures?: { inserted: string[]; skipped: string[] }; caseStudies?: { inserted: string[]; skipped: string[] }; posts?: { inserted: string[]; skipped: string[] }; profile: string; }
 
 function versionSectionCount(v: Version): number {
   const sections = (v.snapshotJson as { sections?: unknown[] } | null)?.sections;
@@ -23,8 +22,6 @@ export default function HomepagePage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [showVersions, setShowVersions] = useState(false);
-  const [seedReport, setSeedReport] = useState<SeedReport | null>(null);
-  const [seeding, setSeeding] = useState(false);
   const [savingVersion, setSavingVersion] = useState(false);
   const [editing, setEditing] = useState<Section | null>(null);
   const [restoreTarget, setRestoreTarget] = useState<Version | null>(null);
@@ -106,21 +103,6 @@ export default function HomepagePage() {
     setRestoring(false);
   }
 
-  async function handleSeed() {
-    setError("");
-    setSeeding(true);
-    try {
-      const res = await fetch("/api/homepage/seed", { method: "POST" });
-      if (!res.ok) throw new Error("seed failed");
-      const data = await res.json();
-      setSeedReport(data.report);
-      await load();
-    } catch {
-      setError("Seeding failed — please try again.");
-    }
-    setSeeding(false);
-  }
-
   if (loading) return <div style={{ color: "var(--text-muted)" }}>Loading...</div>;
 
   return (
@@ -131,7 +113,6 @@ export default function HomepagePage() {
           <p style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 4 }}>Manage and reorder homepage sections</p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <Button variant="outline" onClick={handleSeed} disabled={seeding}>{seeding ? "Seeding..." : "Seed homepage content"}</Button>
           <Button variant="outline" onClick={() => setShowVersions(true)}><History size={16} style={{ marginRight: 6 }} />Versions</Button>
           <Button onClick={handleSaveVersion} disabled={savingVersion}><Save size={16} style={{ marginRight: 6 }} />{savingVersion ? "Saving..." : "Save Version"}</Button>
         </div>
@@ -153,36 +134,9 @@ export default function HomepagePage() {
         </div>
       )}
 
-      {seedReport && (
-        <Card>
-          <CardContent style={{ padding: "12px 16px", fontSize: 13, color: "var(--text-primary)" }}>
-            <div style={{ fontWeight: 600, marginBottom: 6 }}>Seed report</div>
-            <div>Sections — added: {seedReport.sections.inserted.join(", ") || "none"}; already there: {seedReport.sections.skipped.join(", ") || "none"}</div>
-            <div>Services — added: {seedReport.services.inserted.join(", ") || "none"}; already there: {seedReport.services.skipped.join(", ") || "none"}</div>
-            <div>Projects — added: {seedReport.projects.inserted.join(", ") || "none"}; already there: {seedReport.projects.skipped.join(", ") || "none"}</div>
-            <div>Technologies — added: {seedReport.technologies.inserted.join(", ") || "none"}; already there: {seedReport.technologies.skipped.join(", ") || "none"}; project links added: {seedReport.projectLinks.inserted}</div>
-            {seedReport.releases && (
-              <div>Releases — added: {seedReport.releases.inserted.join(", ") || "none"}; already there: {seedReport.releases.skipped.join(", ") || "none"}; platform links added: {seedReport.releasePlatforms?.inserted ?? 0}</div>
-            )}
-            {seedReport.ventures && (
-              <div>Ventures — added: {seedReport.ventures.inserted.join(", ") || "none"}; already there: {seedReport.ventures.skipped.join(", ") || "none"}</div>
-            )}
-            {seedReport.caseStudies && (
-              <div>Case Studies — added: {seedReport.caseStudies.inserted.join(", ") || "none"}; already there: {seedReport.caseStudies.skipped.join(", ") || "none"}</div>
-            )}
-            {seedReport.posts && (
-              <div>Posts — added: {seedReport.posts.inserted.join(", ") || "none"}; already there: {seedReport.posts.skipped.join(", ") || "none"}</div>
-            )}
-            <div>Profile: {seedReport.profile}</div>
-            <div style={{ color: "var(--text-muted)", marginTop: 4 }}>Nothing already present was overwritten — run again any time, it only adds what is missing.</div>
-          </CardContent>
-        </Card>
-      )}
-
       {sections.length === 0 ? (
         <div style={{ textAlign: "center", padding: 48, color: "var(--text-muted)" }}>
           <div>No homepage sections configured</div>
-          <div style={{ marginTop: 12 }}><Button onClick={handleSeed} disabled={seeding}>{seeding ? "Seeding..." : "Seed homepage content"}</Button></div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
