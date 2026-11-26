@@ -5,11 +5,11 @@ Generated from the route definitions in `apps/api/src/routes/`. Every entry belo
 ## How the API is organized
 
 - `src/index.ts` mounts three top-level routers: `/api/public` (public content), `/api/admin` (admin CRUD, authenticated), `/api/auth` (Better Auth).
-- `src/routes/admin/index.ts` mounts 28 sub-routers by resource (one per resource). Each resource is a directory (e.g. `routes/admin/finance/`) with focused files per sub-resource plus a `helpers.ts` and an `index.ts` that mounts them at `/`. The import `"./finance"` resolves to `finance/index.ts`, so the mount in `admin/index.ts` never changes when a resource is split.
+- `src/routes/admin/index.ts` mounts 29 sub-routers by resource (one per resource). Each resource is a directory (e.g. `routes/admin/finance/`) with focused files per sub-resource plus a `helpers.ts` and an `index.ts` that mounts them at `/`. The import `"./finance"` resolves to `finance/index.ts`, so the mount in `admin/index.ts` never changes when a resource is split.
 - Shared logic lives in `src/lib/` (`admin-auth`, `errors`, `rate-limit`, `side-effects`, `validate`, `public-content`, `integrations`, `default-language`, `shared`).
 - Auth: every `/api/admin/*` route calls `requireAuth` (a valid Better Auth session) unless marked "Public (no auth)" below. `/api/public/*` uses the content token (env token or per-integration token). `/api/auth/*` is the Better Auth handler.
 
-**Total: 264 routes.**
+**Total: 271 routes.**
 
 ## public (4 routes)
 
@@ -35,7 +35,7 @@ Generated from the route definitions in `apps/api/src/routes/`. Every entry belo
 | POST | `/api/admin/abandoned` | Public (no auth) | Create abandoned | `admin/abandoned.ts` |
 | DELETE | `/api/admin/abandoned/:id` | Authenticated | Delete abandoned | `admin/abandoned.ts` |
 
-## analytics (6 routes)
+## analytics (5 routes)
 
 | Method | Path | Auth | What it does | File |
 |---|---|---|---|---|
@@ -43,7 +43,6 @@ Generated from the route definitions in `apps/api/src/routes/`. Every entry belo
 | GET | `/api/admin/analytics/referrers` | Authenticated | List referrers | `admin/analytics/reports.ts` |
 | GET | `/api/admin/analytics/search` | Authenticated | List search | `admin/analytics/reports.ts` |
 | GET | `/api/admin/analytics/summary` | Authenticated | List summary | `admin/analytics/reports.ts` |
-| POST | `/api/admin/analytics/track` | Public (no auth) | Create track | `admin/analytics/track.ts` |
 | GET | `/api/admin/analytics/utm` | Authenticated | List utm | `admin/analytics/reports.ts` |
 
 ## content (14 routes)
@@ -126,6 +125,16 @@ Generated from the route definitions in `apps/api/src/routes/`. Every entry belo
 | GET | `/api/admin/entity-technologies/:entity/:id` | Authenticated | Get entity-technologie by id | `admin/entity-technologies.ts` |
 | POST | `/api/admin/entity-technologies/:entity/:id` | Authenticated | Run entity-technologie action (:id) | `admin/entity-technologies.ts` |
 
+## experience (5 routes)
+
+| Method | Path | Auth | What it does | File |
+|---|---|---|---|---|
+| GET | `/api/admin/experience` | Authenticated | List experience | `admin/experience.ts` |
+| POST | `/api/admin/experience` | Authenticated | Create experience | `admin/experience.ts` |
+| GET | `/api/admin/experience/:id` | Authenticated | Get experience by id | `admin/experience.ts` |
+| PUT | `/api/admin/experience/:id` | Authenticated | Update experience | `admin/experience.ts` |
+| DELETE | `/api/admin/experience/:id` | Authenticated | Delete experience | `admin/experience.ts` |
+
 ## faqs (4 routes)
 
 | Method | Path | Auth | What it does | File |
@@ -200,7 +209,7 @@ Generated from the route definitions in `apps/api/src/routes/`. Every entry belo
 | POST | `/api/admin/homepage/versions` | Authenticated | Create version | `admin/homepage.ts` |
 | POST | `/api/admin/homepage/versions/:id/restore` | Authenticated | Run restore action (restore) | `admin/homepage.ts` |
 
-## leads (14 routes)
+## leads (13 routes)
 
 | Method | Path | Auth | What it does | File |
 |---|---|---|---|---|
@@ -209,7 +218,6 @@ Generated from the route definitions in `apps/api/src/routes/`. Every entry belo
 | DELETE | `/api/admin/leads/:id` | Authenticated | Delete lead | `admin/leads/items.ts` |
 | GET | `/api/admin/leads/:id` | Authenticated | Get lead by id | `admin/leads/items.ts` |
 | PATCH | `/api/admin/leads/:id` | Authenticated | Update lead | `admin/leads/items.ts` |
-| GET | `/api/admin/leads/:id/activities` | Authenticated | Get activitie activities | `admin/leads/items.ts` |
 | POST | `/api/admin/leads/:id/assign` | Authenticated | Run assign action (assign) | `admin/leads/items.ts` |
 | GET | `/api/admin/leads/:id/notes` | Authenticated | Get note notes | `admin/leads/notes.ts` |
 | POST | `/api/admin/leads/:id/notes` | Authenticated | Run note action (notes) | `admin/leads/notes.ts` |
@@ -345,7 +353,7 @@ Generated from the route definitions in `apps/api/src/routes/`. Every entry belo
 | GET | `/api/admin/seo/redirects/:id` | Authenticated | Get redirect by id | `admin/seo.ts` |
 | PUT | `/api/admin/seo/redirects/:id` | Authenticated | Update redirect | `admin/seo.ts` |
 
-## settings (21 routes)
+## settings (25 routes)
 
 | Method | Path | Auth | What it does | File |
 |---|---|---|---|---|
@@ -355,6 +363,8 @@ Generated from the route definitions in `apps/api/src/routes/`. Every entry belo
 | PUT | `/api/admin/settings/default-language` | Authenticated | Update default-language | `admin/settings/values.ts` |
 | GET | `/api/admin/settings/favicon` | Authenticated | List favicon | `admin/settings/values.ts` |
 | PUT | `/api/admin/settings/favicon` | Authenticated | Update favicon | `admin/settings/values.ts` |
+| GET | `/api/admin/settings/general` | Authenticated | List general | `admin/settings/values.ts` |
+| PUT | `/api/admin/settings/general` | Authenticated | Update general | `admin/settings/values.ts` |
 | GET | `/api/admin/settings/hero-portrait` | Authenticated | List hero-portrait | `admin/settings/values.ts` |
 | PUT | `/api/admin/settings/hero-portrait` | Authenticated | Update hero-portrait | `admin/settings/values.ts` |
 | GET | `/api/admin/settings/integrations` | Authenticated | List integrations | `admin/settings/integrations.ts` |
@@ -364,6 +374,8 @@ Generated from the route definitions in `apps/api/src/routes/`. Every entry belo
 | PATCH | `/api/admin/settings/integrations/:id` | Public (no auth) | Update integration | `admin/settings/integrations.ts` |
 | PUT | `/api/admin/settings/integrations/:id` | Public (no auth) | Update integration | `admin/settings/integrations.ts` |
 | POST | `/api/admin/settings/integrations/:id/regenerate` | Authenticated | Run regenerate action (regenerate) | `admin/settings/integrations.ts` |
+| GET | `/api/admin/settings/notifications` | Authenticated | List notifications | `admin/settings/values.ts` |
+| PUT | `/api/admin/settings/notifications` | Authenticated | Update notifications | `admin/settings/values.ts` |
 | GET | `/api/admin/settings/primary-identity` | Authenticated | List primary-identity | `admin/settings/values.ts` |
 | PUT | `/api/admin/settings/primary-identity` | Authenticated | Update primary-identity | `admin/settings/values.ts` |
 | GET | `/api/admin/settings/search-indexing` | Authenticated | List search-indexing | `admin/settings/values.ts` |

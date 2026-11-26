@@ -1,12 +1,12 @@
 // Portfolio-V3 Hono API — the single backend (Phase 2).
 // Cloudflare Worker `portfolio-v3-api`. Mounts the public content API
-// (what the Astro site reads) and the admin CRUD APIs. No cutover yet:
-// the admin UI and the public site still talk to the Next.js admin
-// API; this worker is additive until the cutover is approved.
+// (what the Astro site reads) and the admin CRUD APIs. Cutover complete:
+// the admin UI and the public site talk to this Hono worker; the
+// Next.js admin API routes are retired (deleted).
 //
 // Hono 4.13.18 (latest stable, per the V3 latest-version policy).
 // Router: the default RegExpRouter — see the note below; SmartRouter
-// was deliberately NOT added (202 routes is far below the size where
+// was deliberately NOT added (271 routes is far below the size where
 // it could help, and it would only add a second router to maintain).
 import { Hono } from "hono";
 import { cors } from "hono/cors";

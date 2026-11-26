@@ -8,8 +8,9 @@
 // Workers-safety verdict: @repo/analytics is NOT Workers-safe — every
 // service in it calls getDb() from @repo/database, which is a postgres.js
 // (TCP) singleton, and the aggregator even holds a module-level
-// `const db = getDb()`. The aggregations and the track beacon are therefore
-// re-implemented here with direct Drizzle over getApiDb() (Neon HTTP).
+// `const db = getDb()`. The aggregations are therefore re-implemented
+// here with direct Drizzle over getApiDb() (Neon HTTP). (The POST /track
+// beacon was deleted 2026-11-26 — it had zero callers.)
 // The SQL is copied verbatim from packages/analytics/src — same queries,
 // same response shapes — only the driver changes. extractUTMParams is
 // pure (no DB) and is copied verbatim from packages/analytics/src/utm-service.ts.

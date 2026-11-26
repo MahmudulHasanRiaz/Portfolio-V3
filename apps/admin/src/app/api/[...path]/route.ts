@@ -28,11 +28,11 @@
 //   /api/public/*          -> {HONO}/api/public/*
 //   /api/<resource>/*      -> {HONO}/api/admin/<resource>/*
 // The local route files for those resources are retired (deleted);
-// only /api/portal/* keeps local handlers (Portal is not ported —
-// Next.js routing serves those specific routes, not this catch-all).
-// Paths Hono does not serve (dead SEO/search routes) forward to Hono
-// and get Hono's 404, which is the correct answer for a route that
-// no longer exists.
+// there are no local /api/* handlers left in the admin app — every
+// /api/* call forwards through this proxy, including /api/portal/*,
+// which Hono serves as /api/admin/portal/*.
+// Paths Hono does not serve forward to Hono and get Hono's 404,
+// which is the correct answer for a route that no longer exists.
 //
 // Bodies are streamed (duplex) so binary downloads (invoice /
 // proposal PDFs) pass through without buffering. When no service

@@ -11,10 +11,11 @@
 //   return the bare row; delete returns { success: true }. 404 messages
 //   ("Expense category not found", "Expense not found", "Invoice not
 //   found", "Payment method not found", "Payment not found") are preserved.
-// - The sources ran through createFinanceRepositories (@repo/finance,
-//   postgres.js over the shared getSql() singleton — TCP, Workers-
-//   incompatible). The repository logic is re-implemented here with direct
-//   Drizzle over the Neon HTTP db (getApiDb): explicit column handling is
+// - The sources ran through createFinanceRepositories (@repo/finance —
+//   package deleted 2026-11-26, dead-code B3 — postgres.js over the
+//   shared getSql() singleton — TCP, Workers-incompatible). The
+//   repository logic is re-implemented here with direct Drizzle over
+//   the Neon HTTP db (getApiDb): explicit column handling is
 //   unnecessary because Drizzle rows are already keyed by the schema's
 //   camelCase property names, so no case conversion is applied.
 // - Validation mirrors the @repo/validation finance.ts Zod schemas
@@ -22,8 +23,8 @@
 //   @repo/validation). A failed parse returns the first issue's message
 //   with 400, exactly as the sources. `createdBy` is never taken from the
 //   body: it is stamped from the session user, as in the sources.
-// - Money logic mirrors packages/finance/src/currency.ts + the
-//   repositories: BDT is the base currency; non-BDT amounts require an
+// - Money logic mirrors the former packages/finance/src/currency.ts
+//   (deleted 2026-11-26) + the repositories: BDT is the base currency; non-BDT amounts require an
 //   exchange rate (400 "Exchange rate is required for ..."), amountBdt /
 //   totalBdt are always computed server-side, never trusted from the
 //   client. Expenses snapshot the category name into the legacy `category`
