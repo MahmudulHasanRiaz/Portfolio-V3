@@ -450,15 +450,27 @@ main {
 /* A11y (2026-11-09): keyboard focus — several links/buttons had no
    visible focus style at all (.btn, nav links, .deck-card, globe
    tags, picker rows). Every link/button now gets a teal ring on
-   keyboard focus. Components with their own :focus-visible ring
-   (corner-btn, pill-rotate-btn, chev-btn, deck-dot, home-fab,
+   keyboard focus. The ring is a box-shadow, not an outline: outlines
+   ignore border-radius in Safari and draw square on rounded elements,
+   while box-shadow follows each element's own radius (same pattern as
+   the pill buttons below). Components with their own :focus-visible
+   ring (corner-btn, pill-rotate-btn, chev-btn, deck-dot, home-fab,
    picker-resume-btn, release-card-link, pill-profile-btn,
    pill-menu-btn) keep theirs — their
    class-scoped rules outrank this one. */
+/* Mobile tap (2026-11-26): suppress the browser's default tap
+   highlight — a square rectangle that ignores border-radius — on
+   links/buttons. The site's own :active/:hover feedback is untouched. */
+a,
+button {
+	-webkit-tap-highlight-color: transparent;
+}
 a:focus-visible,
 button:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 2px;
+	outline: none;
+	box-shadow:
+		0 0 0 2px var(--bg),
+		0 0 0 4px var(--accent);
 }
 
 /* ---------- Buttons (subtle hover, desktop-only) ---------- */
@@ -1231,8 +1243,10 @@ button:focus-visible {
 }
 
 .home-fab:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 2px;
+	outline: none;
+	box-shadow:
+		0 0 0 2px var(--bg),
+		0 0 0 4px var(--accent);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2548,8 +2562,10 @@ html[lang="bn"] .hero-name {
 
 .chev-btn:focus-visible,
 .deck-dot:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 2px;
+	outline: none;
+	box-shadow:
+		0 0 0 2px var(--bg),
+		0 0 0 4px var(--accent);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -3634,8 +3650,10 @@ button.tag:hover {
 
 .media-thumb:focus-visible,
 .media-scroll-frame:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 2px;
+	outline: none;
+	box-shadow:
+		0 0 0 2px var(--bg),
+		0 0 0 4px var(--accent);
 }
 
 /* Full-page screenshots (screencapture-* / *-full) sit in a tall
@@ -4866,8 +4884,10 @@ button.tag:hover {
 }
 
 .release-card-link:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 2px;
+	outline: none;
+	box-shadow:
+		0 0 0 2px var(--bg),
+		0 0 0 4px var(--accent);
 }
 
 /* Aspect-video thumbnail on top of the card. */
@@ -5872,8 +5892,10 @@ button.tag:hover {
 }
 
 .form-field .service-select-btn:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 2px;
+	outline: none;
+	box-shadow:
+		0 0 0 2px var(--bg),
+		0 0 0 4px var(--accent);
 }
 
 .service-select-value {
@@ -5935,8 +5957,10 @@ button.tag:hover {
 }
 
 .service-select-option:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 1px;
+	outline: none;
+	box-shadow:
+		0 0 0 2px var(--bg),
+		0 0 0 4px var(--accent);
 }
 
 .service-select-check {
