@@ -275,6 +275,9 @@ export const CONTENT_CACHE_TAGS: Record<string, string> = {
   projects: "projects",
   posts: "posts",
   case_studies: "case-studies",
+  // Services archive (2026-11-26): service saves purge "services"
+  // (+ "home" via cacheTagsForContentType) so /services/ refreshes.
+  services: "services",
 };
 
 export function cacheTagsForContentType(typeName: string): string[] {

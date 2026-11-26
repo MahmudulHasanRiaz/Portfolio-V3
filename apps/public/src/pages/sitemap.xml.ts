@@ -33,6 +33,7 @@ const STATIC_PATHS = [
 	"/skills",
 	"/education",
 	"/experience",
+	"/services",
 ];
 
 const DETAIL_TYPES = [

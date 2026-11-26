@@ -131,9 +131,13 @@ export default defineConfig({
 		"/skills": { maxAge: 3600, swr: 300, tags: ["skills"] },
 		"/education": { maxAge: 3600, swr: 300, tags: ["education"] },
 		"/experience": { maxAge: 3600, swr: 300, tags: ["experience"] },
+		// Services archive (2026-11-26): purged by the "services" tag
+		// on service saves (CONTENT_CACHE_TAGS in apps/api).
+		"/services": { maxAge: 3600, swr: 300, tags: ["services"] },
 		"/bn/skills": { maxAge: 3600, swr: 300, tags: ["skills"] },
 		"/bn/education": { maxAge: 3600, swr: 300, tags: ["education"] },
 		"/bn/experience": { maxAge: 3600, swr: 300, tags: ["experience"] },
+		"/bn/services": { maxAge: 3600, swr: 300, tags: ["services"] },
 		"/": {
 			maxAge: 3600,
 			swr: 300,

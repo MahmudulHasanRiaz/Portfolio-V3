@@ -11,6 +11,7 @@ export const en: Dict = {
 	navVentures: "Ventures",
 	navReleases: "Releases",
 	navProjects: "Projects",
+	navServices: "Services",
 	navCaseStudies: "Case Studies",
 	navPosts: "Posts",
 	navSkills: "Skills",
@@ -66,6 +67,7 @@ export const en: Dict = {
 	// Home sections
 	projectsTitle: "Projects",
 	viewAllProjects: "View all projects →",
+	viewAllServices: "View all services →",
 	viewAllCaseStudies: "View all case studies →",
 	viewAllPosts: "View all posts →",
 	viewAllReleases: "View all releases →",
@@ -150,6 +152,7 @@ export const en: Dict = {
 	backHome: "← Back to home",
 	homeName: "Home",
 	allProjects: "All projects",
+	allServices: "All services",
 	allPosts: "All posts",
 	allReleases: "All releases",
 	allVentures: "All ventures",
@@ -164,6 +167,7 @@ export const en: Dict = {
 	showingVentures: "Showing {shown} of {total} ventures",
 	showingCaseStudies: "Showing {shown} of {total} case studies",
 	emptyProjects: "No projects published yet.",
+	emptyServices: "No services published yet.",
 	emptyPosts: "No posts published yet.",
 	emptyCaseStudies: "No case studies published yet.",
 	emptyVentures: "No ventures published yet.",
@@ -305,6 +309,9 @@ export const en: Dict = {
 	projectsPageTitle: "All projects — Mahmudul Hasan Riaz",
 	projectsPageDescription:
 		"All projects by Mahmudul Hasan Riaz — ERP, SaaS and e-commerce systems for businesses in Bangladesh and beyond.",
+	servicesPageTitle: "All services — Mahmudul Hasan Riaz",
+	servicesPageDescription:
+		"All services by Mahmudul Hasan Riaz — ERP/CRM development, custom websites, e-commerce consultancy and WordPress development for businesses in Bangladesh and beyond.",
 	postsPageTitle: "All posts — Mahmudul Hasan Riaz",
 	postsPageDescription:
 		"Posts by Mahmudul Hasan Riaz — ERP, e-commerce, WordPress, and nasheed.",

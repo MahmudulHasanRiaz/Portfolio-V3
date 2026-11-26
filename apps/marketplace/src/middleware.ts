@@ -56,7 +56,7 @@ import { runWithLiveFallbackTracking } from "./lib/live-fallback";
 const DETAIL_ROUTE_RE =
 	/^\/(bn\/)?(posts|projects|case-studies|ventures|releases)\/[^/]+\/?$/;
 
-// Archives + Know Me + Skills + Education (EN + BN). The homepage
+// Archives + Know Me + Skills + Education + Services (EN + BN). The homepage
 // pattern also matches "/bn" and "/bn/". (MARKETPLACE COPY: no
 // "platforms" here — the Platforms pages do not exist on this copy.)
 // PR #25: `skills|education` were missing here while the routeRules in
@@ -70,7 +70,7 @@ const DETAIL_ROUTE_RE =
 // ghosted the two pages together. Keep this regex in sync with the
 // routeRules; a route missing here silently loses browser caching.
 const LIST_ROUTE_RE =
-	/^\/(bn\/)?(posts|projects|case-studies|ventures|releases|know-me|skills|education|experience)\/?$/;
+	/^\/(bn\/)?(posts|projects|case-studies|ventures|releases|know-me|skills|education|experience|services)\/?$/;
 const HOME_ROUTE_RE = /^\/(bn\/?)?$/;
 
 // Keep in sync with the routeRules in astro.config.mjs (all content
