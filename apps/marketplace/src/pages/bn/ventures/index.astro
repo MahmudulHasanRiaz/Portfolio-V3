@@ -1,7 +1,7 @@
 ---
 import Layout from "../../../layouts/Layout.astro";
 import { getVentures, formatDate, truncateShort, slugify } from "../../../lib/content";
-import { applySiteCopy, getDict, langUrl, localizeData, showingLabel } from "../../../lib/i18n";
+import { applySiteCopy, getDict, langUrl, localizeData, showingLabel, ventureStageBn } from "../../../lib/i18n";
 import { getSiteSettings } from "../../../lib/settings";
 import ThumbImage from "../../../components/ThumbImage.astro";
 import ArchiveFilter from "../../../components/ArchiveFilter.astro";
@@ -35,7 +35,11 @@ const filterItems = [...tagCounts.entries()].map(([facet, count]) => ({
 	// The chip LABEL stays the human text. The slug is language-neutral,
 	// so the same ?filter= value works on the EN and BN pages.
 	value: slugify(facet),
-	label: facet,
+	// The chip LABEL is the human text — on /bn/ the known English
+	// stage values are mapped to Bangla (ventureStageBn). The VALUE
+	// stays the language-neutral slug, so the same ?filter= works on
+	// the EN and BN pages.
+	label: ventureStageBn(facet),
 	count,
 }));
 
