@@ -68,4 +68,5 @@ const sections: { title: string; description: string; href?: string }[] = [
   { title: "Site Copy", description: "Edit the Know Me bio paragraphs (English + Bangla) shown on the public site", href: "/dashboard/settings/site-copy" },
   { title: "Search Engine Indexing", description: "Turn search engine indexing on or off for the public site. Off by default — enable it only when the site is final.", href: "/dashboard/settings/search-indexing" },
   { title: "Website Integrations", description: "Manage the Bearer tokens the public website uses to fetch live content — create, regenerate, revoke, or delete integrations.", href: "/dashboard/settings/website-integrations" },
+  { title: "Social Login", description: "Google and GitHub sign-in for the admin — OAuth credentials, enable/disable, and the callback URLs to paste into each provider.", href: "/dashboard/settings/social-login" },
 ];

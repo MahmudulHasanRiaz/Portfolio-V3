@@ -9,7 +9,7 @@ Generated from the route definitions in `apps/api/src/routes/`. Every entry belo
 - Shared logic lives in `src/lib/` (`admin-auth`, `errors`, `rate-limit`, `side-effects`, `validate`, `public-content`, `integrations`, `default-language`, `shared`).
 - Auth: every `/api/admin/*` route calls `requireAuth` (a valid Better Auth session) unless marked "Public (no auth)" below. `/api/public/*` uses the content token (env token or per-integration token). `/api/auth/*` is the Better Auth handler. Every `/api/portal/*` route except the three auth endpoints resolves the signed-in Better Auth user to a portal client (`requirePortalClient`) and returns 401 otherwise.
 
-**Total: 291 routes.**
+**Total: 293 routes.**
 
 ## public (4 routes)
 
@@ -378,7 +378,7 @@ Generated from the route definitions in `apps/api/src/routes/`. Every entry belo
 | GET | `/api/admin/seo/redirects/:id` | Authenticated | Get redirect by id | `admin/seo.ts` |
 | PUT | `/api/admin/seo/redirects/:id` | Authenticated | Update redirect | `admin/seo.ts` |
 
-## settings (25 routes)
+## settings (27 routes)
 
 | Method | Path | Auth | What it does | File |
 |---|---|---|---|---|
@@ -407,6 +407,8 @@ Generated from the route definitions in `apps/api/src/routes/`. Every entry belo
 | PUT | `/api/admin/settings/search-indexing` | Authenticated | Update search-indexing | `admin/settings/values.ts` |
 | GET | `/api/admin/settings/site-copy` | Authenticated | List site-copy | `admin/settings/values.ts` |
 | PUT | `/api/admin/settings/site-copy` | Authenticated | Update site-copy | `admin/settings/values.ts` |
+| GET | `/api/admin/settings/social-login` | Authenticated | List social-login | `admin/settings/social-login.ts` |
+| PUT | `/api/admin/settings/social-login` | Authenticated | Update social-login | `admin/settings/social-login.ts` |
 
 ## timeline (4 routes)
 

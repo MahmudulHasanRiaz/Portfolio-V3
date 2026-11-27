@@ -65,7 +65,7 @@ export async function delegateToBetterAuth(
     headers,
     body: JSON.stringify(body),
   });
-  return getAuth().handler(req);
+  return (await getAuth()).handler(req);
 }
 
 /** Display name for a client (used as the Better Auth user name). */
