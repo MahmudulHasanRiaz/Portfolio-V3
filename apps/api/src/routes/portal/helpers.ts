@@ -19,6 +19,18 @@ import {
   proposalTemplates,
   projectsFreelance,
 } from "@repo/database/schema";
+import { uuidSchema } from "@repo/validation";
+
+/**
+ * Log a portal error server-side and return a generic client-facing
+ * message. Never return a DB/driver error to the client: Neon wraps a
+ * failed query as "Failed query: <SQL>\nparams: <values>", so returning
+ * err.message leaks table/column names and submitted values.
+ */
+export function portalError(err: unknown, fallback: string): string {
+  console.error("[Portal API] Error:", err);
+  return fallback;
+}
 
 /** Parse a JSON request body; null when the body is absent or invalid. */
 export async function readJsonBody(
@@ -61,6 +73,9 @@ export async function resolveClientName(
   db: ApiDb,
   clientId: string,
 ): Promise<string> {
+  // A null/empty clientId must never reach the uuid column (Postgres
+  // throws and the driver wraps the SQL in the error).
+  if (!uuidSchema.safeParse(clientId).success) return "Client";
   const [row] = await db
     .select({ name: clients.name })
     .from(clients)
@@ -160,6 +175,10 @@ export async function getClientProject(
   id: string,
   clientId: string,
 ) {
+  // A non-UUID id must never reach the uuid column (Postgres throws and
+  // the driver wraps the SQL in the error) — treat it as "not found",
+  // exactly like the uuidParam guard on the detail routes.
+  if (!uuidSchema.safeParse(id).success) return null;
   const [project] = await db
     .select()
     .from(projectsFreelance)

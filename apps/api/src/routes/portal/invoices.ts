@@ -12,7 +12,7 @@ import {
   parsePagination,
   uuidParam,
 } from "../../lib/validate";
-import { requirePortalClient } from "./helpers";
+import { portalError, requirePortalClient } from "./helpers";
 
 const invoices = new Hono();
 
@@ -49,9 +49,7 @@ invoices.get("/", async (c) => {
       pageSize,
     });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to fetch invoices";
-    return c.json({ error: message }, 500);
+    return c.json({ error: portalError(err, "Failed to fetch invoices") }, 500);
   }
 });
 
@@ -84,9 +82,7 @@ invoices.get("/:id", async (c) => {
     }
     return c.json({ ...invoice, projectTitle });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to fetch invoice";
-    return c.json({ error: message }, 500);
+    return c.json({ error: portalError(err, "Failed to fetch invoice") }, 500);
   }
 });
 

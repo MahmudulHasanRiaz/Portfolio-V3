@@ -18,7 +18,7 @@ import {
   uuidParam,
 } from "../../lib/validate";
 import { dispatchTrigger } from "../admin/workflows/helpers";
-import { requirePortalClient } from "./helpers";
+import { portalError, requirePortalClient } from "./helpers";
 
 const proposals = new Hono();
 
@@ -93,9 +93,7 @@ proposals.get("/", async (c) => {
     const list = rows.map(toProposal);
     return c.json({ proposals: list, total: list.length, page, pageSize });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to fetch proposals";
-    return c.json({ error: message }, 500);
+    return c.json({ error: portalError(err, "Failed to fetch proposals") }, 500);
   }
 });
 
@@ -123,9 +121,7 @@ proposals.get("/:id", async (c) => {
     if (!row) return c.json({ error: "Proposal not found" }, 404);
     return c.json(toProposal(row));
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to fetch proposal";
-    return c.json({ error: message }, 500);
+    return c.json({ error: portalError(err, "Failed to fetch proposal") }, 500);
   }
 });
 
@@ -173,9 +169,7 @@ proposals.post("/:id/accept", async (c) => {
     });
     return c.json({ success: true, proposal: updated ?? proposal });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to accept proposal";
-    return c.json({ error: message }, 500);
+    return c.json({ error: portalError(err, "Failed to accept proposal") }, 500);
   }
 });
 
@@ -215,9 +209,7 @@ proposals.post("/:id/reject", async (c) => {
     }
     return c.json({ success: true, proposal: updated ?? proposal });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to reject proposal";
-    return c.json({ error: message }, 500);
+    return c.json({ error: portalError(err, "Failed to reject proposal") }, 500);
   }
 });
 

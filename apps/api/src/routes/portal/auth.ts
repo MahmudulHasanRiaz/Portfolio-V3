@@ -18,10 +18,12 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { getApiDb } from "../../db";
 import { portalSessions, projectsFreelance } from "@repo/database/schema";
+import { uuidSchema } from "@repo/validation";
 import {
   delegateToBetterAuth,
   findBaUserByEmail,
   logActivity,
+  portalError,
   readJsonBody,
   resolveClientName,
   updateLastAccessed,
@@ -64,6 +66,15 @@ auth.post("/login", async (c) => {
     }
 
     const db = getApiDb();
+    // A non-UUID projectId must never reach the uuid column: Postgres
+    // throws and the driver wraps the SQL in the error. Treat it exactly
+    // like an unknown project.
+    if (!uuidSchema.safeParse(projectId).success) {
+      return c.json(
+        { error: "Project not found or portal access not enabled" },
+        404,
+      );
+    }
     const [project] = await db
       .select()
       .from(projectsFreelance)
@@ -144,8 +155,7 @@ auth.post("/login", async (c) => {
     }
     return signInRes;
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Login failed";
-    return c.json({ error: message }, 401);
+    return c.json({ error: portalError(err, "Login failed") }, 401);
   }
 });
 
@@ -241,8 +251,7 @@ auth.post("/setup", async (c) => {
     }
     return signupRes;
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Setup failed";
-    return c.json({ error: message }, 500);
+    return c.json({ error: portalError(err, "Setup failed") }, 500);
   }
 });
 
@@ -278,8 +287,7 @@ auth.get("/verify", async (c) => {
       projectName: project?.title ?? "Unknown Project",
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Verification failed";
-    return c.json({ error: message }, 500);
+    return c.json({ error: portalError(err, "Verification failed") }, 500);
   }
 });
 

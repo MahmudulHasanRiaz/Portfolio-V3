@@ -20,6 +20,7 @@ import { z } from "zod";
 import {
   getClientProjectIds,
   logActivity,
+  portalError,
   readJsonBody,
   requirePortalClient,
 } from "./helpers";
@@ -55,9 +56,7 @@ deliverables.get("/", async (c) => {
       pageSize,
     });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to fetch deliverables";
-    return c.json({ error: message }, 500);
+    return c.json({ error: portalError(err, "Failed to fetch deliverables") }, 500);
   }
 });
 
@@ -91,9 +90,7 @@ deliverables.get("/:id", async (c) => {
     }
     return c.json(deliverable);
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to fetch deliverable";
-    return c.json({ error: message }, 500);
+    return c.json({ error: portalError(err, "Failed to fetch deliverable") }, 500);
   }
 });
 
@@ -148,9 +145,7 @@ deliverables.post("/:id/feedback", async (c) => {
       deliverable: updated ?? deliverable,
     });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to submit feedback";
-    return c.json({ error: message }, 500);
+    return c.json({ error: portalError(err, "Failed to submit feedback") }, 500);
   }
 });
 

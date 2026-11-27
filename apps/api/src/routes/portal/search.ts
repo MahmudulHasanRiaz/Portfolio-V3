@@ -4,7 +4,11 @@
 import { Hono } from "hono";
 import { getApiDb } from "../../db";
 import { parsePagination, queryParam } from "../../lib/validate";
-import { portalSearch, requirePortalClient } from "./helpers";
+import {
+  portalError,
+  portalSearch,
+  requirePortalClient,
+} from "./helpers";
 
 const search = new Hono();
 
@@ -33,9 +37,7 @@ search.get("/", async (c) => {
       totalPages: Math.ceil(total / pageSize),
     });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Search failed";
-    return c.json({ error: message }, 500);
+    return c.json({ error: portalError(err, "Search failed") }, 500);
   }
 });
 
