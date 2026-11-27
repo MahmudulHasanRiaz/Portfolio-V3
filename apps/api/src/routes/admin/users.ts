@@ -49,13 +49,8 @@ app.get("/users", async (c) => {
       .orderBy(sql`${users.name} ASC NULLS LAST`, asc(users.email));
     return c.json(rows);
   } catch (err) {
-    return c.json(
-      {
-        error:
-          err instanceof Error ? err.message : "Failed to fetch users",
-      },
-      500,
-    );
+    console.error("[Admin Users API] Error:", err);
+    return c.json({ error: "Failed to fetch users" }, 500);
   }
 });
 

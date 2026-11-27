@@ -505,7 +505,7 @@ app.get("/seo/validate", async (c) => {
   } catch (err) {
     console.error("[SEO Validation API] Error:", err);
     return c.json(
-      { error: err instanceof Error ? err.message : "Validation failed." },
+      { error: "Validation failed." },
       500,
     );
   }

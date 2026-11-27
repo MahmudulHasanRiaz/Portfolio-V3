@@ -68,7 +68,7 @@ app.get("/sessions", async (c) => {
   } catch (err) {
     console.error("[Portal Sessions API] Error:", err);
     return c.json(
-      { error: err instanceof Error ? err.message : "Failed to fetch sessions" },
+      { error: "Failed to fetch sessions" },
       500,
     );
   }
@@ -122,7 +122,7 @@ app.get("/sessions/:id", async (c) => {
   } catch (err) {
     console.error("[Portal Sessions API] Error:", err);
     return c.json(
-      { error: err instanceof Error ? err.message : "Failed to fetch session" },
+      { error: "Failed to fetch session" },
       500,
     );
   }
@@ -154,7 +154,7 @@ app.post("/sessions/:id/disable", async (c) => {
   } catch (err) {
     console.error("[Portal Sessions API] Error:", err);
     return c.json(
-      { error: err instanceof Error ? err.message : "Failed to disable portal" },
+      { error: "Failed to disable portal" },
       500,
     );
   }
@@ -191,7 +191,7 @@ app.post("/sessions/:id/regenerate-token", async (c) => {
   } catch (err) {
     console.error("[Portal Sessions API] Error:", err);
     return c.json(
-      { error: err instanceof Error ? err.message : "Failed to regenerate token" },
+      { error: "Failed to regenerate token" },
       500,
     );
   }
