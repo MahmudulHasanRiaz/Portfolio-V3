@@ -16,6 +16,7 @@
     "@neondatabase/serverless": "^1.2.0",
     "@repo/database": "*",
     "@repo/validation": "*",
+    "bcryptjs": "^3.0.3",
     "better-auth": "^1.7.22",
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.18",
@@ -26,6 +27,7 @@
     "@cloudflare/workers-types": "^5.20261112.1",
     "@repo/eslint-config": "*",
     "@repo/typescript-config": "*",
+    "@types/bcryptjs": "^3.0.0",
     "typescript": "^7.0.2",
     "wrangler": "^4.161.0"
   }

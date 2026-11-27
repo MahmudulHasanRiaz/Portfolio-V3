@@ -4,12 +4,12 @@ Generated from the route definitions in `apps/api/src/routes/`. Every entry belo
 
 ## How the API is organized
 
-- `src/index.ts` mounts three top-level routers: `/api/public` (public content), `/api/admin` (admin CRUD, authenticated), `/api/auth` (Better Auth).
+- `src/index.ts` mounts four top-level routers: `/api/public` (public content), `/api/admin` (admin CRUD, authenticated), `/api/auth` (Better Auth), `/api/portal` (portal client API, authenticated).
 - `src/routes/admin/index.ts` mounts 29 sub-routers by resource (one per resource). Each resource is a directory (e.g. `routes/admin/finance/`) with focused files per sub-resource plus a `helpers.ts` and an `index.ts` that mounts them at `/`. The import `"./finance"` resolves to `finance/index.ts`, so the mount in `admin/index.ts` never changes when a resource is split.
 - Shared logic lives in `src/lib/` (`admin-auth`, `errors`, `rate-limit`, `side-effects`, `validate`, `public-content`, `integrations`, `default-language`, `shared`).
-- Auth: every `/api/admin/*` route calls `requireAuth` (a valid Better Auth session) unless marked "Public (no auth)" below. `/api/public/*` uses the content token (env token or per-integration token). `/api/auth/*` is the Better Auth handler.
+- Auth: every `/api/admin/*` route calls `requireAuth` (a valid Better Auth session) unless marked "Public (no auth)" below. `/api/public/*` uses the content token (env token or per-integration token). `/api/auth/*` is the Better Auth handler. Every `/api/portal/*` route except the three auth endpoints resolves the signed-in Better Auth user to a portal client (`requirePortalClient`) and returns 401 otherwise.
 
-**Total: 271 routes.**
+**Total: 291 routes.**
 
 ## public (4 routes)
 
@@ -256,6 +256,31 @@ Generated from the route definitions in `apps/api/src/routes/`. Every entry belo
 | GET | `/api/admin/portal/sessions/:id` | Authenticated | Get session by id | `admin/portal.ts` |
 | POST | `/api/admin/portal/sessions/:id/disable` | Authenticated | Run disable action (disable) | `admin/portal.ts` |
 | POST | `/api/admin/portal/sessions/:id/regenerate-token` | Authenticated | Run regenerate-token action (regenerate-token) | `admin/portal.ts` |
+
+## portal-client (20 routes)
+
+| Method | Path | Auth | What it does | File |
+|---|---|---|---|---|
+| POST | `/api/portal/auth/login` | Public (portal login) | Client login (Better Auth, legacy bcrypt migration on first login) | `portal/auth.ts` |
+| POST | `/api/portal/auth/setup` | Public (portal token) | Set up client password (Better Auth sign-up) | `portal/auth.ts` |
+| GET | `/api/portal/auth/verify` | Public (portal token) | Verify setup token | `portal/auth.ts` |
+| GET | `/api/portal/projects` | Authenticated (portal client) | List client's projects | `portal/projects.ts` |
+| GET | `/api/portal/projects/:id` | Authenticated (portal client) | Get project by id | `portal/projects.ts` |
+| GET | `/api/portal/projects/:id/activities` | Authenticated (portal client) | List project activities | `portal/projects.ts` |
+| GET | `/api/portal/projects/:id/milestones` | Authenticated (portal client) | List project milestones | `portal/projects.ts` |
+| GET | `/api/portal/projects/:id/deliverables` | Authenticated (portal client) | List project deliverables | `portal/projects.ts` |
+| GET | `/api/portal/deliverables` | Authenticated (portal client) | List client's deliverables | `portal/deliverables.ts` |
+| GET | `/api/portal/deliverables/:id` | Authenticated (portal client) | Get deliverable by id | `portal/deliverables.ts` |
+| POST | `/api/portal/deliverables/:id/feedback` | Authenticated (portal client) | Submit client feedback | `portal/deliverables.ts` |
+| GET | `/api/portal/proposals` | Authenticated (portal client) | List client's proposals | `portal/proposals.ts` |
+| GET | `/api/portal/proposals/:id` | Authenticated (portal client) | Get proposal by id | `portal/proposals.ts` |
+| POST | `/api/portal/proposals/:id/accept` | Authenticated (portal client) | Accept proposal | `portal/proposals.ts` |
+| POST | `/api/portal/proposals/:id/reject` | Authenticated (portal client) | Reject proposal | `portal/proposals.ts` |
+| GET | `/api/portal/invoices` | Authenticated (portal client) | List client's invoices | `portal/invoices.ts` |
+| GET | `/api/portal/invoices/:id` | Authenticated (portal client) | Get invoice by id | `portal/invoices.ts` |
+| GET | `/api/portal/messages` | Authenticated (portal client) | List messages | `portal/messages.ts` |
+| POST | `/api/portal/messages` | Authenticated (portal client) | Send message | `portal/messages.ts` |
+| GET | `/api/portal/search` | Authenticated (portal client) | Search client's portal data | `portal/search.ts` |
 
 ## products (5 routes)
 

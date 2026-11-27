@@ -77,6 +77,7 @@ function createAuth() {
     trustedOrigins: [
       "https://portfolio-v3-admin.riaaz.workers.dev",
       "https://portfolio-v3-public.riaaz.workers.dev",
+      "https://portfolio-v3-portal.riaaz.workers.dev",
     ],
   });
 }

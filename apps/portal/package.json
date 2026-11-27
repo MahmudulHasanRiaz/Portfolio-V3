@@ -9,16 +9,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@repo/database": "*",
-    "@repo/portal-pkg": "*",
     "@repo/ui": "*",
-    "@repo/workflows": "*",
     "next": "^16.4.6",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "lucide-react": "^1.72.0"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.17",
     "@repo/typescript-config": "*",
     "@repo/eslint-config": "*",
     "@types/react": "^19.3.0",

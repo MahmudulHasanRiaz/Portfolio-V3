@@ -16,6 +16,7 @@ import { HTTPException } from "hono/http-exception";
 import publicRoutes from "./routes/public";
 import adminRoutes from "./routes/admin";
 import authRoutes from "./routes/auth";
+import { portalRouter } from "./routes/portal";
 import { createRateLimiter } from "./lib/rate-limit";
 
 type Env = {
@@ -108,7 +109,8 @@ app.get("/health", (c) => c.json({ ok: true }));
 const api = app
   .route("/api/public", publicRoutes)
   .route("/api/admin", adminRoutes)
-  .route("/api/auth", authRoutes);
+  .route("/api/auth", authRoutes)
+  .route("/api/portal", portalRouter);
 
 api.notFound((c) => c.json({ error: "Not found" }, 404));
 api.onError((err, c) => {
