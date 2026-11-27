@@ -241,10 +241,8 @@ app.get("/", async (c) => {
       },
     });
   } catch (err) {
-    return c.json(
-      { error: err instanceof Error ? err.message : "Failed to fetch media" },
-      500,
-    );
+    console.error("[Admin Media API] Error:", err);
+    return c.json({ error: "Failed to fetch media" }, 500);
   }
 });
 
@@ -393,10 +391,8 @@ app.post("/upload", async (c) => {
     if (err instanceof MediaError) {
       return c.json({ error: err.message }, err.statusCode);
     }
-    return c.json(
-      { error: err instanceof Error ? err.message : "Upload failed" },
-      500,
-    );
+    console.error("[Admin Media API] Error:", err);
+    return c.json({ error: "Upload failed" }, 500);
   }
 });
 
@@ -457,10 +453,8 @@ app.post("/bulk-move", async (c) => {
     }
     return c.json({ success: true, moved: toMove.length, failed });
   } catch (err) {
-    return c.json(
-      { error: err instanceof Error ? err.message : "Failed to move media" },
-      500,
-    );
+    console.error("[Admin Media API] Error:", err);
+    return c.json({ error: "Failed to move media" }, 500);
   }
 });
 
@@ -479,10 +473,8 @@ app.get("/usage/:id", async (c) => {
     if (err instanceof NotFoundError) {
       return c.json({ error: err.message }, 404);
     }
-    return c.json(
-      { error: err instanceof Error ? err.message : "Failed to find usage" },
-      500,
-    );
+    console.error("[Admin Media API] Error:", err);
+    return c.json({ error: "Failed to find usage" }, 500);
   }
 });
 
@@ -550,10 +542,8 @@ app.get("/:id/download", async (c) => {
     if (err instanceof MediaError) {
       return c.json({ error: err.message }, err.statusCode);
     }
-    return c.json(
-      { error: err instanceof Error ? err.message : "Download failed" },
-      500,
-    );
+    console.error("[Admin Media API] Error:", err);
+    return c.json({ error: "Download failed" }, 500);
   }
 });
 
@@ -583,10 +573,8 @@ app.post("/:id/restore", async (c) => {
     if (err instanceof NotFoundError) {
       return c.json({ error: err.message }, 404);
     }
-    return c.json(
-      { error: err instanceof Error ? err.message : "Failed to restore media" },
-      500,
-    );
+    console.error("[Admin Media API] Error:", err);
+    return c.json({ error: "Failed to restore media" }, 500);
   }
 });
 
@@ -603,10 +591,8 @@ app.get("/:id", async (c) => {
     if (err instanceof NotFoundError) {
       return c.json({ error: err.message }, 404);
     }
-    return c.json(
-      { error: err instanceof Error ? err.message : "Failed to fetch media" },
-      500,
-    );
+    console.error("[Admin Media API] Error:", err);
+    return c.json({ error: "Failed to fetch media" }, 500);
   }
 });
 
@@ -652,10 +638,8 @@ async function updateAssetHandler(c: Context<Env>) {
     if (err instanceof MediaError) {
       return c.json({ error: err.message }, err.statusCode);
     }
-    return c.json(
-      { error: err instanceof Error ? err.message : "Failed to update media" },
-      500,
-    );
+    console.error("[Admin Media API] Error:", err);
+    return c.json({ error: "Failed to update media" }, 500);
   }
 }
 
@@ -676,10 +660,8 @@ app.delete("/:id", async (c) => {
     if (err instanceof NotFoundError) {
       return c.json({ error: err.message }, 404);
     }
-    return c.json(
-      { error: err instanceof Error ? err.message : "Failed to delete media" },
-      500,
-    );
+    console.error("[Admin Media API] Error:", err);
+    return c.json({ error: "Failed to delete media" }, 500);
   }
 });
 

@@ -64,7 +64,11 @@ const app = new Hono<Env>();
 type Db = ReturnType<typeof getApiDb>;
 
 function errorMessage(err: unknown, fallback: string): string {
-  return err instanceof Error ? err.message : fallback;
+  // Never return a DB/driver error to the client: Neon wraps a failed
+  // query as "Failed query: <SQL>\nparams: <values>", so returning
+  // err.message leaks table/column names and submitted values.
+  console.error("[Admin Revisions API] Error:", err);
+  return fallback;
 }
 
 const ENTITY_TYPES = ["pages", "posts", "services", "projects", "case_studies"];

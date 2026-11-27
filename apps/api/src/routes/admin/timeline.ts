@@ -55,7 +55,11 @@ type Env = {
 const app = new Hono<Env>();
 
 function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : "Unknown error";
+  // Never return a DB/driver error to the client: Neon wraps a failed
+  // query as "Failed query: <SQL>\nparams: <values>", so returning
+  // err.message leaks table/column names and submitted values.
+  console.error("[Admin Timeline API] Error:", err);
+  return "Unknown error";
 }
 
 // GET / — list timeline events (paginated).

@@ -66,7 +66,7 @@ app.get("/search/synonyms", async (c) => {
   } catch (err) {
     console.error("[Search Synonyms API] Error:", err);
     return c.json(
-      { error: err instanceof Error ? err.message : "Failed to list synonyms." },
+      { error: "Failed to list synonyms." },
       500,
     );
   }
@@ -96,7 +96,7 @@ app.post("/search/synonyms", async (c) => {
   } catch (err) {
     console.error("[Search Synonyms API] Error:", err);
     return c.json(
-      { error: err instanceof Error ? err.message : "Failed to create synonym." },
+      { error: "Failed to create synonym." },
       500,
     );
   }
@@ -135,7 +135,7 @@ app.patch("/search/synonyms/:id", async (c) => {
   } catch (err) {
     console.error("[Search Synonyms API] Error:", err);
     return c.json(
-      { error: err instanceof Error ? err.message : "Failed to update synonym." },
+      { error: "Failed to update synonym." },
       500,
     );
   }
@@ -156,7 +156,7 @@ app.delete("/search/synonyms/:id", async (c) => {
   } catch (err) {
     console.error("[Search Synonyms API] Error:", err);
     return c.json(
-      { error: err instanceof Error ? err.message : "Failed to delete synonym." },
+      { error: "Failed to delete synonym." },
       500,
     );
   }

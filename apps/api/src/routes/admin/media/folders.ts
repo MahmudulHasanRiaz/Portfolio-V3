@@ -48,10 +48,8 @@ app.get("/folders", async (c) => {
     const folders = await listFolders(db, null);
     return c.json({ success: true, data: folders });
   } catch (err) {
-    return c.json(
-      { error: err instanceof Error ? err.message : "Failed to fetch folders" },
-      500,
-    );
+    console.error("[Admin Media API] Error:", err);
+    return c.json({ error: "Failed to fetch folders" }, 500);
   }
 });
 
@@ -129,10 +127,8 @@ app.post("/folders", async (c) => {
     if (err instanceof MediaError) {
       return c.json({ error: err.message }, err.statusCode);
     }
-    return c.json(
-      { error: err instanceof Error ? err.message : "Failed to create folder" },
-      500,
-    );
+    console.error("[Admin Media API] Error:", err);
+    return c.json({ error: "Failed to create folder" }, 500);
   }
 });
 
@@ -154,10 +150,8 @@ app.get("/folders/:id", async (c) => {
     if (err instanceof NotFoundError) {
       return c.json({ error: err.message }, 404);
     }
-    return c.json(
-      { error: err instanceof Error ? err.message : "Failed to fetch folder" },
-      500,
-    );
+    console.error("[Admin Media API] Error:", err);
+    return c.json({ error: "Failed to fetch folder" }, 500);
   }
 });
 
@@ -229,10 +223,8 @@ async function renameFolderHandler(c: Context<Env>) {
     if (err instanceof NotFoundError) {
       return c.json({ error: err.message }, 404);
     }
-    return c.json(
-      { error: err instanceof Error ? err.message : "Failed to rename folder" },
-      500,
-    );
+    console.error("[Admin Media API] Error:", err);
+    return c.json({ error: "Failed to rename folder" }, 500);
   }
 }
 
@@ -317,10 +309,8 @@ app.delete("/folders/:id", async (c) => {
     if (err instanceof MediaError) {
       return c.json({ error: err.message }, err.statusCode);
     }
-    return c.json(
-      { error: err instanceof Error ? err.message : "Failed to delete folder" },
-      500,
-    );
+    console.error("[Admin Media API] Error:", err);
+    return c.json({ error: "Failed to delete folder" }, 500);
   }
 });
 
