@@ -10,7 +10,18 @@ import Link from "next/link";
  * row, key "social_login"). The API never returns a client secret:
  * GET reports `configured` + a masked client-ID prefix only, and PUT
  * treats an empty secret as "keep the stored one", so this form never
- * has to re-send a secret it cannot see.
+ * has to re-send a secret it cannot see. A stored secret is removed
+ * only via the per-provider "Remove secret" button, which sends
+ * `clearSecret: true` with the next save (emptying the field alone
+ * can never delete it).
+ *
+ * AUTOFILL: the client-ID/secret fields must never be filled by the
+ * browser password manager (it once offered the saved admin email as
+ * the Google Client ID). Chrome ignores autoComplete="off" on
+ * credential-looking fields, so the secret uses
+ * autoComplete="new-password" (never fill a saved password) and both
+ * fields use neutral name/id tokens with no username/email/login
+ * token, so no manager pairs them into a login form.
  *
  * Social sign-in can never create an account (both providers run with
  * disableImplicitSignUp): only an email that already has an admin
@@ -57,6 +68,9 @@ interface ProviderForm {
   clientId: string;
   /** Typed secret only — always "" when loaded (the API never returns it). */
   clientSecret: string;
+  /** Set by "Remove secret" — sent as clearSecret on save; typing a
+   *  new secret clears it again. */
+  clearSecret: boolean;
   configured: boolean;
   clientIdPrefix: string | null;
 }
@@ -65,6 +79,7 @@ const EMPTY_PROVIDER: ProviderForm = {
   enabled: false,
   clientId: "",
   clientSecret: "",
+  clearSecret: false,
   configured: false,
   clientIdPrefix: null,
 };
@@ -100,6 +115,7 @@ function applyLoaded(
       enabled: p.enabled === true,
       clientId: typeof p.clientId === "string" ? p.clientId : "",
       clientSecret: "",
+      clearSecret: false,
       configured: p.configured === true,
       clientIdPrefix:
         typeof p.clientIdPrefix === "string" ? p.clientIdPrefix : null,
@@ -153,11 +169,13 @@ export default function SocialLoginSettingsPage() {
             enabled: google.enabled,
             clientId: google.clientId.trim(),
             clientSecret: google.clientSecret.trim(),
+            clearSecret: google.clearSecret,
           },
           github: {
             enabled: github.enabled,
             clientId: github.clientId.trim(),
             clientSecret: github.clientSecret.trim(),
+            clearSecret: github.clearSecret,
           },
         }),
       });
@@ -252,11 +270,12 @@ export default function SocialLoginSettingsPage() {
             Enable {meta.name} sign-in
           </label>
           <div>
-            <label htmlFor={`${id}-client-id`} style={labelStyle}>
+            <label htmlFor={`${id}-oauth-key`} style={labelStyle}>
               Client ID
             </label>
             <input
-              id={`${id}-client-id`}
+              id={`${id}-oauth-key`}
+              name={`${id}-oauth-key`}
               type="text"
               value={form.clientId}
               onChange={(e) => update({ clientId: e.target.value })}
@@ -272,16 +291,19 @@ export default function SocialLoginSettingsPage() {
             />
           </div>
           <div>
-            <label htmlFor={`${id}-client-secret`} style={labelStyle}>
+            <label htmlFor={`${id}-oauth-secret`} style={labelStyle}>
               Client secret
             </label>
             <input
-              id={`${id}-client-secret`}
+              id={`${id}-oauth-secret`}
+              name={`${id}-oauth-secret`}
               type="password"
               value={form.clientSecret}
-              onChange={(e) => update({ clientSecret: e.target.value })}
+              onChange={(e) =>
+                update({ clientSecret: e.target.value, clearSecret: false })
+              }
               maxLength={500}
-              autoComplete="off"
+              autoComplete="new-password"
               spellCheck={false}
               placeholder={
                 form.configured
@@ -295,6 +317,29 @@ export default function SocialLoginSettingsPage() {
               sign-in (OAuth requires it) — it is never shown again after
               saving.
             </p>
+            {form.configured && (
+              <div style={{ marginTop: 8 }}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    update({
+                      clientSecret: "",
+                      clearSecret: true,
+                      configured: false,
+                    })
+                  }
+                >
+                  Remove secret
+                </Button>
+              </div>
+            )}
+            {form.clearSecret && (
+              <p style={hintStyle}>
+                Secret will be removed when you save. Typing a new secret
+                above cancels the removal.
+              </p>
+            )}
           </div>
           <div>
             <label htmlFor={`${id}-callback-url`} style={labelStyle}>
@@ -306,6 +351,7 @@ export default function SocialLoginSettingsPage() {
                 type="text"
                 value={callbackUrls[id]}
                 readOnly
+                autoComplete="off"
                 spellCheck={false}
                 style={{ ...inputStyle, flex: 1 }}
               />
@@ -352,9 +398,12 @@ export default function SocialLoginSettingsPage() {
         it is enabled here with both credentials saved.
       </p>
 
-      {loading ? (
-        <p style={{ color: "var(--text-muted)" }}>Loading…</p>
-      ) : (
+      {/* While loading, render no content node at all (and no
+          "Loading…" text): the fetch is one fast local call, and a
+          loading text node lingered in the accessibility tree after
+          the form had loaded. The page title and intro above stay
+          visible throughout. */}
+      {loading ? null : (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {renderProvider("google", google)}
           {renderProvider("github", github)}

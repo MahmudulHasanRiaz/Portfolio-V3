@@ -9,7 +9,9 @@
 // - The client secret is NEVER returned by GET (only `configured` +
 //   a masked client-ID prefix, like the integrations tokenPrefix) and
 //   never logged. PUT treats an empty secret as "keep the stored one",
-//   so the form never has to re-send a secret it cannot see.
+//   so the form never has to re-send a secret it cannot see; an
+//   explicit `clearSecret: true` on a provider REMOVES the stored
+//   secret (empty secret alone can never delete it, by design).
 // - An OAuth client secret MUST be stored read-back: Better Auth sends
 //   the raw secret to Google/GitHub on every code exchange, so hashing
 //   (as with Website Integration tokens) is impossible here. The
@@ -47,9 +49,12 @@ const app = new Hono<Env>();
 const providerSchema = z.object({
   enabled: z.boolean(),
   // Empty string clears the stored client ID. A secret of "" means
-  // "keep the stored secret" (the form never sees the stored value).
+  // "keep the stored secret" (the form never sees the stored value);
+  // `clearSecret: true` is the ONLY way to remove a stored secret.
+  // clearSecret wins over any secret value sent in the same request.
   clientId: z.string().max(SOCIAL_CLIENT_ID_MAX),
   clientSecret: z.string().max(SOCIAL_CLIENT_SECRET_MAX),
+  clearSecret: z.boolean().optional(),
 });
 
 const socialLoginSchema = z.object({
@@ -165,12 +170,22 @@ app.put("/social-login", async (c) => {
 
 /** Merge one provider's submitted form over its stored row: an empty
  *  secret keeps the stored secret (the form never sees it); the
- *  client ID is taken as submitted (empty clears it). */
+ *  client ID is taken as submitted (empty clears it). `clearSecret`
+ *  removes the stored secret outright — the only way to delete one —
+ *  and wins over any secret value sent in the same request. */
 function mergeProvider(
-  submitted: { enabled: boolean; clientId: string; clientSecret: string },
+  submitted: {
+    enabled: boolean;
+    clientId: string;
+    clientSecret: string;
+    clearSecret?: boolean;
+  },
   stored: SocialProviderConfig,
 ): SocialProviderConfig {
   const clientId = submitted.clientId.trim();
+  if (submitted.clearSecret === true) {
+    return { enabled: submitted.enabled, clientId, clientSecret: "" };
+  }
   const submittedSecret = submitted.clientSecret.trim();
   return {
     enabled: submitted.enabled,
