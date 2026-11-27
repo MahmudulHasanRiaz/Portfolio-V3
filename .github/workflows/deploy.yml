@@ -1,13 +1,13 @@
-# Deploy — auto-deploy all four Cloudflare Workers on push to main.
+# Deploy — auto-deploy all five Cloudflare Workers on push to main.
 #
 # Trigger: a merge to main (push to main) deploys everything live, in
-# order: api first (the others read from it), then admin, then public
-# and marketplace. Manual dispatch is available for a redeploy without
-# a code change.
+# order: api first (the others read from it), then admin, then public,
+# marketplace and portal. Manual dispatch is available for a redeploy
+# without a code change.
 #
 # This replaces the old manual flow (wrangler deploy from a local
 # machine). After this file lands in main, no manual deploy is needed:
-# merge a PR to main and GitHub Actions deploys all four workers.
+# merge a PR to main and GitHub Actions deploys all five workers.
 #
 # Secrets (repo Settings → Secrets and variables → Actions):
 #   CLOUDFLARE_API_TOKEN — a Cloudflare API token with Workers deploy
@@ -87,3 +87,19 @@ jobs:
       - name: Deploy marketplace (portfolio-v3-marketplace)
         working-directory: apps/marketplace
         run: npx wrangler deploy
+
+      - name: Deploy portal (portfolio-v3-portal)
+        # Last: the portal reads from the API through the HONO_API
+        # service binding, so the API must be live first. Phase 5 PR-2
+        # (wrangler.jsonc + open-next.config.ts + next.config.mjs).
+        # No new secrets: the portal Worker holds no database or
+        # secret — Hono already has DATABASE_URL + BETTER_AUTH_SECRET.
+        working-directory: apps/portal
+        env:
+          # Same as admin: bypasses the opennextjs-cloudflare
+          # ensureR2Bucket failure (the portal has no R2 cache bucket;
+          # it uses the default incremental cache).
+          OPEN_NEXT_DEPLOY: "true"
+        run: |
+          npx opennextjs-cloudflare build
+          npx wrangler deploy
