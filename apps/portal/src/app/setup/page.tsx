@@ -18,7 +18,7 @@ function SetupForm() {
 
   useEffect(() => {
     if (!token) return;
-    fetch(`/api/auth/verify?token=${encodeURIComponent(token)}`)
+    fetch(`/api/portal/auth/verify?token=${encodeURIComponent(token)}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.projectId) setSessionInfo(data);
@@ -42,7 +42,7 @@ function SetupForm() {
     setError("");
 
     try {
-      const res = await fetch("/api/auth/setup", {
+      const res = await fetch("/api/portal/auth/setup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, email, password }),

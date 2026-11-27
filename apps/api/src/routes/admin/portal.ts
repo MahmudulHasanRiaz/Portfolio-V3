@@ -25,8 +25,13 @@
 //   token (Web Crypto — Workers-native) and writes it to both the
 //   session row and the denormalized copy on the freelance project.
 import { Hono } from "hono";
-import { desc, eq } from "drizzle-orm";
-import { portalSessions, projectsFreelance } from "@repo/database/schema";
+import { and, desc, eq, sql } from "drizzle-orm";
+import {
+  baAccount,
+  baUser,
+  portalSessions,
+  projectsFreelance,
+} from "@repo/database/schema";
 import { getApiDb } from "../../db";
 import { requireAuth } from "../../lib/admin-auth";
 import { invalidParam, uuidParam } from "../../lib/validate";
@@ -95,7 +100,25 @@ app.get("/sessions/:id", async (c) => {
       .limit(1);
     if (!row) return c.json({ error: "Not found" }, 404);
     const { passwordHash, ...rest } = row;
-    return c.json({ ...rest, hasPassword: passwordHash != null && passwordHash !== "" });
+    let hasPassword = passwordHash != null && passwordHash !== "";
+    if (!hasPassword && row.clientEmail) {
+      // A Better Auth credential account for the client email also counts
+      // as "password set": the portal login migrated to Better Auth, and
+      // new setups no longer write the legacy password_hash.
+      const [account] = await db
+        .select({ id: baAccount.id })
+        .from(baAccount)
+        .innerJoin(baUser, eq(baUser.id, baAccount.userId))
+        .where(
+          and(
+            eq(baAccount.providerId, "credential"),
+            sql`lower(${baUser.email}) = lower(${row.clientEmail})`,
+          ),
+        )
+        .limit(1);
+      hasPassword = !!account;
+    }
+    return c.json({ ...rest, hasPassword });
   } catch (err) {
     console.error("[Portal Sessions API] Error:", err);
     return c.json(
