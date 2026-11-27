@@ -11,7 +11,11 @@ import {
   projectsFreelance,
 } from "@repo/database/schema";
 import { invalidParam, parsePagination, uuidParam } from "../../lib/validate";
-import { getClientProject, requirePortalClient } from "./helpers";
+import {
+  getClientProject,
+  portalError,
+  requirePortalClient,
+} from "./helpers";
 
 const projects = new Hono();
 
@@ -51,9 +55,7 @@ projects.get("/", async (c) => {
       .limit(50);
     return c.json({ projects: rows, total: rows.length });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to fetch projects";
-    return c.json({ error: message }, 500);
+    return c.json({ error: portalError(err, "Failed to fetch projects") }, 500);
   }
 });
 
@@ -81,9 +83,7 @@ projects.get("/:id", async (c) => {
       createdAt: project.createdAt,
     });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to fetch project";
-    return c.json({ error: message }, 500);
+    return c.json({ error: portalError(err, "Failed to fetch project") }, 500);
   }
 });
 
@@ -106,9 +106,7 @@ projects.get("/:id/activities", async (c) => {
       .offset((page - 1) * pageSize);
     return c.json({ activities: rows, total: rows.length, page, pageSize });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to fetch activities";
-    return c.json({ error: message }, 500);
+    return c.json({ error: portalError(err, "Failed to fetch activities") }, 500);
   }
 });
 
@@ -131,9 +129,7 @@ projects.get("/:id/milestones", async (c) => {
       );
     return c.json({ milestones: rows, total: rows.length });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to fetch milestones";
-    return c.json({ error: message }, 500);
+    return c.json({ error: portalError(err, "Failed to fetch milestones") }, 500);
   }
 });
 
@@ -154,9 +150,7 @@ projects.get("/:id/deliverables", async (c) => {
       .orderBy(desc(projectDeliverables.submittedAt));
     return c.json({ deliverables: rows, total: rows.length });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to fetch deliverables";
-    return c.json({ error: message }, 500);
+    return c.json({ error: portalError(err, "Failed to fetch deliverables") }, 500);
   }
 });
 

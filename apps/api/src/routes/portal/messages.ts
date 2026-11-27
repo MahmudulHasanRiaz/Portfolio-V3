@@ -13,6 +13,7 @@ import { z } from "zod";
 import {
   getClientProject,
   getClientProjectIds,
+  portalError,
   readJsonBody,
   requirePortalClient,
 } from "./helpers";
@@ -53,9 +54,7 @@ messages.get("/", async (c) => {
     rows.reverse();
     return c.json({ messages: rows, total: rows.length, page, pageSize });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to fetch messages";
-    return c.json({ error: message }, 500);
+    return c.json({ error: portalError(err, "Failed to fetch messages") }, 500);
   }
 });
 
@@ -88,9 +87,7 @@ messages.post("/", async (c) => {
       .returning();
     return c.json({ success: true, message: inserted }, 201);
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Failed to send message";
-    return c.json({ error: message }, 500);
+    return c.json({ error: portalError(err, "Failed to send message") }, 500);
   }
 });
 
