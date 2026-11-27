@@ -29,7 +29,20 @@
   // answer 401 without the header, not 500).
   "triggers": { "crons": ["*/5 * * * *"] },
   "vars": {
-    "BETTER_AUTH_URL": "https://portfolio-v3-api.riaaz.workers.dev",
+    // Better Auth baseURL — MUST be the browser-facing ADMIN origin, not
+    // this worker's own URL. The OAuth redirect_uri is built from it
+    // ({baseURL}/api/auth/callback/<provider>), and the whole OAuth
+    // round-trip must stay on the admin origin: the state cookie set by
+    // /sign-in/social and the session cookie set by the callback land
+    // on the admin origin through the admin's /api/* proxy, and the
+    // browser is redirected back to the admin afterwards. With this
+    // worker's URL here, the callback would land on the API worker,
+    // the cookies would be set for the API origin (which the admin
+    // never sees), and social sign-in could never complete. Email /
+    // password sign-in is unaffected by this value (it is same-origin
+    // through the proxy either way), as are the portal's internal
+    // sign-up delegations (no redirects involved).
+    "BETTER_AUTH_URL": "https://portfolio-v3-admin.riaaz.workers.dev",
     // Public r2.dev URL of the portfolio-v3-media R2 bucket. The PDF
     // routes (finance invoices, proposal documents) store generated
     // PDFs under documents/ and return { pdfUrl } built from this

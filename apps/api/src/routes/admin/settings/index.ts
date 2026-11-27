@@ -5,11 +5,13 @@
 import { Hono } from "hono";
 import type { Env } from "./helpers";
 import integrationsRoutes from "./integrations";
+import socialLoginRoutes from "./social-login";
 import valuesRoutes from "./values";
 
 const app = new Hono<Env>();
 
 app.route("/", integrationsRoutes);
+app.route("/", socialLoginRoutes);
 app.route("/", valuesRoutes);
 
 export default app;

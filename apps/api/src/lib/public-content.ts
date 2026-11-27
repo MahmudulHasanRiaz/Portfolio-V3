@@ -44,6 +44,11 @@ import {
 } from "./default-language";
 import { SITE_NAME_KEY, SITE_TAGLINE_KEY } from "./general-settings";
 import {
+  getUsableSocialProviders,
+  normalizeSocialLoginConfig,
+  SOCIAL_LOGIN_KEY,
+} from "./social-login-settings";
+import {
   findActiveIntegrationByToken,
   hasActiveIntegration,
   touchIntegrationLastUsed,
@@ -1380,6 +1385,14 @@ export interface PublicSettings {
    * the key is absent/empty; Astro falls back to the live stats value
    * (chip 1) / build-time number (chip 2). */
   heroChips?: string[];
+  /** Social login providers the admin login page may offer (settings
+   * key `social_login`, edited at Settings → Social Login). Only
+   * providers that are enabled AND fully credentialed are listed —
+   * provider ids only, never any credential material. The public and
+   * marketplace sites ignore this field (their loaders pick known
+   * fields only); the admin login page reads it straight from this
+   * endpoint. Always present; [] when nothing is usable. */
+  socialProviders: ("google" | "github")[];
   bn?: PublicSettingsBn;
 }
 
@@ -1633,6 +1646,7 @@ export async function getPublicSettings(): Promise<PublicSettings> {
     availability: { ...AVAILABILITY_DEFAULT },
     searchIndexingEnabled: SEARCH_INDEXING_DEFAULT,
     designations: [],
+    socialProviders: [],
   };
   try {
     // PR #46: the stats row, the profile row and the founder row are
@@ -1668,6 +1682,7 @@ export async function getPublicSettings(): Promise<PublicSettings> {
       statsEntries,
       profile,
       founder,
+      socialLoginRow,
     ] = await Promise.all([
       findSetting(HERO_PORTRAIT_KEY),
       findSetting(FAVICON_KEY),
@@ -1698,6 +1713,7 @@ export async function getPublicSettings(): Promise<PublicSettings> {
       statsRow(getApiDb()),
       publicProfile(getApiDb()),
       founderRow(getApiDb()),
+      findSetting(SOCIAL_LOGIN_KEY),
     ]);
     // English stats: the valid row items, in row order. Bangla labels:
     // positional over ALL row items (null = no Bangla yet for that
@@ -1784,6 +1800,9 @@ export async function getPublicSettings(): Promise<PublicSettings> {
       ...(siteUrl ? { siteUrl } : {}),
       ...(stats ? { stats } : {}),
       ...(heroChips ? { heroChips } : {}),
+      socialProviders: getUsableSocialProviders(
+        normalizeSocialLoginConfig(socialLoginRow?.value ?? null),
+      ),
       bn: hasBn ? bn : undefined,
     };
   } catch {
