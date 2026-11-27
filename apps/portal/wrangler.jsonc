@@ -1,0 +1,46 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"main": ".open-next/worker.js",
+	"name": "portfolio-v3-portal",
+	"compatibility_date": "2026-11-12",
+	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	"services": [
+		{
+			// Self-reference service binding, the service name must match the worker name
+			// see https://opennext.js.org/cloudflare/caching
+			"binding": "WORKER_SELF_REFERENCE",
+			"service": "portfolio-v3-portal"
+		},
+		{
+			// Hono API service binding (Phase 5, portal port). A Worker
+			// CANNOT fetch another Worker's `*.workers.dev` URL from
+			// inside the Worker (Cloudflare "error code: 1042" — the
+			// `workers.dev` hostname does not resolve in the Worker's
+			// subrequest context). The /api/* proxy route
+			// (src/app/api/[...path]/route.ts) and the middleware session
+			// check (src/middleware.ts) therefore reach Hono through
+			// this binding instead of over HTTPS. It is the only
+			// free-tier path that works without a custom domain.
+			"binding": "HONO_API",
+			"service": "portfolio-v3-api"
+		}
+	],
+	"vars": {
+		// HONO_API_URL is the Hono worker base URL used as the local-dev
+		// fallback when the HONO_API service binding is unavailable
+		// (src/app/api/[...path]/route.ts). NODE_ENV is production.
+		// No other vars: the portal Worker needs no database or secret —
+		// Hono already holds DATABASE_URL + BETTER_AUTH_SECRET, and the
+		// portal authenticates through Hono's Better Auth handler.
+		"HONO_API_URL": "https://portfolio-v3-api.riaaz.workers.dev",
+		"NODE_ENV": "production"
+	}
+	// No r2_buckets: the portal uses the default incremental cache (no
+	// NEXT_INC_CACHE_R2_BUCKET binding). An R2 cache bucket can be added
+	// later via the dashboard, mirroring the admin's setup.
+	// No images binding: the portal uses no next/image.
+}
