@@ -147,7 +147,7 @@ export function maskClientId(clientId: string): string | null {
  *  from it — they must be the ADMIN origin, not the API worker's,
  *  so the OAuth state + session cookies land on the admin origin
  *  through the existing /api/* proxy (see apps/api/wrangler.jsonc). */
-export const ADMIN_ORIGIN = "https://portfolio-v3-admin.riaaz.workers.dev";
+export const ADMIN_ORIGIN = "https://admin.mahmudulhasanriaz.com";
 
 export function socialCallbackBaseUrl(): string {
   const base = (process.env.BETTER_AUTH_URL ?? ADMIN_ORIGIN).replace(

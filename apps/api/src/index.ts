@@ -67,6 +67,12 @@ app.use(
       "https://portfolio-v3-public.riaaz.workers.dev",
       "https://admin.riaz.com.bd",
       "https://portfolio-public.riaaz.workers.dev",
+      // Custom domains (2026-11-28) — the workers.dev origins stay
+      // listed as fallback; the custom domains are the live ones.
+      "https://admin.mahmudulhasanriaz.com",
+      "https://mahmudulhasanriaz.com",
+      "https://portal.mahmudulhasanriaz.com",
+      "https://marketplace.mahmudulhasanriaz.com",
     ],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],

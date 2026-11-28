@@ -32,7 +32,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
  *  runtime, set in wrangler.jsonc) or NEXT_PUBLIC_API_URL (build-time,
  *  also the rewrite destination in next.config.mjs). */
 export const DEFAULT_HONO_API_URL =
-  "https://portfolio-v3-api.riaaz.workers.dev";
+  "https://api.mahmudulhasanriaz.com";
 
 type HonoBinding = {
 	fetch: (req: Request) => Promise<Response>;

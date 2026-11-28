@@ -586,9 +586,8 @@ export interface PublicSettings {
 	 * Canonical site URL (settings key "site_url"; the API
 	 * camelCases it to "siteUrl"). Base for canonical links,
 	 * og:url, JSON-LD and sitemap URLs. Absent / invalid = the
-	 * live workers.dev URL (DEFAULT below). The custom domain
-	 * (mahmudulhasanriaz.com) stays disconnected until dev
-	 * finishes — never set it here.
+	 * live custom-domain URL (DEFAULT below, mahmudulhasanriaz.com
+	 * since 2026-11-28).
 	 */
 	siteUrl: string;
 	/** Admin-managed favicon URL (settings key "favicon_url"). Null =
@@ -681,7 +680,7 @@ export const DEFAULT_PUBLIC_SETTINGS: PublicSettings = {
 	defaultLanguage: "en",
 	availability: { available: false, badgeText: "Available for projects" },
 	searchIndexingEnabled: false,
-	siteUrl: "https://portfolio-public.riaaz.workers.dev",
+	siteUrl: "https://mahmudulhasanriaz.com",
 	heroHeadline: "I build products people rely on every day.",
 	heroDescription:
 		"ERP, e-commerce and SaaS systems for businesses in Bangladesh and beyond — designed to hold up at real-world scale.",

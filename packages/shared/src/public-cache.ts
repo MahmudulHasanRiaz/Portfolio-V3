@@ -14,7 +14,7 @@
 //
 // Configuration (admin env, never in the repo):
 //   PUBLIC_SITE_URL — the public Worker origin, e.g.
-//     https://portfolio-public.riaaz.workers.dev
+//     https://mahmudulhasanriaz.com
 //   CACHE_INVALIDATE_SECRET — the shared secret; MUST match the
 //     Cloudflare dashboard secret of the same name on the public Worker.
 //     The endpoint answers 503 while the secret is unset there, and 401

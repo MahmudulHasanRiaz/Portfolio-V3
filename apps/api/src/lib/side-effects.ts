@@ -82,9 +82,9 @@ function readEnv(env: unknown, key: string): string | undefined {
     : undefined;
 }
 
-/** Default public Worker origin (task brief); PUBLIC_SITE_URL overrides it. */
+/** Default public site origin; PUBLIC_SITE_URL overrides it. */
 export const DEFAULT_PUBLIC_SITE_URL =
-  "https://portfolio-v3-public.riaaz.workers.dev";
+  "https://mahmudulhasanriaz.com";
 
 function publicSiteUrl(env: unknown): string {
   const raw =
@@ -94,9 +94,9 @@ function publicSiteUrl(env: unknown): string {
   return raw.replace(/\/+$/, "");
 }
 
-/** Default marketplace Worker origin; MARKETPLACE_SITE_URL overrides it. */
+/** Default marketplace site origin; MARKETPLACE_SITE_URL overrides it. */
 export const DEFAULT_MARKETPLACE_SITE_URL =
-  "https://portfolio-v3-marketplace.riaaz.workers.dev";
+  "https://marketplace.mahmudulhasanriaz.com";
 
 function marketplaceSiteUrl(env: unknown): string {
   const raw =

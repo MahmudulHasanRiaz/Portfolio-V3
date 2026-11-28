@@ -176,6 +176,11 @@ function createAuth(social: SocialLoginConfig) {
       "https://portfolio-v3-admin.riaaz.workers.dev",
       "https://portfolio-v3-public.riaaz.workers.dev",
       "https://portfolio-v3-portal.riaaz.workers.dev",
+      // Custom domains (2026-11-28) — the workers.dev origins stay
+      // listed as fallback; the custom domains are the live ones.
+      "https://admin.mahmudulhasanriaz.com",
+      "https://mahmudulhasanriaz.com",
+      "https://portal.mahmudulhasanriaz.com",
     ],
   });
 }

@@ -48,7 +48,7 @@ type HonoBinding = {
 const HONO_API_URL = (
 	process.env.HONO_API_URL ??
 	process.env.NEXT_PUBLIC_API_URL ??
-	"https://portfolio-v3-api.riaaz.workers.dev"
+	"https://api.mahmudulhasanriaz.com"
 ).replace(/\/$/, "");
 
 async function getHonoBinding(): Promise<HonoBinding | null> {

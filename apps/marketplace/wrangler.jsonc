@@ -33,8 +33,9 @@
 	// public Worker). The loader (src/loaders/public-content.ts)
 	// therefore calls Hono through this binding
 	// (`env.HONO_API.fetch(...)`) instead of over HTTPS; it is the
-	// only free-tier path that works without a custom domain (which
-	// the user deferred). The PUBLIC_CONTENT_API_URL var above is
+	// only free-tier path that works without a custom domain. The
+	// custom domain is connected since 2026-11-28; the binding stays
+	// the production path. The PUBLIC_CONTENT_API_URL var above is
 	// still kept (and still used as the path source + the local-dev /
 	// build fallback); the binding only changes HOW the request
 	// reaches Hono, not what is requested or the Bearer token.
@@ -48,5 +49,5 @@
 	// 2026-11-13 (Hono cutover): the API is now the Hono worker, not
 	// the Next.js admin — this var MUST stay the Hono URL, or a deploy
 	// from this file reverts the cutover.
-	"vars": { "PUBLIC_CONTENT_API_URL": "https://portfolio-v3-api.riaaz.workers.dev", "PUBLIC_CONTENT_LIVE_BUILD": "1" }
+	"vars": { "PUBLIC_CONTENT_API_URL": "https://api.mahmudulhasanriaz.com", "PUBLIC_CONTENT_LIVE_BUILD": "1" }
 }

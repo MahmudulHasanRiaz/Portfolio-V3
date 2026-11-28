@@ -31,10 +31,11 @@ indexed by search engines.
 
 ## Hosting
 
-- Deployed as a separate Cloudflare Worker (e.g.
-  `portfolio-v3-marketplace.riaaz.workers.dev`).
-- The link used is the Cloudflare Worker link for now. A custom subdomain
-  may be added later (the owner's decision, after verifying the marketplace).
+- Deployed as a separate Cloudflare Worker, live on the custom domain
+  `marketplace.mahmudulhasanriaz.com` (the `*.workers.dev` URL still
+  works as a fallback).
+- The custom subdomain went live 2026-11-28, together with the other
+  four workers moving to mahmudulhasanriaz.com.
 - Cloudflare is the host now; it may change to another platform later.
 
 ## THE SYNC RULE (mandatory — for AI agents and human developers alike)
