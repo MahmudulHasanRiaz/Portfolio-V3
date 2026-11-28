@@ -23,8 +23,9 @@
 			// Worker's subrequest context). The /api/* proxy route
 			// (src/app/api/[...path]/route.ts) and the server actions
 			// (src/lib/hono-client.ts) therefore reach Hono through
-			// this binding instead of over HTTPS. It is the only
-			// free-tier path that works without a custom domain.
+			// this binding instead of over HTTPS. The binding stays the
+			// production path now that the custom domain is connected
+			// (2026-11-28); the custom-domain URL is the local-dev fallback.
 			"binding": "HONO_API",
 			"service": "portfolio-v3-api"
 		}
@@ -41,7 +42,7 @@
 		// next.config.mjs, but it is read at BUILD time, so it must be
 		// set in the build environment, not here. Both default to the
 		// production worker when unset.
-		"HONO_API_URL": "https://portfolio-v3-api.riaaz.workers.dev",
+		"HONO_API_URL": "https://api.mahmudulhasanriaz.com",
 		"NODE_ENV": "production"
 	},
 	"r2_buckets": [

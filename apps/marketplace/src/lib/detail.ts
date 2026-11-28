@@ -1,8 +1,8 @@
 // Shared detail-page helpers (Run 13 — detail-pages fix round).
 //
-// - SITE_URL is the site's ACTUAL live base URL. Canonical links,
-//   JSON-LD URLs and OG images all use it — never riaz.com.bd (the old /
-//   future domain) while the live site is on workers.dev.
+// - SITE_URL is the site's ACTUAL live base URL (the custom domain,
+//   live since 2026-11-28). Canonical links, JSON-LD URLs and OG
+//   images all use it.
 // - Body rendering: live entries carry their body as a plain `content`
 //   string. `parseBodyBlocks` turns it into the preview's content
 //   blocks ('## ' lines become h3 sub-headings, the rest
@@ -17,7 +17,7 @@
 //   invents content.
 
 export const SITE_URL =
-	"https://portfolio-v3-marketplace.riaaz.workers.dev";
+	"https://marketplace.mahmudulhasanriaz.com";
 
 /**
  * Origin of the incoming request (protocol + host, no path, no
@@ -69,7 +69,7 @@ export function requestOrigin(
  * arrive here as the same value — and the distinction does not matter:
  * in both cases the request host wins, which is the wanted behaviour.
  * Only a genuinely different admin value (e.g. the custom domain
- * mahmudulhasanriaz.com once it is connected) counts as an override.
+ * mahmudulhasanriaz.com, connected 2026-11-28) counts as an override.
  */
 export function isAdminSiteUrl(siteUrl?: string | null): siteUrl is string {
 	if (typeof siteUrl !== "string") return false;

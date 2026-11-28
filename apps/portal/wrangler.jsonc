@@ -23,8 +23,9 @@
 			// subrequest context). The /api/* proxy route
 			// (src/app/api/[...path]/route.ts) and the middleware session
 			// check (src/middleware.ts) therefore reach Hono through
-			// this binding instead of over HTTPS. It is the only
-			// free-tier path that works without a custom domain.
+			// this binding instead of over HTTPS. The binding stays the
+			// production path now that the custom domain is connected
+			// (2026-11-28); the custom-domain URL is the local-dev fallback.
 			"binding": "HONO_API",
 			"service": "portfolio-v3-api"
 		}
@@ -36,7 +37,7 @@
 		// No other vars: the portal Worker needs no database or secret —
 		// Hono already holds DATABASE_URL + BETTER_AUTH_SECRET, and the
 		// portal authenticates through Hono's Better Auth handler.
-		"HONO_API_URL": "https://portfolio-v3-api.riaaz.workers.dev",
+		"HONO_API_URL": "https://api.mahmudulhasanriaz.com",
 		"NODE_ENV": "production"
 	}
 	// No r2_buckets: the portal uses the default incremental cache (no

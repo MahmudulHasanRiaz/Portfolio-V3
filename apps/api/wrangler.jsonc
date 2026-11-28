@@ -11,9 +11,9 @@
   // admin saves. A Worker CANNOT fetch another Worker's
   // `*.workers.dev` URL from inside the Worker (Cloudflare "error
   // code: 1042"), so the purge goes through these bindings instead of
-  // over HTTPS — the only free-tier path that works without a custom
-  // domain. The PUBLIC_SITE_URL var is still kept as the local-dev /
-  // no-binding fallback. PR #21 added MARKETPLACE_SITE: the
+  // over HTTPS — the binding stays the production path now that
+  // the custom domain is connected (2026-11-28). The PUBLIC_SITE_URL
+  // var is still kept as the local-dev / no-binding fallback. PR #21 added MARKETPLACE_SITE: the
   // marketplace has the same tag-cached pages and the same
   // stale-fallback risk, but it was never purged.
   "services": [
@@ -42,7 +42,7 @@
     // password sign-in is unaffected by this value (it is same-origin
     // through the proxy either way), as are the portal's internal
     // sign-up delegations (no redirects involved).
-    "BETTER_AUTH_URL": "https://portfolio-v3-admin.riaaz.workers.dev",
+    "BETTER_AUTH_URL": "https://admin.mahmudulhasanriaz.com",
     // Public r2.dev URL of the portfolio-v3-media R2 bucket. The PDF
     // routes (finance invoices, proposal documents) store generated
     // PDFs under documents/ and return { pdfUrl } built from this
